@@ -18,7 +18,7 @@
 package org.apache.ambari.server.agent;
 
 
-public enum RegistrationStatus {
+public enum RequestStatus {
   OK,
   FAILED
 }

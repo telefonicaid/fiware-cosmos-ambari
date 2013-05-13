@@ -134,10 +134,6 @@ def main():
     logger.error(msg)
     print(msg)
     sys.exit(1)
-  else:
-    # Daemonize current instance of Ambari Agent
-    pid = str(os.getpid())
-    file(ProcessHelper.pidfile, 'w').write(pid)
 
   credential = None
 
@@ -175,7 +171,16 @@ def main():
   # Launch Controller communication
   controller = Controller(config)
   controller.start()
-  # TODO: is run() call necessary?
+  if (len(sys.argv) >1) and sys.argv[1]=='unregister':
+    controller.unregisterWithServer()
+    if not certMan.reqCrtRevoke():
+      logger.error("Could not revoke host's cert")
+    os._exit(0)
+
+  # Daemonize current instance of Ambari Agent
+  pid = str(os.getpid())
+  file(ProcessHelper.pidfile, 'w').write(pid)
+
   controller.run()
   logger.info("finished")
     

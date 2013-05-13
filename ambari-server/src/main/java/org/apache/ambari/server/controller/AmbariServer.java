@@ -41,6 +41,8 @@ import org.apache.ambari.server.orm.dao.MetainfoDAO;
 import org.apache.ambari.server.resources.ResourceManager;
 import org.apache.ambari.server.resources.api.rest.GetResource;
 import org.apache.ambari.server.security.CertificateManager;
+import org.apache.ambari.server.security.SecurityFilter;
+import org.apache.ambari.server.security.authorization.AmbariHostDetailsService;
 import org.apache.ambari.server.security.authorization.AmbariLdapAuthenticationProvider;
 import org.apache.ambari.server.security.authorization.AmbariLocalUserDetailsService;
 import org.apache.ambari.server.security.authorization.Users;
@@ -132,6 +134,8 @@ public class AmbariServer {
           injector.getInstance(PasswordEncoder.class));
       factory.registerSingleton("ambariLocalUserService",
           injector.getInstance(AmbariLocalUserDetailsService.class));
+      factory.registerSingleton("ambariHostService",
+          injector.getInstance(AmbariHostDetailsService.class));
       factory.registerSingleton("ambariLdapAuthenticationProvider",
           injector.getInstance(AmbariLdapAuthenticationProvider.class));
       //Spring Security xml config depends on this Bean
@@ -175,6 +179,8 @@ public class AmbariServer {
 
       //session-per-request strategy for api
       root.addFilter(new FilterHolder(injector.getInstance(AmbariPersistFilter.class)), "/api/*", 1);
+      agentroot.addFilter(new FilterHolder(injector.getInstance(SecurityFilter.class)), "/*", 1);
+      agentroot.addFilter(new FilterHolder(springSecurityFilter), "/*", 1);
 
       if (configs.getApiAuthentication()) {
         root.addFilter(new FilterHolder(springSecurityFilter), "/api/*", 1);

@@ -22,23 +22,26 @@
                     http://www.springframework.org/schema/security
                     http://www.springframework.org/schema/security/spring-security-3.1.xsd">
 
+  <http pattern="/certs/**" use-expressions="true" disable-url-rewriting="true">
+    <x509 subject-principal-regex="OU=(.+)" user-service-ref="ambariHostService" />
+  </http>
+
   <http use-expressions="true"
         disable-url-rewriting="true" entry-point-ref="ambariEntryPoint">
     <http-basic entry-point-ref="ambariEntryPoint"/>
-    <intercept-url pattern="/**" access="isAuthenticated()" method="GET"/>
-    <intercept-url pattern="/**" access="hasRole('ADMIN')"/>
+    <intercept-url pattern="/api/**" access="isAuthenticated()" method="GET"/>
+    <intercept-url pattern="/api/**" access="hasRole('ADMIN')"/>
+    <intercept-url pattern="/**" access="permitAll()"/>
   </http>
 
   <!--<ldap-server id="ldapServer" root="dc=ambari,dc=apache,dc=org"/>-->
 
   <authentication-manager>
-
     <authentication-provider user-service-ref="ambariLocalUserService">
       <password-encoder ref="passwordEncoder"/>
     </authentication-provider>
 
     <authentication-provider ref="ambariLdapAuthenticationProvider"/>
-
   </authentication-manager>
 
   <beans:bean id="ambariEntryPoint" class="org.apache.ambari.server.security.AmbariEntryPoint">

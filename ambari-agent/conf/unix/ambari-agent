@@ -28,6 +28,7 @@ LOGFILE=/var/log/ambari-agent/ambari-agent.out
 AGENT_SCRIPT=/usr/lib/python2.6/site-packages/ambari_agent/main.py
 OK=1
 NOTOK=0
+USAGE="Usage: /usr/sbin/ambari-agent {start|stop|restart|status|unregister}"
 
 
 if [ -a /usr/bin/python2.6 ]; then
@@ -127,7 +128,7 @@ case "$1" in
           tput bold
           echo "$AMBARI_AGENT currently not running"
           tput sgr0
-          echo "Usage: /usr/sbin/ambari-agent {start|stop|restart|status}"
+          echo $USAGE
         fi
         ;;
   stop)
@@ -157,6 +158,23 @@ case "$1" in
           tput sgr0
         fi
         ;;
+  unregister)
+        check_python_version
+        if [ "$?" -eq "$NOTOK" ]; then
+          exit -1
+        fi
+        if [ -f $PIDFILE ]; then
+          tput bold
+          echo "ERROR: $AMBARI_AGENT is running. Cannot unregister a running agent."
+          tput sgr0
+        else
+          echo "Unregistering $AMBARI_AGENT"
+          $PYTHON $AGENT_SCRIPT unregister
+          tput bold
+          echo "$AMBARI_AGENT successfully unregistered"
+          tput sgr0
+        fi
+        ;;
   restart)
         echo -e "Restarting $AMBARI_AGENT"
         $0 stop
@@ -164,7 +182,7 @@ case "$1" in
         ;;     
   *)
         tput bold
-        echo "Usage: /usr/sbin/ambari-agent {start|stop|restart|status}"
+        echo $USAGE
         tput sgr0
         exit 1
 esac

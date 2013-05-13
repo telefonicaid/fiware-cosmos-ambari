@@ -29,7 +29,7 @@ import org.codehaus.jackson.annotate.JsonProperty;
  */
 public class RegistrationResponse {
   @JsonProperty("response")
-  private RegistrationStatus response;
+  private RequestStatus response;
   
   //Response id to start with, usually zero.
   @JsonProperty("responseId")
@@ -38,11 +38,11 @@ public class RegistrationResponse {
   @JsonProperty("statusCommands")
   private List<StatusCommand> statusCommands = null;
 
-  public RegistrationStatus getResponseStatus() {
+  public RequestStatus getResponseStatus() {
     return response;
   }
 
-  public void setResponseStatus(RegistrationStatus response) {
+  public void setResponseStatus(RequestStatus response) {
     this.response = response;
   }
 

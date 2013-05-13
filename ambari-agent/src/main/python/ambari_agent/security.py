@@ -110,6 +110,9 @@ class CertificateManager():
     self.server_crt=self.config.get('security', 'server_crt')
     self.server_url = 'https://' + self.config.get('server', 'hostname') + ':' \
        + self.config.get('server', 'url_port')
+    self.secure_server_url = 'https://' + self.config.get('server', 'hostname') + ':' \
+       + self.config.get('server', 'secured_url_port')
+    self.cachedconnect = None
     
   def getAgentKeyName(self):
     keysdir = self.config.get('security', 'keysdir')
@@ -179,10 +182,22 @@ class CertificateManager():
     result=data['result']
     if result == 'OK':
       agentCrtContent=data['signedCa']
-      agentCrtF = open(self.getAgentCrtName(), "w")
-      agentCrtF.write(agentCrtContent)
+      with open(self.getAgentCrtName(), "w") as agentCrtF:
+        agentCrtF.write(agentCrtContent)
     else:
       logger.error("Certificate signing failed")
+
+  def reqCrtRevoke(self):
+    revoke_crt_req_url = self.secure_server_url + '/certs/' + hostname.hostname()
+    req = urllib2.Request(revoke_crt_req_url, headers = {'Content-Type': 'application/json'})
+    req.get_method = lambda: 'DELETE'
+    if not self.cachedconnect:
+      self.cachedconnect = CachedHTTPSConnection(self.config)
+    response = self.cachedconnect.request(req)
+    revoke_succeeded = json.loads(response)['result'] == 'OK'
+    if not revoke_succeeded:
+      logger.error("Certificate revoke failed")
+    return revoke_succeeded
 
   def genAgentCrtReq(self):
     generate_script = GEN_AGENT_KEY % {'hostname': hostname.hostname(),

@@ -28,11 +28,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.ambari.server.AmbariException;
-import org.apache.ambari.server.agent.HeartBeat;
-import org.apache.ambari.server.agent.HeartBeatHandler;
-import org.apache.ambari.server.agent.HeartBeatResponse;
-import org.apache.ambari.server.agent.Register;
-import org.apache.ambari.server.agent.RegistrationResponse;
+import org.apache.ambari.server.agent.*;
 import org.apache.ambari.server.state.fsm.InvalidStateTransitionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -80,6 +76,21 @@ public class AgentResource {
 
     RegistrationResponse response = hh.handleRegistration(message);
     LOG.debug("Sending registration response " + response);
+    return response;
+  }
+
+  @Path("unregister/{hostName}")
+  @POST
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces({MediaType.APPLICATION_JSON})
+  public UnregistrationResponse unregister(
+      Unregister message,
+      @Context HttpServletRequest req)
+      throws WebApplicationException, AmbariException, InvalidStateTransitionException {
+        /* Call into the heartbeat handler */
+
+    UnregistrationResponse response = hh.handleUnregistration(message);
+    LOG.debug("Sending unregistration response " + response);
     return response;
   }
 

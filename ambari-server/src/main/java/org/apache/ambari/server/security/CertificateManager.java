@@ -58,9 +58,14 @@ public class CertificateManager {
       "-password pass:{0} -passin pass:{0} \n";
   private static final String SIGN_AGENT_CRT = "openssl ca -config " +
       "{0}/ca.config -in {0}/{1} -out {0}/{2} -batch -passin pass:{3} " +
-      "-keyfile {0}/{4} -cert {0}/{5}"; /**
-       * Verify that root certificate exists, generate it otherwise.
-       */
+      "-keyfile {0}/{4} -cert {0}/{5}";
+  private static final String REVOKE_AGENT_CRT = "openssl ca -config " +
+      "{0}/ca.config -revoke {0}/{1} -batch -passin pass:{2} " +
+      "-keyfile {0}/{3} -cert {0}/{4}";
+
+  /**
+   * Verify that root certificate exists, generate it otherwise.
+   */
   public void initRootCert() {
     LOG.info("Initialization of root certificate");
 
@@ -247,6 +252,51 @@ public class CertificateManager {
     response.setResult(SignCertResponse.OK_STATUS);
     response.setSignedCa(agentCrtContent);
     //LOG.info(ShellCommandUtil.getOpenSslCommandResult(command, commandExitCode));
+    return response;
+  }
+
+  /**
+   * Revokes agent certificate
+   * @return string with agent signed certificate content
+   */
+  public synchronized RevokeCertResponse revokeAgentCrt(String agentHostname) {
+    LOG.info("Revoking of agent certificate");
+
+    Map<String, String> configsMap = configs.getConfigsMap();
+    String srvrKstrDir = configsMap.get(Configuration.SRVR_KSTR_DIR_KEY);
+    String srvrCrtPass = configsMap.get(Configuration.SRVR_CRT_PASS_KEY);
+    String srvrCrtName = configsMap.get(Configuration.SRVR_CRT_NAME_KEY);
+    String srvrKeyName = configsMap.get(Configuration.SRVR_KEY_NAME_KEY);
+    String agentCrtName = agentHostname + ".crt";
+    File agentCrtFile = new File(srvrKstrDir, agentCrtName);
+
+    RevokeCertResponse response = new RevokeCertResponse();
+    if(!agentCrtFile.exists()) {
+      String errorMessage = "Agent cert file not found in server";
+      LOG.warn(errorMessage);
+      response.setResult(RevokeCertResponse.ERROR_STATUS);
+      response.setMessage(errorMessage);
+      return response;
+    }
+
+    Object[] scriptArgs = {srvrKstrDir,agentCrtName,
+        srvrCrtPass,srvrKeyName,srvrCrtName};
+
+    String command = MessageFormat.format(REVOKE_AGENT_CRT,scriptArgs);
+    LOG.debug(command);
+
+    int commandExitCode = runCommand(command); // ssl command execution
+    if(commandExitCode != 0) {
+      String errorMessage = "OpenSSL command ended with non-zero exit code";
+      LOG.warn(errorMessage);
+      response.setResult(RevokeCertResponse.ERROR_STATUS);
+      response.setMessage(errorMessage);
+      return response;
+    }
+    if(!agentCrtFile.delete()) {
+      LOG.warn("Could not remove agent cert after revoking it");
+    }
+    response.setResult(RevokeCertResponse.OK_STATUS);
     return response;
   }
 }

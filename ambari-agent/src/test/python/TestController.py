@@ -114,6 +114,34 @@ class TestController(unittest.TestCase):
     self.controller.sendRequest = Controller.Controller.sendRequest
     self.controller.addToQueue = Controller.Controller.addToQueue
 
+  @patch("json.dumps")
+  @patch("json.loads")
+  @patch("time.sleep")
+  @patch("pprint.pformat")
+  @patch.object(Controller, "randint")
+  def test_unregisterWithServer(self, randintMock, pformatMock, sleepMock,
+                                loadsMock, dumpsMock):
+
+    out = StringIO.StringIO()
+    sys.stdout = out
+
+    unregister = MagicMock()
+    self.controller.unregister = unregister
+
+    sendRequest = MagicMock()
+    self.controller.sendRequest = sendRequest
+
+    dumpsMock.return_value = "request"
+    response = {"responseId":1,}
+    loadsMock.return_value = response
+
+    self.assertEqual(response, self.controller.unregisterWithServer())
+
+    sys.stdout = sys.__stdout__
+
+    self.controller.sendRequest = Controller.Controller.sendRequest
+    self.controller.addToQueue = Controller.Controller.addToQueue
+
 
   @patch("pprint.pformat")
   def test_addToQueue(self, pformatMock):

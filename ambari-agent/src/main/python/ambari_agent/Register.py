@@ -21,6 +21,7 @@ limitations under the License.
 import os
 import time
 import subprocess
+from AgentInfo import AgentInfo
 from Hardware import Hardware
 import hostname
 from HostInfo import HostInfo
@@ -32,6 +33,7 @@ class Register:
   declare success for now """
   def __init__(self, config):
     self.hardware = Hardware()
+    self.agentInfo = AgentInfo(config)
     self.config = config
 
   def build(self, id='-1'):
@@ -42,7 +44,7 @@ class Register:
     agentEnv = { }
     hostInfo.register(agentEnv)
 
-    version = self.read_agent_version()
+    version = self.agentInfo.version()
     
     register = { 'responseId'        : int(id),
                   'timestamp'         : timestamp,
@@ -53,14 +55,6 @@ class Register:
                   'agentVersion'      : version
                 }
     return register
-
-  def read_agent_version(self):
-    data_dir = self.config.get('agent', 'prefix')
-    ver_file = os.path.join(data_dir, 'version')
-    f = open(ver_file, "r")
-    version = f.read().strip()
-    f.close()
-    return version
 
 
 def doExec(vals, key, command, preLF=False):
