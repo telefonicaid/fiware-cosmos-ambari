@@ -22,7 +22,7 @@ import org.codehaus.jackson.annotate.JsonProperty;
 
 /**
  *
- * Data model for Ambari Agent to send heartbeat to Ambari Controller.
+ * Data model for Ambari Agent to send registration request to Ambari Controller.
  *
  */
 public class Register {

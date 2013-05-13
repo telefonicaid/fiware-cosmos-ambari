@@ -82,6 +82,8 @@ public interface Clusters {
    */
   public void addHost(String hostname) throws AmbariException;
 
+  public void removeHost(String hostname) throws AmbariException;
+
   /**
    * Map host to the given cluster.
    * A host can belong to multiple clusters

@@ -20,6 +20,7 @@ package org.apache.ambari.server.security.unsecured.rest;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -28,6 +29,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.ambari.server.security.CertificateManager;
+import org.apache.ambari.server.security.RevokeCertResponse;
 import org.apache.ambari.server.security.SignCertResponse;
 import org.apache.ambari.server.security.SignMessage;
 import org.apache.commons.logging.Log;
@@ -61,5 +63,32 @@ public class CertificateSign {
   public SignCertResponse signAgentCrt(@PathParam("hostName") String hostname,
                                        SignMessage message, @Context HttpServletRequest req) {
     return certMan.signAgentCrt(hostname, message.getCsr(), message.getPassphrase());
+  }
+
+  /**
+   * Revokes agent certificate
+   * @response.representation.200.doc This API is invoked by Ambari agent running
+   *  on a cluster to unregister with the server.
+   * @response.representation.200.mediaType application/json
+   * @response.representation.406.doc Error in unregister message format
+   * @response.representation.408.doc Request Timed out
+   * @throws Exception
+   */
+  @Path("{hostName}")
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  @DELETE
+  public RevokeCertResponse revokeAgentCrt(@PathParam("hostName") String hostname,
+                                           @Context HttpServletRequest req) {
+    LOG.info("User requesting revoke cert: " + req.getRemoteUser());
+    if (!hostname.equals(req.getRemoteUser())) {
+      String errorMessage = "Cannot revoke certs of other hosts. Your hostname: "
+          + req.getRemoteUser() + ". Your request's hostname: " + hostname;
+      LOG.warn(errorMessage);
+      RevokeCertResponse response = new RevokeCertResponse();
+      response.setMessage(errorMessage);
+      response.setResult(RevokeCertResponse.ERROR_STATUS);
+      return response;
+    }
+    return certMan.revokeAgentCrt(hostname);
   }
 }

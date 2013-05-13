@@ -387,13 +387,9 @@ public class HeartBeatHandler {
     return response;
   }
 
-  public RegistrationResponse handleRegistration(Register register)
-      throws InvalidStateTransitionException, AmbariException {
-    String hostname = register.getHostname();
-    long now = System.currentTimeMillis();
-
-    String agentVersion = register.getAgentVersion();
-    String serverVersion = ambariMetaInfo.getServerVersion();
+  private static void ensureVersionsCompatible(String serverVersion,
+                                               String agentVersion,
+                                               String hostname) throws AmbariException {
     if (!VersionUtils.areVersionsCompatible(serverVersion, agentVersion)) {
       LOG.warn("Received registration request from host with non compatible"
           + " agent version"
@@ -406,6 +402,17 @@ public class HeartBeatHandler {
           + ", agentVersion=" + agentVersion
           + ", serverVersion=" + serverVersion);
     }
+  }
+
+  public RegistrationResponse handleRegistration(Register register)
+      throws InvalidStateTransitionException, AmbariException {
+    String hostname = register.getHostname();
+    long now = System.currentTimeMillis();
+
+    String agentVersion = register.getAgentVersion();
+    String serverVersion = ambariMetaInfo.getServerVersion();
+
+    ensureVersionsCompatible(serverVersion, agentVersion, hostname);
 
     String agentOsType = getOsType(register.getHardwareProfile().getOS(),
         register.getHardwareProfile().getOSRelease());
@@ -447,10 +454,27 @@ public class HeartBeatHandler {
     }
     response.setStatusCommands(cmds);
 
-    response.setResponseStatus(RegistrationStatus.OK);
+    response.setResponseStatus(RequestStatus.OK);
 
     Long requestId = 0L;
     hostResponseIds.put(hostname, requestId);
+    response.setResponseId(requestId);
+    return response;
+  }
+
+  public UnregistrationResponse handleUnregistration(Unregister unregister)
+            throws InvalidStateTransitionException, AmbariException {
+    String hostname = unregister.getHostname();
+    String agentVersion = unregister.getAgentVersion();
+    String serverVersion = ambariMetaInfo.getServerVersion();
+    ensureVersionsCompatible(serverVersion, agentVersion, hostname);
+
+    clusterFsm.removeHost(hostname);
+    hostResponseIds.remove(hostname);
+
+    UnregistrationResponse response = new UnregistrationResponse();
+    response.setResponseStatus(RequestStatus.OK);
+    Long requestId = 0L;
     response.setResponseId(requestId);
     return response;
   }

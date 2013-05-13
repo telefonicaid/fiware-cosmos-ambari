@@ -35,6 +35,7 @@ import org.apache.ambari.server.agent.DiskInfo;
 import org.apache.ambari.server.api.services.AmbariMetaInfo;
 import org.apache.ambari.server.orm.dao.ClusterDAO;
 import org.apache.ambari.server.orm.dao.HostDAO;
+import org.apache.ambari.server.orm.dao.HostStateDAO;
 import org.apache.ambari.server.orm.entities.ClusterEntity;
 import org.apache.ambari.server.orm.entities.HostEntity;
 import org.apache.ambari.server.state.*;
@@ -68,6 +69,8 @@ public class ClustersImpl implements Clusters {
   ClusterDAO clusterDAO;
   @Inject
   HostDAO hostDAO;
+  @Inject
+  HostStateDAO hostStateDAO;
   @Inject
   ClusterFactory clusterFactory;
   @Inject
@@ -286,6 +289,33 @@ public class ClustersImpl implements Clusters {
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("Adding a host to Clusters"
+            + ", hostname=" + hostname);
+      }
+    } finally {
+      r.unlock();
+    }
+  }
+
+  @Override
+  public void removeHost(String hostname) throws AmbariException {
+    loadClustersAndHosts();
+
+    if (!hosts.containsKey(hostname)) {
+      throw new AmbariException("Host not found. hostName = " + hostname);
+    }
+    if (!hostClusterMap.get(hostname).isEmpty()) {
+      throw new AmbariException("Host belongs to a cluster");
+    }
+    r.lock();
+
+    try {
+      hosts.remove(hostname);
+      hostClusterMap.remove(hostname);
+      hostStateDAO.removeByHostName(hostname);
+      hostDAO.removeByName(hostname);
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Removing a host from Clusters"
             + ", hostname=" + hostname);
       }
     } finally {

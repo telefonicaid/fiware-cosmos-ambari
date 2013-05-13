@@ -33,6 +33,7 @@ import AmbariConfig
 import ProcessHelper
 from Heartbeat import Heartbeat
 from Register import Register
+from Unregister import Unregister
 from ActionQueue import ActionQueue
 import security
 from NetUtil import NetUtil
@@ -52,6 +53,7 @@ class Controller(threading.Thread):
     self.hostname = hostname.hostname()
     server_secured_url = 'https://' + config.get('server', 'hostname') + ':' + config.get('server', 'secured_url_port')
     self.registerUrl = server_secured_url + '/agent/v1/register/' + self.hostname
+    self.unregisterUrl = server_secured_url + '/agent/v1/unregister/' + self.hostname
     self.heartbeatUrl = server_secured_url + '/agent/v1/heartbeat/' + self.hostname
     self.netutil = NetUtil()
     self.responseId = -1
@@ -63,31 +65,43 @@ class Controller(threading.Thread):
     self.actionQueue = ActionQueue(self.config)
     self.actionQueue.start()
     self.register = Register(self.config)
+    self.unregister = Unregister(self.config)
     self.heartbeat = Heartbeat(self.actionQueue)
     pass
   
   def __del__(self):
     logger.info("Server connection disconnected.")
     pass
+
+  def unregisterWithServer(self):
+    id = -1
+    ret = self.retriedRequest(self.unregisterUrl, lambda: self.unregister.build(id))
+    logger.info("Unregistered with the server")
+    print("Unregistered with the server")
+    return ret
   
   def registerWithServer(self):
-    retry=False
-    firstTime=True
-    registered=False
+    id = -1
+    ret = self.retriedRequest(self.registerUrl, lambda: self.register.build(id))
+    logger.info("Registered with the server")
+    print("Registered with the server")
+    return ret
+
+  def retriedRequest(self, requestUrl, payloadBuilder):
+    successfulRequest=False
     id = -1
     ret = {}
 
-    while not registered:
+    while not successfulRequest:
       try:
-        data = json.dumps(self.register.build(id))
-        logger.info("Registering with the server " + pprint.pformat(data))
-        response = self.sendRequest(self.registerUrl, data)
+        data = json.dumps(payloadBuilder())
+        logger.info("Sending request to url " + requestUrl + " " + pprint.pformat(data))
+        response = self.sendRequest(requestUrl, data)
         ret = json.loads(response)
 
-        logger.info("Registered with the server with " + pprint.pformat(ret))
-        print("Registered with the server")
+        logger.info("Request successful " + pprint.pformat(ret))
         self.responseId= int(ret['responseId'])
-        registered = True
+        successfulRequest = True
         if 'statusCommands' in ret.keys():
           logger.info("Got status commands on registration " + pprint.pformat(ret['statusCommands']) )
           self.addToQueue(ret['statusCommands'])
@@ -96,7 +110,7 @@ class Controller(threading.Thread):
       except Exception, err:
         # try a reconnect only after a certain amount of random time
         delay = randint(0, self.range)
-        logger.info("Unable to connect to: " + self.registerUrl, exc_info = True)
+        logger.info("Unable to connect to: " + requestUrl, exc_info = True)
         """ Sleeping for {0} seconds and then retrying again """.format(delay)
         time.sleep(delay)
         pass

@@ -33,6 +33,7 @@ class TestCertGeneration(TestCase):
     config.add_section('server')
     config.set('server', 'hostname', 'example.com')
     config.set('server', 'url_port', '777')
+    config.set('server', 'secured_url_port', '778')
     config.add_section('security')
     config.set('security', 'keysdir', self.tmpdir)
     config.set('security', 'server_crt', 'ca.crt')

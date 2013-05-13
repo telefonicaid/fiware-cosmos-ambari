@@ -49,9 +49,11 @@ public class SecurityFilter implements Filter {
 
     HttpServletRequest req = (HttpServletRequest) serReq;
     String reqUrl = req.getRequestURL().toString();
-	
+
+    LOG.info("Filtering " + reqUrl + " for security purposes");
     if (serReq.getLocalPort() == AmbariServer.AGENT_ONE_WAY_AUTH) {
-      if (isRequestAllowed(reqUrl)) {
+      if (isRequestAllowed(reqUrl, req.getMethod())) {
+        LOG.info("OK, request can go on");
         filtCh.doFilter(serReq, serResp);
       }
       else {
@@ -59,15 +61,17 @@ public class SecurityFilter implements Filter {
       }
 
 	}
-	else
+	else {
+      LOG.info("OK, request can go on because it is using the safe port");
       filtCh.doFilter(serReq, serResp);
+    }
   }
 
   @Override
   public void init(FilterConfig arg0) throws ServletException {
   }
 
-  private boolean isRequestAllowed(String reqUrl) {
+  private boolean isRequestAllowed(String reqUrl, String method) {
 	try {
 
       boolean isMatch = Pattern.matches("https://[A-z]*:[0-9]*/cert/ca[/]*", reqUrl);
@@ -77,7 +81,7 @@ public class SecurityFilter implements Filter {
 		
 		 isMatch = Pattern.matches("https://[A-z]*:[0-9]*/certs/[A-z0-9-.]*", reqUrl);
 		
-		 if (isMatch)
+		 if (isMatch && !method.equals("DELETE"))
 			 return true;
 		
 		 isMatch = Pattern.matches("https://[A-z]*:[0-9]*/resources/.*", reqUrl);

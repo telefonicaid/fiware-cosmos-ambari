@@ -33,7 +33,6 @@ import org.apache.ambari.server.actionmanager.HostRoleCommandFactory;
 import org.apache.ambari.server.actionmanager.StageFactory;
 import org.apache.ambari.server.agent.rest.AgentResource;
 import org.apache.ambari.server.api.services.AmbariMetaInfo;
-import org.apache.ambari.server.orm.InMemoryDefaultTestModule;
 import org.apache.ambari.server.state.*;
 import org.apache.ambari.server.state.cluster.ClusterFactory;
 import org.apache.ambari.server.state.cluster.ClusterImpl;
@@ -77,7 +76,9 @@ public class AgentResourceTest extends JerseyTest {
 
   public class MockModule extends AbstractModule {
 
-    RegistrationResponse response = new RegistrationResponse();
+    RegistrationResponse registrationResponse = new RegistrationResponse();
+    UnregistrationResponse unregistrationResponse =
+        new UnregistrationResponse();
     HeartBeatResponse hresponse = new HeartBeatResponse();
 
     @Override
@@ -85,11 +86,14 @@ public class AgentResourceTest extends JerseyTest {
       installDependencies();
 
       handler = mock(HeartBeatHandler.class);
-      response.setResponseStatus(RegistrationStatus.OK);
+      registrationResponse.setResponseStatus(RequestStatus.OK);
+      unregistrationResponse.setResponseStatus(RequestStatus.OK);
       hresponse.setResponseId(0L);
       try {
         when(handler.handleRegistration(any(Register.class))).thenReturn(
-            response);
+            registrationResponse);
+        when(handler.handleUnregistration(any(Unregister.class)))
+            .thenReturn(unregistrationResponse);
         when(handler.handleHeartBeat(any(HeartBeat.class))).thenReturn(
             hresponse);
       } catch (Exception ex) {
@@ -160,7 +164,20 @@ public class AgentResourceTest extends JerseyTest {
     response = webResource.type(MediaType.APPLICATION_JSON)
       .post(RegistrationResponse.class, createDummyJSONRegister());
     LOG.info("Returned from Server responce=" + response);
-    Assert.assertEquals(response.getResponseStatus(), RegistrationStatus.OK);
+    Assert.assertEquals(response.getResponseStatus(), RequestStatus.OK);
+  }
+
+  @Test
+  public void agentUnregistration() throws UniformInterfaceException, JSONException {
+    UnregistrationResponse response;
+    ClientConfig clientConfig = new DefaultClientConfig();
+    clientConfig.getFeatures().put(JSONConfiguration.FEATURE_POJO_MAPPING, Boolean.TRUE);
+    client = Client.create(clientConfig);
+    WebResource webResource = client.resource("http://localhost:9998/unregister/dummyhost");
+    response = webResource.type(MediaType.APPLICATION_JSON)
+        .post(UnregistrationResponse.class, createDummyJSONRegister());
+    LOG.info("Returned from Server responce=" + response);
+    Assert.assertEquals(response.getResponseStatus(), RequestStatus.OK);
   }
 
   @Test
@@ -173,7 +190,7 @@ public class AgentResourceTest extends JerseyTest {
     response = webResource.type(MediaType.APPLICATION_JSON)
         .post(HeartBeatResponse.class, createDummyHeartBeat());
     LOG.info("Returned from Server: "
-        + " response=" +   response);
+        + " registrationResponse=" +   response);
     Assert.assertEquals(response.getResponseId(), 0L);
   }
 }
