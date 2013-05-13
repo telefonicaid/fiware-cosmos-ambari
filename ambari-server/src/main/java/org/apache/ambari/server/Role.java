@@ -76,5 +76,8 @@ public enum Role {
   NODEMANAGER,
   YARN_CLIENT,
   HISTORYSERVER,
-  TEZ_CLIENT
+  TEZ_CLIENT,
+  // Cosmos specific
+  USER_MASTER_MANAGER,
+  USER_SLAVE_MANAGER
 }
