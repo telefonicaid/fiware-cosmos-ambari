@@ -19,45 +19,41 @@ package org.apache.ambari.server.bootstrap;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.ambari.server.bootstrap.BootStrapStatus.BSStat;
+import org.apache.ambari.server.bootstrap.BootStrapRequest.BSStat;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-/**
- * @author ncole
- *
- */
-class BSRunner extends Thread {
-  private static Log LOG = LogFactory.getLog(BSRunner.class);
-
+class BSActionRunner extends Thread {
+  private static Log LOG = LogFactory.getLog(BSActionRunner.class);
   private static final String DEFAULT_USER = "root";
 
-  private  boolean finished = false;
-  private SshHostInfo sshHostInfo;
-  private File bootDir;
-  private String bsScript;
-  private File requestIdDir;
-  private File sshKeyFile;
-  private File passwordFile;
-  private int requestId;
-  private String agentSetupScript;
-  private String agentSetupPassword;
-  private String ambariHostname;
-  private boolean verbose;
-  private BootStrapImpl bsImpl;
+  private boolean finished = false;
+  private final SshHostInfo sshHostInfo;
+  private final File bootDir;
+  private final String bsScript;
+  private final File sshKeyFile;
+  private final int requestId;
+  private final File requestIdDir;
+  private final String agentSetupScript;
+  private final String agentSetupPassword;
+  private final String ambariHostname;
+  private final boolean verbose;
+  private final BootStrapImpl bsImpl;
   private final String clusterOsType;
-  private String projectVersion;
+  private final String projectVersion;
 
-  public BSRunner(BootStrapImpl impl, SshHostInfo sshHostInfo, String bootDir,
+  public BSActionRunner(BootStrapImpl impl, SshHostInfo sshHostInfo, String bootDir,
       String bsScript, String agentSetupScript, String agentSetupPassword,
-      int requestId, long timeout, String hostName, boolean isVerbose, String clusterOsType,
+      int requestId, String hostName, boolean isVerbose, String clusterOsType,
       String projectVersion)
   {
     this.requestId = requestId;
@@ -73,7 +69,7 @@ class BSRunner extends Thread {
     this.clusterOsType = clusterOsType;
     this.projectVersion = projectVersion;
     this.bsImpl = impl;
-    BootStrapStatus status = new BootStrapStatus();
+    BootStrapRequest status = new BootStrapRequest();
     status.setLog("RUNNING");
     status.setStatus(BSStat.RUNNING);
     bsImpl.updateStatus(requestId, status);
@@ -81,16 +77,15 @@ class BSRunner extends Thread {
 
   /**
    * Update the gathered data from reading output
-   *
    */
-  private class BSStatusCollector implements Runnable {
+  private class StatusCollector implements Runnable {
     @Override
     public void run() {
       BSHostStatusCollector collector = new BSHostStatusCollector(requestIdDir,
           sshHostInfo.getHosts());
       collector.run();
       List<BSHostStatus> hostStatus = collector.getHostStatus();
-      BootStrapStatus status = new BootStrapStatus();
+      BootStrapRequest status = new BootStrapRequest();
       status.setHostsStatus(hostStatus);
       status.setLog("");
       status.setStatus(BSStat.RUNNING);
@@ -98,19 +93,29 @@ class BSRunner extends Thread {
     }
   }
 
-  private String createHostString(List<String> list) {
-    StringBuilder ret = new StringBuilder();
-    if (list == null) {
-      return "";
+  private String getCommand(String hostString, String user, File passwordFile) {
+    List<String> command = new LinkedList<String> ();
+    command.add(this.bsScript);
+    command.add(hostString);
+    command.add(this.requestIdDir.toString());
+    command.add(user);
+    command.add(this.sshKeyFile.toString());
+    command.add(this.agentSetupScript);
+    command.add(this.ambariHostname);
+    command.add(this.clusterOsType);
+    command.add(this.projectVersion);
+    if (passwordFile != null) {
+      command.add(passwordFile.toString());
+    } else {
+      command.add("null");
     }
 
-    int i = 0;
-    for (String host: list) {
-      ret.append(host);
-      if (i++ != list.size()-1)
-        ret.append(",");
-    }
-    return ret.toString();
+    LOG.info(String.format("Host= %s bs=%s requestDir=%s user=%s keyfile=%s " +
+        "passwordFile=%s server=%s version=%s", hostString, this.bsScript,
+        requestIdDir, user, this.sshKeyFile, passwordFile, this.ambariHostname,
+        projectVersion));
+
+    return StringUtils.join(command, " ");
   }
 
   /** Create request id dir for each bootstrap call **/
@@ -136,26 +141,36 @@ class BSRunner extends Thread {
     FileUtils.writeStringToFile(sshKeyFile, data);
   }
 
-  private void writePasswordFile(String data) throws IOException {
+  private void writePasswordFile(File passwordFile, String data) throws IOException {
     FileUtils.writeStringToFile(passwordFile, data);
   }
 
-  public synchronized void finished() {
+  private void finished() {
     this.finished = true;
+    for (String host : this.sshHostInfo.getHosts()) {
+      this.bsImpl.unsetHostInProcess(host);
+    }
+  }
+
+  private void init() {
+    for (String host : this.sshHostInfo.getHosts()) {
+      this.bsImpl.setHostInProcess(host);
+    }
   }
 
   @Override
   public void run() {
-    String hostString = createHostString(sshHostInfo.getHosts());
     String user = sshHostInfo.getUser();
     if (user == null || user.isEmpty()) {
       user = DEFAULT_USER;
     }
-    String commands[] = new String[10];
+
     String shellCommand[] = new String[3];
     BSStat stat = BSStat.RUNNING;
     String scriptlog = "";
+    File passwordFile = null;
     try {
+      this.init();
       createRunDir();
       if (LOG.isDebugEnabled()) {
         // FIXME needs to be removed later
@@ -166,12 +181,12 @@ class BSRunner extends Thread {
 
       String password = sshHostInfo.getPassword();
       if (password != null && !password.isEmpty()) {
-        this.passwordFile = new File(this.requestIdDir, "host_pass");
+        passwordFile = new File(this.requestIdDir, "host_pass");
         // TODO : line separator should be changed
         // if we are going to support multi platform server-agent solution
         String lineSeparator = System.getProperty("line.separator");
         password = password + lineSeparator;
-        writePasswordFile(password);
+        writePasswordFile(passwordFile, password);
       }
 
       writeSshKeyFile(sshHostInfo.getSshKey());
@@ -180,48 +195,28 @@ class BSRunner extends Thread {
        */
       shellCommand[0] = "sh";
       shellCommand[1] = "-c";
-      
-      commands[0] = this.bsScript;
-      commands[1] = hostString;
-      commands[2] = this.requestIdDir.toString();
-      commands[3] = user;
-      commands[4] = this.sshKeyFile.toString();
-      commands[5] = this.agentSetupScript.toString();
-      commands[6] = this.ambariHostname;
-      commands[7] = this.clusterOsType;
-      commands[8] = this.projectVersion;
-      if (this.passwordFile != null) {
-        commands[9] = this.passwordFile.toString();
-      }
-      LOG.info("Host= " + hostString + " bs=" + this.bsScript + " requestDir=" +
-          requestIdDir + " user=" + user + " keyfile=" + this.sshKeyFile +
-          " passwordFile " + this.passwordFile + " server=" + this.ambariHostname +
-          " version=" + projectVersion);
 
       String[] env = new String[] { "AMBARI_PASSPHRASE=" + agentSetupPassword };
       if (this.verbose)
         env = new String[] { env[0], " BS_VERBOSE=\"-vvv\" " };
 
-      StringBuilder commandString = new StringBuilder();
-      for (String comm : commands) {
-        commandString.append(" " + comm);
-      }   
-     
+      String commandString = this.getCommand(
+          sshHostInfo.hostsString(), user, passwordFile);
+
       if (LOG.isDebugEnabled()) {
         LOG.debug(commandString);
       }
-      
+
       String bootStrapOutputFile = requestIdDir + File.separator + "bootstrap.out";
       String bootStrapErrorFile = requestIdDir + File.separator + "bootstrap.err";
-      commandString.append(
-          " 1> " + bootStrapOutputFile + " 2>" + bootStrapErrorFile);
-      
-      shellCommand[2] = commandString.toString();
+      commandString += " 1> " + bootStrapOutputFile + " 2>" + bootStrapErrorFile;
+
+      shellCommand[2] = commandString;
       Process process = Runtime.getRuntime().exec(shellCommand, env);
 
       // Startup a scheduled executor service to look through the logs
       ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-      BSStatusCollector statusCollector = new BSStatusCollector();
+      StatusCollector statusCollector = new StatusCollector();
       ScheduledFuture<?> handle = scheduler.scheduleWithFixedDelay(statusCollector,
           0, 10, TimeUnit.SECONDS);
       LOG.info("Kicking off the scheduler for polling on logs in " +
@@ -247,14 +242,14 @@ class BSRunner extends Thread {
           stat = BSStat.SUCCESS;
         }
 
-        scheduler.schedule(new BSStatusCollector(), 0, TimeUnit.SECONDS);
+        scheduler.schedule(new StatusCollector(), 0, TimeUnit.SECONDS);
         long startTime = System.currentTimeMillis();
         while (true) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Waiting for hosts status to be updated");
           }
           boolean pendingHosts = false;
-          BootStrapStatus tmpStatus = bsImpl.getStatus(requestId);
+          BootStrapRequest tmpStatus = bsImpl.getStatus(requestId);
           for (BSHostStatus status : tmpStatus.getHostsStatus()) {
             if (status.getStatus().equals("RUNNING")) {
               pendingHosts = true;
@@ -283,7 +278,7 @@ class BSRunner extends Thread {
       } finally {
         handle.cancel(true);
         /* schedule a last update */
-        scheduler.schedule(new BSStatusCollector(), 0, TimeUnit.SECONDS);
+        scheduler.schedule(new StatusCollector(), 0, TimeUnit.SECONDS);
         scheduler.shutdownNow();
         try {
           scheduler.awaitTermination(10, TimeUnit.SECONDS);
@@ -298,11 +293,11 @@ class BSRunner extends Thread {
     }
     finally {
       /* get the bstatus */
-      BootStrapStatus tmpStatus = bsImpl.getStatus(requestId);
+      BootStrapRequest tmpStatus = bsImpl.getStatus(requestId);
       tmpStatus.setLog(scriptlog);
       tmpStatus.setStatus(stat);
       bsImpl.updateStatus(requestId, tmpStatus);
-      bsImpl.reset();
+      bsImpl.resetBootstrapRunner();
       // Remove private ssh key after bootstrap is complete
       try {
         FileUtils.forceDelete(sshKeyFile);

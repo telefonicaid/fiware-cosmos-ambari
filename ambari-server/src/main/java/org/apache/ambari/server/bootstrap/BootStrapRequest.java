@@ -36,13 +36,20 @@ import javax.xml.bind.annotation.XmlType;
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "", propOrder = {})
-public class BootStrapStatus {
+public class BootStrapRequest {
   @XmlType(name="status")
   @XmlEnum
   public enum BSStat {
     RUNNING,
     SUCCESS,
     ERROR
+  }
+
+  @XmlType(name="action")
+  @XmlEnum
+  public enum BSAction {
+    BOOTSTRAP,
+    TEARDOWN
   }
 
   @XmlElement
@@ -54,6 +61,9 @@ public class BootStrapStatus {
   @XmlElement
   private String log;
 
+  @XmlElement
+  private BSAction action;
+
   public void setStatus(BSStat status) {
     this.status = status;
   }
@@ -64,6 +74,14 @@ public class BootStrapStatus {
 
   public void setHostsStatus(List<BSHostStatus> hostsStatus) {
     this.hostsStatus = hostsStatus;
+  }
+
+  public BSAction getAction() {
+    return this.action;
+  }
+
+  public void setAction(BSAction action) {
+    this.action = action;
   }
 
   public List<BSHostStatus> getHostsStatus() {

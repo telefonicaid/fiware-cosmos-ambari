@@ -22,7 +22,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.ambari.server.api.services.AmbariMetaInfo;
 import org.apache.ambari.server.bootstrap.BSResponse.BSRunStat;
@@ -36,28 +38,31 @@ import com.google.inject.Singleton;
 @Singleton
 public class BootStrapImpl {
   private File bootStrapDir;
-  private String bootScript;
+  private String bootstrapActionScript;
   private String bootSetupAgentScript;
+  private String teardownAgentScript;
   private String bootSetupAgentPassword;
-  private BSRunner bsRunner;
+  private BSActionRunner bsActionRunner;
   private String masterHostname;
-  long timeout;
 
   private static Log LOG = LogFactory.getLog(BootStrapImpl.class);
 
   /* Monotonically increasing requestid for the bootstrap api to query on */
   int requestId = 0;
-  private FifoLinkedHashMap<Long, BootStrapStatus> bsStatus;
+  private FifoLinkedHashMap<Long, BootStrapRequest> bsStatus;
+  private Set<String> hostsInProcess;
   private final String clusterOsType;
   private String projectVersion;
 
   @Inject
   public BootStrapImpl(Configuration conf, AmbariMetaInfo ambariMetaInfo) throws IOException {
     this.bootStrapDir = conf.getBootStrapDir();
-    this.bootScript = conf.getBootStrapScript();
+    this.bootstrapActionScript = conf.getBootStrapActionScript();
     this.bootSetupAgentScript = conf.getBootSetupAgentScript();
     this.bootSetupAgentPassword = conf.getBootSetupAgentPassword();
-    this.bsStatus = new FifoLinkedHashMap<Long, BootStrapStatus>();
+    this.teardownAgentScript = conf.getTeardownAgentScript();
+    this.bsStatus = new FifoLinkedHashMap<Long, BootStrapRequest>();
+    this.hostsInProcess = new HashSet<String>();
     this.masterHostname = conf.getMasterHostname(
         InetAddress.getLocalHost().getCanonicalHostName());
     this.clusterOsType = conf.getServerOsType();
@@ -65,12 +70,12 @@ public class BootStrapImpl {
   }
 
   /**
-   * Return {@link BootStrapStatus} for a given responseId.
+   * Return {@link BootStrapRequest} for a given responseId.
    * @param requestId the responseId for which the status needs to be returned.
    * @return status for a specific response id. A response Id of -1 means the
    * latest responseId.
    */
-  public synchronized BootStrapStatus getStatus(long requestId) {
+  public synchronized BootStrapRequest getStatus(long requestId) {
     if (! bsStatus.containsKey(Long.valueOf(requestId))) {
       return null;
     }
@@ -82,8 +87,31 @@ public class BootStrapImpl {
    * @param requestId the request id.
    * @param status the status of the update.
    */
-  synchronized void updateStatus(long requestId, BootStrapStatus status) {
-    bsStatus.put(Long.valueOf(requestId), status);
+  synchronized void updateStatus(long requestId, BootStrapRequest status) {
+    bsStatus.put(requestId, status);
+  }
+
+  /**
+   * sets the input hostname as being in a bootstrap/teardown process.
+   */
+  synchronized void setHostInProcess(String hostname) {
+    if (!this.hostsInProcess.add(hostname)) {
+      LOG.warn("Hostname " + hostname + "is being marked as being in a " +
+          "bootstrap/teardown process, but it had previously been marked " +
+          "already");
+    }
+  }
+
+  /**
+   * removes the input hostname from the set of hosts being in a
+   * bootstrap/teardown process.
+   */
+  synchronized void unsetHostInProcess(String hostname) {
+    if (!this.hostsInProcess.remove(hostname)) {
+      LOG.warn("Hostname " + hostname + "is being marked as not being in a " +
+          "bootstrap/teardown process, but it wasn't marked as being in such" +
+          " a process");
+    }
   }
 
 
@@ -95,25 +123,49 @@ public class BootStrapImpl {
     }
   }
 
-  public  synchronized BSResponse runBootStrap(SshHostInfo info) {
+  private synchronized BSResponse runBsAction(
+      SshHostInfo info, String actionScript) {
     BSResponse response = new BSResponse();
     /* Run some checks for ssh host */
-    LOG.info("BootStrapping hosts " + info.hostListAsString());
-    if (bsRunner != null) {
-      response.setLog("BootStrap in Progress: Cannot Run more than one.");
+    if (bsActionRunner != null) {
+      response.setLog("BootStrap action in Progress: Cannot Run more than one " +
+          "bootstrap action at the same time.");
       response.setStatus(BSRunStat.ERROR);
-
       return response;
     }
+    for (String host : info.getHosts()) {
+      if (this.hostsInProcess.contains(host)) {
+        response.setStatus(BSRunStat.ERROR);
+        response.setLog("Host " + host + "is already in a bootstrap or " +
+            "teardown process. Please wait until the process is complete " +
+            "before you start a bootstrap action on the host.");
+        return response;
+      }
+    }
+
     requestId++;
 
-    bsRunner = new BSRunner(this, info, bootStrapDir.toString(),
-        bootScript, bootSetupAgentScript, bootSetupAgentPassword, requestId, 0L,
-        this.masterHostname, info.isVerbose(), this.clusterOsType, this.projectVersion);
-    bsRunner.start();
+    bsActionRunner = new BSActionRunner(this, info, bootStrapDir.toString(),
+        bootstrapActionScript, actionScript, bootSetupAgentPassword, requestId,
+        this.masterHostname, info.isVerbose(), this.clusterOsType,
+        this.projectVersion);
+    bsActionRunner.start();
     response.setStatus(BSRunStat.OK);
-    response.setLog("Running Bootstrap now.");
     response.setRequestId(requestId);
+    return response;
+  }
+
+  public synchronized BSResponse runBootStrap(SshHostInfo info) {
+    LOG.info("BootStrapping hosts " + info.hostsString());
+    BSResponse response = runBsAction(info, bootSetupAgentScript);
+    response.setLog("Running Bootstrap now.");
+    return response;
+  }
+
+  public synchronized BSResponse runTeardown(SshHostInfo info) {
+    LOG.info("Tearing down hosts " + info.hostsString());
+    BSResponse response = runBsAction(info, teardownAgentScript);
+    response.setLog("Running teardown now.");
     return response;
   }
 
@@ -125,13 +177,13 @@ public class BootStrapImpl {
     List<BSHostStatus> statuses = new ArrayList<BSHostStatus>();
 
     if (null == hosts || 0 == hosts.size() || (hosts.size() == 1 && hosts.get(0).equals("*"))) {
-      for (BootStrapStatus status : bsStatus.values()) {
+      for (BootStrapRequest status : bsStatus.values()) {
         if (null != status.getHostsStatus())
           statuses.addAll(status.getHostsStatus());
       }
     } else {
       // TODO make bootstrapping a bit more robust then stop looping
-      for (BootStrapStatus status : bsStatus.values()) {
+      for (BootStrapRequest status : bsStatus.values()) {
         for (BSHostStatus hostStatus : status.getHostsStatus()) {
           if (-1 != hosts.indexOf(hostStatus.getHostName())) {
             statuses.add(hostStatus);
@@ -146,8 +198,8 @@ public class BootStrapImpl {
   /**
    *
    */
-  public synchronized void reset() {
-    bsRunner = null;
+  public synchronized void resetBootstrapRunner() {
+    bsActionRunner = null;
   }
 
 }

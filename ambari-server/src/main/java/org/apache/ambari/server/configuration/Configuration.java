@@ -47,11 +47,12 @@ public class Configuration {
   public static final String BOOTSTRAP_DIR = "bootstrap.dir";
   public static final String BOOTSTRAP_DIR_DEFAULT = "/var/run/ambari-server/bootstrap";
   public static final String WEBAPP_DIR = "webapp.dir";
-  public static final String BOOTSTRAP_SCRIPT = "bootstrap.script";
+  public static final String BOOTSTRAP_ACTION_SCRIPT = "bootstrap.action.script";
   public static final String BOOTSTRAP_SCRIPT_DEFAULT =  "/usr/bin/ambari_bootstrap";
   public static final String BOOTSTRAP_SETUP_AGENT_SCRIPT = "bootstrap.setup_agent.script";
   public static final String BOOTSTRAP_SETUP_AGENT_PASSWORD = "bootstrap.setup_agent.password";
   public static final String BOOTSTRAP_MASTER_HOSTNAME = "bootstrap.master_host_name";
+  public static final String BOOTSTRAP_TEARDOWN_AGENT_SCRIPT = "bootstrap.teardown_agent.script";
   public static final String API_AUTHENTICATE = "api.authenticate";
   public static final String API_USE_SSL = "api.ssl";
   public static final String SRVR_KSTR_DIR_KEY = "security.server.keys_dir";
@@ -321,12 +322,17 @@ public class Configuration {
     return new File(fileName);
   }
 
-  public String getBootStrapScript() {
-    String bootscript = properties.getProperty(BOOTSTRAP_SCRIPT);
+  public String getBootStrapActionScript() {
+    String bootscript = properties.getProperty(BOOTSTRAP_ACTION_SCRIPT);
     if (bootscript == null) {
       return BOOTSTRAP_SCRIPT_DEFAULT;
     }
     return bootscript;
+  }
+
+  public String getTeardownAgentScript() {
+    return properties.getProperty(BOOTSTRAP_TEARDOWN_AGENT_SCRIPT,
+        "/usr/lib/python2.6/site-packages/ambari_server/TeardownAgent.py");
   }
 
   public String getBootSetupAgentScript() {

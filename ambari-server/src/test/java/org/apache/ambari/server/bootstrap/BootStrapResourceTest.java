@@ -32,7 +32,7 @@ import junit.framework.Assert;
 
 import org.apache.ambari.server.api.rest.BootStrapResource;
 import org.apache.ambari.server.bootstrap.BSResponse.BSRunStat;
-import org.apache.ambari.server.bootstrap.BootStrapStatus.BSStat;
+import org.apache.ambari.server.bootstrap.BootStrapRequest.BSStat;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jettison.json.JSONException;
@@ -95,8 +95,8 @@ public class BootStrapResourceTest extends JerseyTest {
     return response;
   }
 
-  protected BootStrapStatus generateDummyBSStatus() {
-    BootStrapStatus status = new BootStrapStatus();
+  protected BootStrapRequest generateDummyBSStatus() {
+    BootStrapRequest status = new BootStrapRequest();
     status.setLog("Logging ");
     status.setStatus(BSStat.ERROR);
     status.setHostsStatus(new ArrayList<BSHostStatus>());
@@ -106,9 +106,9 @@ public class BootStrapResourceTest extends JerseyTest {
   @Test
   public void bootStrapGet() throws UniformInterfaceException, JSONException {
     WebResource webResource = resource();
-    BootStrapStatus status = webResource.path("/bootstrap/0").type(
+    BootStrapRequest status = webResource.path("/bootstrap/0").type(
         MediaType.APPLICATION_JSON)
-        .get(BootStrapStatus.class);
+        .get(BootStrapRequest.class);
     LOG.info("GET Response from the API " + status.getLog() + " " +
         status.getStatus());
     Assert.assertEquals(status.getStatus(), BSStat.ERROR);

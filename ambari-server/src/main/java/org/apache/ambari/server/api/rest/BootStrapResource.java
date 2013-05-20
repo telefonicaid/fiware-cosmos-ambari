@@ -23,23 +23,14 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
-import org.apache.ambari.server.bootstrap.BSHostStatus;
-import org.apache.ambari.server.bootstrap.BSResponse;
-import org.apache.ambari.server.bootstrap.BootStrapImpl;
-import org.apache.ambari.server.bootstrap.BootStrapStatus;
-import org.apache.ambari.server.bootstrap.SshHostInfo;
+import org.apache.ambari.server.bootstrap.*;
+import org.apache.ambari.server.bootstrap.BootStrapRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -77,6 +68,27 @@ public class BootStrapResource {
   }
 
   /**
+   * Undoes bootstrap on a list of hosts.
+   * @response.representation.200.doc
+   *
+   * @response.representation.200.mediaType application/json
+   * @response.representation.406.doc Error in format
+   * @response.representation.408.doc Request Timed out
+   * @throws Exception
+   */
+  @DELETE
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+  public BSResponse teardown(SshHostInfo sshInfo, @Context UriInfo uriInfo) {
+
+    normalizeHosts(sshInfo);
+
+    BSResponse resp = bsImpl.runTeardown(sshInfo);
+
+    return resp;
+  }
+
+  /**
    * Current BootStrap Information thats running.
    * @response.representation.200.doc
    *
@@ -88,9 +100,9 @@ public class BootStrapResource {
   @GET
   @Path("/{requestId}")
   @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
-  public BootStrapStatus getBootStrapStatus(@PathParam("requestId")
+  public BootStrapRequest getBootStrapStatus(@PathParam("requestId")
     long requestId, @Context UriInfo info) {
-    BootStrapStatus status = bsImpl.getStatus(requestId);
+    BootStrapRequest status = bsImpl.getStatus(requestId);
     if (status == null)
       throw new WebApplicationException(Response.Status.NO_CONTENT);
     return status;
@@ -100,7 +112,7 @@ public class BootStrapResource {
   /**
    * Gets a list of bootstrapped hosts.
    *
-   * @param info  the host info, with no SSL key information
+   * @param uriInfo  the host info, with no SSL key information
    */
   @GET
   @Path("/hosts")

@@ -329,7 +329,25 @@
                   <location>src/main/python/bootstrap.py</location>
                 </source>
                 <source>
+                  <location>src/main/python/PSSH.py</location>
+                </source>
+                <source>
+                  <location>src/main/python/PSCP.py</location>
+                </source>
+                <source>
+                  <location>src/main/python/SCP.py</location>
+                </source>
+                <source>
+                  <location>src/main/python/SSH.py</location>
+                </source>
+                <source>
+                  <location>src/main/python/ParallelExecution.py</location>
+                </source>
+                <source>
                   <location>src/main/python/setupAgent.py</location>
+                </source>
+                <source>
+                  <location>src/main/python/TeardownAgent.py</location>
                 </source>
                 <source>
                   <location>src/main/python/os_type_check.sh</location>
