@@ -143,7 +143,7 @@ App.WizardStep14Controller = Em.Controller.extend({
     if (this.get('tasks')[0].status == 'INITIALIZE') {
       this.stopService();
     }
-    else if (this.get('tasks')[1].status == 'INITIALIZE') {
+    else if (this.taskIsReady(1)) {
       this.createMasterComponent();
     }
     else if (this.taskIsReady(2)) {
@@ -175,8 +175,7 @@ App.WizardStep14Controller = Em.Controller.extend({
     if (this.get('tasks')[task].status != 'INITIALIZE') {
       return false;
     }
-    var startIndex = (task == 4) ? 0 : 1;
-    var tempArr = this.get('tasks').mapProperty('status').slice(startIndex, task).uniq();
+    var tempArr = this.get('tasks').mapProperty('status').slice(0, task).uniq();
     return tempArr.length == 1 && tempArr[0] == 'COMPLETED';
   },
 
@@ -214,7 +213,8 @@ App.WizardStep14Controller = Em.Controller.extend({
         name: 'reassign.stop_service',
         sender: this,
         data: {
-          serviceName: serviceName
+          serviceName: serviceName,
+          displayName: App.Service.find().findProperty('serviceName', serviceName).get('displayName')
         },
         beforeSend: 'onStopServiceBeforeSend',
         success: 'onStopServiceSuccess',
@@ -661,7 +661,8 @@ App.WizardStep14Controller = Em.Controller.extend({
         sender: this,
         data: {
           hostName: hostName,
-          componentName: componentName
+          componentName: componentName,
+          displayName: App.format.role(componentName)
         },
         beforeSend: 'onInstallComponentBeforeSend',
         success: 'onInstallComponentSuccess',
@@ -702,7 +703,8 @@ App.WizardStep14Controller = Em.Controller.extend({
         name: 'reassign.start_components',
         sender: this,
         data: {
-          serviceName: serviceName
+          serviceName: serviceName,
+          displayName: App.Service.find().findProperty('serviceName', serviceName).get('displayName')
         },
         beforeSend: 'onStartComponentsBeforeSend',
         success: 'onStartComponentsSuccess',
@@ -756,9 +758,9 @@ App.WizardStep14Controller = Em.Controller.extend({
         this.setTasksStatus(task, 'COMPLETED');
       }
       stopPolling = true;
-    } else if (polledData.someProperty('Tasks.status', 'IN_PROGRESS')) {
-      if (task == 5) {
-        this.get('tasks')[5].set('progress', 50);
+    } else {
+      if (polledData.length == 1) {
+        this.get('tasks')[task].set('progress', 50);
       } else {
         var progress = polledData.filterProperty('Tasks.status', 'COMPLETED').length / polledData.length * 100;
         this.get('tasks')[task].set('progress', Math.round(progress));

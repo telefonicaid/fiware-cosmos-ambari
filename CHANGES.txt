@@ -12,6 +12,13 @@ Trunk (unreleased changes):
 
  NEW FEATURES
 
+ AMBARI-2140. Improve Ambari-agent test coverage. (swagle)
+
+ AMBARI-2133. Add Nagios alerts for Hadoop 2.0 in Ambari. (swagle)
+
+ AMBARI-2123. Allow the user to specify a non-root ssh user in Install Options.
+ (yusaku)
+
  AMBARI-2096. Create smoke test for HISTORYSERVER. (swagle)
 
  AMBARI-2094. Create smoke test for NODEMANAGER component as a part of 
@@ -289,6 +296,22 @@ Trunk (unreleased changes):
  (Sumit Mohanty via mahadev)
 
  IMPROVEMENTS
+
+ AMBARI-2158. Certain queries with metrics takes a long time (3 minutes on
+ a 450-node cluster). (tbeerbower)
+
+ AMBARI-2150. Reassign Master Wizard: start the service after reassigning the
+ master. (yusaku)
+
+ AMBARI-1887. Heatmap should display full details on mapped metric.
+ (Sandeep Baldawa via yusaku)
+
+ AMBARI-2137. Enable WebHDFS by default. (yusaku)
+
+ AMBARI-2122. Improve navigation when jumping from one page to Host Details
+ page and back. (yusaku)
+
+ AMBARI-2121. Allow Nagios user to be customized during install. (yusaku)
 
  AMBARI-2111. Enable customization of smoke test user. (yusaku)
 
@@ -841,6 +864,81 @@ Trunk (unreleased changes):
  Farrellee via mahadev)
 
  BUG FIXES
+
+ AMBARI-2156. zookeeper service check fails when zk client is not co-hosted
+ with zk server. (jaimin)
+
+ AMBARI-2161. Datanode Start fails in secure cluster. (jaimin)
+
+ AMBARI-2160. zookeeper smoke test fails with unknown host exception for
+ secure cluster.(jaimin)
+
+ AMBARI-2155. Incorrect page display after closing Reassign Master Wizard.
+ (yusaku)
+
+ AMBARI-2154. Unwanted auto scrolling on the Host detail page. (yusaku)
+
+ AMBARI-2153. Reassign Master Wizard: Background Operations popup should show
+ display names for services and components. (yusaku)
+
+ AMBARI-2152. Sometimes stale host / host component indicators are shown.
+ (yusaku)
+
+ AMBARI-2151. Incorrect error message for invalid user name. (yusaku)
+
+ AMBARI-2149. Ambari needs to set right path for GC log directory of Hbase
+ process. (mahadev)
+
+ AMBARI-2116. Add parameters to improve HIVE performance. Missing property. 
+ (swagle)
+
+ AMBARI-2146. When hive and oozie users have been changed after upgrade hive
+ metastore and oozie cannot start properly. (smohanty)
+
+ AMBARI-2145. Create script for deploying all new services for UI. (smohanty)
+
+ AMBARI-2144. Installation with existing Oracle DB fails. (swagle)
+
+ AMBARI-2143. HBASE fails to start on master. (smohanty
+
+ AMBARI-2141. When hbase user is changed hbase does not start properly
+ after upgrade. (smohanty)
+
+ AMBARI-2142. Unecessary use of @Transactional on all DAO methods. (swagle)
+
+ AMBARI-2107. Cluster CPU Chart is off the charts. Reopened. (swagle)
+
+ AMBARI-2139. Hive Service check fails on secure cluster. (jaimin)
+
+ AMBARI-2138. HBase smoke test fails on secure cluster. (swagle)
+
+ AMBARI-2136. Home paths are not set correctly in /etc/sqoop/conf/sqoop-env.sh
+ (mahadev)
+
+ AMBARI-2135. Ambari agent start say to look at .out, not .log. (smohanty)
+
+ AMBARI-2134. Set default value of oozie property
+ "oozie.service.AuthorizationService.authorization.enabled" to true. (jaimin)
+
+ AMBARI-2132. Error during "HDFS" service starting. (swagle)
+
+ AMBARI-2116. Add parameters to improve HIVE performance. With decriptions. 
+ (swagle)
+
+ AMBARI-2127. Service check should not emit log with Exceptions considering
+ its a positive scenario. (smohanty)
+
+ AMBARI-2124. Hive client is not getting reconfigured when it is co-hosted with 
+ hive server/metastore. (swagle)
+
+ AMBARI-2114. Refresh on the Service page always activates summary tab. (jaimin)
+
+ AMBARI-2120. Add few logs to allow root-cause the issue where agent seems
+ to unable to communicate with the server. (smohanty)
+
+ AMBARI-2116. Add parameters to improve HIVE performance. (swagle)
+
+ AMBARI-2117. Set jobtracker retire interval. (swagle)
 
  AMBARI-2109. Sanitize KEYS and NOTICE.txt on trunk. (yusaku)
  
@@ -1506,6 +1604,8 @@ Trunk (unreleased changes):
 
  AMBARI-1657. User directories on HDFS do not get created with custom names 
  provided from Ambari UI. (swagle)
+
+ AMBARI-2125. Fix for UNKNOWN state failing retry on install. (ncole)
 
  AMBARI-2072. Fix to remove actual_configs from cluster response. (ncole)
 

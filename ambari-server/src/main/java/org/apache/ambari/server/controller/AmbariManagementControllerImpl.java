@@ -31,6 +31,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import com.google.inject.persist.Transactional;
 import org.apache.ambari.server.AmbariException;
 import org.apache.ambari.server.ClusterNotFoundException;
 import org.apache.ambari.server.DuplicateResourceException;
@@ -1875,28 +1876,15 @@ public class AmbariManagementControllerImpl implements
     for (String serviceName : services) {
       Service s = cluster.getService(serviceName);
       for (String component : s.getServiceComponents().keySet()) {
-        List<ServiceComponentHost> potentialHosts = null;
+        List<ServiceComponentHost> potentialHosts = new
+          ArrayList<ServiceComponentHost>();
         ServiceComponent sc = s.getServiceComponents().get(component);
         if (sc.isClientComponent()) {
-          potentialHosts = new ArrayList<ServiceComponentHost>();
-          // Check if the Client components are in the list of changed hosts
-          if (existingSchs != null && !existingSchs.isEmpty()) {
-            for (ServiceComponentHost potentialSch : sc
-              .getServiceComponentHosts().values()) {
-              boolean addSch = true;
-              // Ignore the Sch if same service has changed on the same host
-              for (ServiceComponentHost existingSch : existingSchs) {
-                if (potentialSch.getHostName().equals(existingSch
-                    .getHostName()) && potentialSch.getServiceName().equals
-                    (existingSch.getServiceName())) {
-                  addSch = false;
-                  break;
-                }
-              }
-              if (addSch && !potentialSch.getHostState().equals(HostState
-                .HEARTBEAT_LOST)) {
-                potentialHosts.add(potentialSch);
-              }
+          for (ServiceComponentHost potentialSch : sc
+            .getServiceComponentHosts().values()) {
+            if (!potentialSch.getHostState().equals(HostState
+              .HEARTBEAT_LOST)) {
+              potentialHosts.add(potentialSch);
             }
           }
         }
@@ -1905,8 +1893,7 @@ public class AmbariManagementControllerImpl implements
         }
       }
     }
-    LOG.info("Client hosts for reinstall : " + clientSchs.size
-      ());
+    LOG.info("Client hosts for reinstall : " + clientSchs.size());
 
     for (String sc : clientSchs.keySet()) {
       Map<State, List<ServiceComponentHost>> schMap = new
@@ -2228,7 +2215,8 @@ public class AmbariManagementControllerImpl implements
     }
   }
 
-  private void updateServiceStates(
+  @Transactional
+  void updateServiceStates(
       Map<State, List<Service>> changedServices,
       Map<State, List<ServiceComponent>> changedComps,
       Map<String, Map<State, List<ServiceComponentHost>>> changedScHosts) {
@@ -2532,7 +2520,7 @@ public class AmbariManagementControllerImpl implements
         }
         for (ServiceComponentHost sch : sc.getServiceComponentHosts().values()){
           State oldSchState = sch.getState();
-          if (oldSchState == State.MAINTENANCE) {
+          if (oldSchState == State.MAINTENANCE || oldSchState == State.UNKNOWN) {
             //Ignore host components updates in this state
             if (LOG.isDebugEnabled()) {
               LOG.debug("Ignoring ServiceComponentHost"
@@ -2833,7 +2821,7 @@ public class AmbariManagementControllerImpl implements
 
       for (ServiceComponentHost sch : sc.getServiceComponentHosts().values()) {
         State oldSchState = sch.getState();
-        if (oldSchState == State.MAINTENANCE) {
+        if (oldSchState == State.MAINTENANCE || oldSchState == State.UNKNOWN) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Ignoring ServiceComponentHost"
                 + ", clusterName=" + request.getClusterName()
@@ -3045,7 +3033,7 @@ public class AmbariManagementControllerImpl implements
       }
 
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Received a createHostComponent request"
+        LOG.debug("Received a updateHostComponent request"
             + ", clusterName=" + request.getClusterName()
             + ", serviceName=" + request.getServiceName()
             + ", componentName=" + request.getComponentName()
@@ -3125,13 +3113,14 @@ public class AmbariManagementControllerImpl implements
       // If upgrade request comes without state information then its an error
       boolean upgradeRequest = checkIfUpgradeRequestAndValidate(request, cluster, s, sc, sch);
 
-      if (newState == null) {
+      if (newState == null || oldState.equals(State.UNKNOWN)) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Nothing to do for new updateServiceComponentHost request"
               + ", clusterName=" + request.getClusterName()
               + ", serviceName=" + request.getServiceName()
               + ", componentName=" + request.getComponentName()
               + ", hostname=" + request.getHostname()
+              + ", oldState=" + oldState
               + ", newDesiredState=null");
         }
         continue;
