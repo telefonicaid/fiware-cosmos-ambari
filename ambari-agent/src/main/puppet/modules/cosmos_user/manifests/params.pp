@@ -3,11 +3,12 @@ class cosmos_user::params inherits hdp::params {
   if has_key($configuration, 'cosmos-user') {
     $cosmos_user_config = $configuration['cosmos-user']
     $user = $cosmos_user_config['user']
-    $password = $cosmos_user_config['password']
+    $master = $cosmos_user_config['master']
 
-    $ssh_public_key = $cosmos_user_config['ssh_public_key']
-    $ssh_private_key = $cosmos_user_config['ssh_private_key']
-    $ssh_authorized_keys = $cosmos_user_config['ssh_authorized_keys']
+    $ssh_master_public_key = $cosmos_user_config['ssh_master_public_key']
+    $ssh_master_private_key = $cosmos_user_config['ssh_master_private_key']
+    $ssh_master_authorized_keys = $cosmos_user_config['ssh_master_authorized_keys']
+    $ssh_slave_authorized_keys = $cosmos_user_config['ssh_slave_authorized_keys']
   }
 
   $group = hdp_default('group', 'cosmos')

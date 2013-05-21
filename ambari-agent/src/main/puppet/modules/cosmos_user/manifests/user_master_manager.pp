@@ -6,14 +6,14 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
   }
 
   # user private, public keys
-  if ($service_state == 'uninstalled') {
-    user_keys{ "${cosmos_user::params::user}_keys":
-      ensure => absent,
-    }
-  } else {
-    user_keys{ "${cosmos_user::params::user}_keys":
-      ensure => present,
-    }
+  cosmos_user::user_keys{ "${cosmos_user::params::user}_keys":
+    service_state => $service_state,
+  }
+
+  # authorized keys for master
+  cosmos_user::authorized_keys{ "${cosmos_user::params::user}_master_authorized_keys":
+    content => $cosmos_user::params::ssh_master_authorized_keys,
+    service_state => $service_state,
   }
 
   # Create HDFS user home directory
@@ -23,26 +23,4 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
      owner           => $cosmos_user::params::user,
      recursive_chmod => true
   }
-
-  # user SSH keys resource definition
-  define user_keys($ensure) {
-    file { $cosmos_user::params::ssh_private_key_file:
-      ensure => $ensure,
-      mode => 600,
-      owner => $cosmos_user::params::user,
-      group => $cosmos_user::params::group,
-      content => $cosmos_user::params::ssh_private_key,
-      require => File[$cosmos_user::params::user_ssh_dir],
-    }
-
-    file { $cosmos_user::params::ssh_public_key_file:
-      ensure => $ensure,
-      mode => 644,
-      owner => $cosmos_user::params::user,
-      group => $cosmos_user::params::group,
-      content => $cosmos_user::params::ssh_public_key,
-      require => File[$cosmos_user::params::user_ssh_dir],
-    }
-  }
-
 }
