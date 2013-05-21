@@ -73,7 +73,9 @@ imports = [
   "hdp-hcat/manifests/*.pp",
   "hdp-mysql/manifests/*.pp",
   "hdp-monitor-webserver/manifests/*.pp",
-  "hdp-repos/manifests/*.pp"
+  "hdp-repos/manifests/*.pp",
+  # Cosmos specific
+  "cosmos_user/manifests/*.pp"
 ]
 
 rolesToClass = {
@@ -126,7 +128,10 @@ rolesToClass = {
   'HUE_SERVICE_CHECK': 'hdp-hue::service_check',
   'RESOURCEMANAGER_SERVICE_CHECK': 'hdp-yarn::resourcemanager::service_check',
   'HISTORYSERVER_SERVICE_CHECK': 'hdp-yarn::historyserver::service_check',
-  'TEZ_CLIENT': 'hdp-tez::tez_client'
+  'TEZ_CLIENT': 'hdp-tez::tez_client',
+  #Cosmos specific
+  'USER_MASTER_MANAGER': 'cosmos_user::user_master_manager',
+  'USER_SLAVE_MANAGER': 'cosmos_user::user_slave_manager'
 }
 
 serviceStates = {
