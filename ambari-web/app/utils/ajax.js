@@ -65,7 +65,7 @@ var urls = {
     }
   },
   'service.item.smoke': {
-    'real': '/clusters/{clusterName}/services/{serviceName}/actions/{serviceName}_SERVICE_CHECK',
+    'real': '/clusters/{clusterName}/services/{serviceName}/actions/{actionName}',
     'mock': '/data/wizard/deploy/poll_1.json',
     'format': function () {
       return {
@@ -86,7 +86,7 @@ var urls = {
       return {
         data: JSON.stringify({
           RequestInfo: {
-            "context": "Stop service " + data.serviceName
+            "context": "Stop service " + data.displayName
           },
           Body: {
             ServiceInfo: {
@@ -137,7 +137,7 @@ var urls = {
       return {
         data: JSON.stringify({
           RequestInfo: {
-            "context": "Install " + data.componentName
+            "context": "Install " + data.displayName
           },
           Body: {
             "HostRoles": {
@@ -156,11 +156,11 @@ var urls = {
       return {
         data: JSON.stringify({
           RequestInfo: {
-            "context": "Start service " + data.serviceName
+            "context": "Start service " + data.displayName
           },
           Body: {
             ServiceInfo: {
-              "state": "INSTALLED"
+              "state": "STARTED"
             }
           }
         })
@@ -447,9 +447,9 @@ var urls = {
   'wizard.launch_bootstrap': {
     'real': '/bootstrap',
     'mock': '/data/wizard/bootstrap/bootstrap.json',
+    'type': 'POST',
     'format': function (data) {
       return {
-        type: 'POST',
         async: false,
         contentType: 'application/json',
         data: data.bootStrapData
