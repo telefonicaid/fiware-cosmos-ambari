@@ -93,8 +93,13 @@ public class HostDAO {
   }
 
   @Transactional
+  public void removeUnmerged(HostEntity hostEntity) {
+    entityManagerProvider.get().remove(hostEntity);
+  }
+
+  @Transactional
   public void removeByName(String hostName) {
-    remove(findByName(hostName));
+    removeUnmerged(findByName(hostName));
   }
 
 }

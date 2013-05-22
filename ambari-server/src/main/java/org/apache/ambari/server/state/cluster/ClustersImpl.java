@@ -297,6 +297,7 @@ public class ClustersImpl implements Clusters {
   }
 
   @Override
+  @Transactional
   public void removeHost(String hostname) throws AmbariException {
     loadClustersAndHosts();
 
