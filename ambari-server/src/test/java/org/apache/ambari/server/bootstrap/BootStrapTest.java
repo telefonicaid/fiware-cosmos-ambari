@@ -28,7 +28,7 @@ import junit.framework.Assert;
 import junit.framework.TestCase;
 
 import org.apache.ambari.server.api.services.AmbariMetaInfo;
-import org.apache.ambari.server.bootstrap.BootStrapStatus.BSStat;
+import org.apache.ambari.server.bootstrap.BootStrapRequest.BSStat;
 import org.apache.ambari.server.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
@@ -67,7 +67,7 @@ public class BootStrapTest extends TestCase {
     LOG.info("ServerVersionFilePath is " + serverVersionFilePath);
     properties.setProperty(Configuration.BOOTSTRAP_DIR,
        bootdir);
-    properties.setProperty(Configuration.BOOTSTRAP_SCRIPT, "echo");
+    properties.setProperty(Configuration.BOOTSTRAP_ACTION_SCRIPT, "echo");
     properties.setProperty(Configuration.SRVR_KSTR_DIR_KEY, "target" + File.separator + "classes");
     properties.setProperty(Configuration.METADETA_DIR_PATH, metadetadir);
     properties.setProperty(Configuration.SERVER_VERSION_FILE, serverVersionFilePath);
@@ -86,7 +86,7 @@ public class BootStrapTest extends TestCase {
     BSResponse response = impl.runBootStrap(info);
     LOG.info("Response id from bootstrap " + response.getRequestId());
     /* do a query */
-    BootStrapStatus status = impl.getStatus(response.getRequestId());
+    BootStrapRequest status = impl.getStatus(response.getRequestId());
     LOG.info("Status " + status.getStatus());
     int num = 0;
     while ((status.getStatus() != BSStat.SUCCESS) && (num < 10000)) {

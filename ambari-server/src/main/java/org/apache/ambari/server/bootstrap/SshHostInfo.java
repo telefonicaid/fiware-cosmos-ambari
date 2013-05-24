@@ -18,6 +18,8 @@
 
 package org.apache.ambari.server.bootstrap;
 
+import org.apache.commons.lang.StringUtils;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,14 +93,7 @@ public class SshHostInfo {
     this.password = password;
   }
 
-  public String hostListAsString() {
-    StringBuilder ret = new StringBuilder();
-    if (this.hosts == null) {
-      return "";
-    }
-    for (String host : this.hosts) {
-      ret.append(host).append(":");
-    }
-    return ret.toString();
+  public String hostsString() {
+    return StringUtils.join(this.hosts, ",");
   }
 }
