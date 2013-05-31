@@ -308,6 +308,17 @@
               </sources>
             </mapping>
             <mapping>
+              <directory>/var/lib/ambari-server/resources/stacks/Cosmos</directory>
+              <filemode>755</filemode>
+              <username>root</username>
+              <groupname>root</groupname>
+              <sources>
+                <source>
+                  <location>src/main/resources/stacks/Cosmos</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
               <directory>/var/lib/ambari-server/resources/stacks/HDPLocal</directory>
               <filemode>755</filemode>
               <username>root</username>
