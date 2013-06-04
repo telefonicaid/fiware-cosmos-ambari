@@ -19,6 +19,7 @@
 package org.apache.ambari.server.security;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.regex.Pattern;
 
 import javax.servlet.Filter;
@@ -51,7 +52,7 @@ public class SecurityFilter implements Filter {
     String reqUrl = req.getRequestURL().toString();
 
     LOG.info("Filtering " + reqUrl + " for security purposes");
-    if (serReq.getLocalPort() == AmbariServer.AGENT_ONE_WAY_AUTH) {
+    if (serReq.getLocalPort() != AmbariServer.AGENT_TWO_WAY_AUTH) {
       if (isRequestAllowed(reqUrl, req.getMethod())) {
         LOG.info("OK, request can go on");
         filtCh.doFilter(serReq, serResp);
@@ -60,8 +61,8 @@ public class SecurityFilter implements Filter {
         LOG.warn("This request is not allowed on this port");
       }
 
-	}
-	else {
+    }
+	  else {
       LOG.info("OK, request can go on because it is using the safe port");
       filtCh.doFilter(serReq, serResp);
     }
@@ -72,26 +73,31 @@ public class SecurityFilter implements Filter {
   }
 
   private boolean isRequestAllowed(String reqUrl, String method) {
-	try {
+    try {
+      URL url = new URL(reqUrl);
+      if (!"https".equals(url.getProtocol())) {
+        LOG.warn(String.format("Request %s is not using HTTPS", reqUrl));
+        return false;
+      }
 
-      boolean isMatch = Pattern.matches("https://[A-z]*:[0-9]*/cert/ca[/]*", reqUrl);
-		
-      if (isMatch)
-    	  return true;
-		
-		 isMatch = Pattern.matches("https://[A-z]*:[0-9]*/certs/[A-z0-9-.]*", reqUrl);
-		
-		 if (isMatch && !method.equals("DELETE"))
-			 return true;
-		
-		 isMatch = Pattern.matches("https://[A-z]*:[0-9]*/resources/.*", reqUrl);
-		
-		 if (isMatch)
-			 return true;
-		
-	} catch (Exception e) {
-	}
-  LOG.warn("Request " + reqUrl + " doesn't match any pattern.");
-	return false;
+      if (Pattern.matches("/cert/ca(/?)", url.getPath())) {
+        return true;
+      }
+
+      if (Pattern.matches("/certs/(\\w+)", url.getPath())
+          && !method.equals("DELETE")) {
+        return true;
+      }
+
+      if (Pattern.matches("/resources/.*", url.getPath())) {
+        return true;
+      }
+
+    } catch (Exception e) {
+      LOG.warn("Exception while validating if request is secure " +
+        e.toString());
+    }
+    LOG.warn("Request " + reqUrl + " doesn't match any pattern.");
+    return false;
   }
 }
