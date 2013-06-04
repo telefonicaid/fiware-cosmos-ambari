@@ -1,25 +1,20 @@
+# Telefónica Digital - Product Development and Innovation
+#
+# THIS CODE AND INFORMATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND,
+# EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
+# All rights reserved.
+
 class cosmos_user::params inherits hdp::params {
 
   if has_key($configuration, 'cosmos-user') {
     $cosmos_user_config = $configuration['cosmos-user']
-    $user = $cosmos_user_config['user']
-    $master = $cosmos_user_config['master']
-
-    $ssh_master_public_key = $cosmos_user_config['ssh_master_public_key']
-    $ssh_master_private_key = $cosmos_user_config['ssh_master_private_key']
-    $ssh_master_authorized_keys = $cosmos_user_config['ssh_master_authorized_keys']
-    $ssh_slave_authorized_keys = $cosmos_user_config['ssh_slave_authorized_keys']
+    notice("Number of Cosmos users: ${cosmos_user_config['number_of_users']}")
+    $users_preambles = cosmos_user_range('1', $cosmos_user_config['number_of_users'])
   }
 
   $group = hdp_default('group', 'cosmos')
-
-  $user_home = "/home/${user}"
-  $user_ssh_dir = "${user_home}/.ssh"
-  
-  $ssh_private_key_file ="${user_ssh_dir}/id_rsa"
-  $ssh_public_key_file ="${user_ssh_dir}/id_rsa.pub"
-  $ssh_authorized_keys_file ="${user_ssh_dir}/authorized_keys"
-
-  $hdfs_user_dir = "/user/${user}"
   $hdfs_user_dir_mode = 700
 }
