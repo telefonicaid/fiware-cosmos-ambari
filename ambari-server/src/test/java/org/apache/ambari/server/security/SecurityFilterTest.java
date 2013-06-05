@@ -61,7 +61,7 @@ public class SecurityFilterTest {
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockHttpServletRequest request = this.getDefaultRequest();
     request.setMethod("DELETE");
-    request.setRequestURI("/certs/somehost");
+    request.setRequestURI("/certs/www.andromeda-01.com");
     MockFilterChain chain = new MockFilterChain();
     filter.doFilter(request, response, chain);
     assertNull(chain.getRequest());
@@ -73,7 +73,7 @@ public class SecurityFilterTest {
     SecurityFilter filter = new SecurityFilter();
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockHttpServletRequest request = this.getDefaultRequest();
-    request.setRequestURI("/certs/somehost");
+    request.setRequestURI("/certs/www.andromeda-01.com");
     request.setMethod("POST");
     MockFilterChain chain = new MockFilterChain();
     filter.doFilter(request, response, chain);
