@@ -84,7 +84,7 @@ public class SecurityFilter implements Filter {
         return true;
       }
 
-      if (Pattern.matches("/certs/(\\w+)", url.getPath())
+      if (Pattern.matches("/certs/[^/]+", url.getPath())
           && !method.equals("DELETE")) {
         return true;
       }
