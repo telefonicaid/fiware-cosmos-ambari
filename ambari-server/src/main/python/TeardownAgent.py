@@ -26,7 +26,7 @@ import subprocess
 def exec_os_command(os_command):
     os_stat = subprocess.Popen(os_command, stdout=subprocess.PIPE)
     return {
-        "exitstatus": os.stat.returncode,
+        "exitstatus": os_stat.returncode,
         "log": os_stat.communicate(0)
     }
 
