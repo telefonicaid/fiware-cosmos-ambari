@@ -28,5 +28,10 @@
       <reponame>HDP-epel</reponame>
       <mirrorslist><![CDATA[http://mirrors.fedoraproject.org/mirrorlist?repo=epel-6&arch=$basearch]]></mirrorslist>
     </repo>
+    <repo>
+      <baseurl>http://servilinux.hi.inet/ambari/Updates-HDP-1.2.1/</baseurl>
+      <repoid>Updates-HDP-1.2.1</repoid>
+      <reponame>Updates-HDP</reponame>
+    </repo>
   </os>
 </reposinfo>
