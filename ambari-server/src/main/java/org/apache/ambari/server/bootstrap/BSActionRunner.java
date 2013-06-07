@@ -294,6 +294,12 @@ class BSActionRunner extends Thread {
     finally {
       /* get the bstatus */
       BootStrapRequest tmpStatus = bsImpl.getStatus(requestId);
+      for (BSHostStatus hostStatus : tmpStatus.getHostsStatus()) {
+        if ("FAILED".equals(hostStatus.getStatus())) {
+          stat = BSStat.ERROR;
+          break;
+        }
+      }
       tmpStatus.setLog(scriptlog);
       tmpStatus.setStatus(stat);
       bsImpl.updateStatus(requestId, tmpStatus);
