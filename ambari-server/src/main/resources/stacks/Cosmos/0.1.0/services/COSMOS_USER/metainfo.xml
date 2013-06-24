@@ -17,12 +17,12 @@
     <components>
         <component>
             <name>USER_MASTER_MANAGER</name>
-            <category>MASTER</category>
+            <category>CLIENT</category>
         </component>
 
         <component>
             <name>USER_SLAVE_MANAGER</name>
-            <category>SLAVE</category>
+            <category>CLIENT</category>
         </component>
     </components>
 
