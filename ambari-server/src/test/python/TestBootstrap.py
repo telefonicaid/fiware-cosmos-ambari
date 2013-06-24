@@ -211,7 +211,7 @@ class TestBootstrap(TestCase):
     @patch.object(BootStrapAction, "create_done_files")
     @patch.object(BootStrapAction, "getRunActionWithoutPasswordCommand")
     @patch.object(BootStrapAction, "getMoveRepoFileWithoutPasswordCommand")
-        def test_commands_without_password_are_called_for_passwordless_user(
+    def test_commands_without_password_are_called_for_passwordless_user(
             self, getMoveRepoFileWithoutPasswordCommand_method,
             getRunActionWithoutPasswordCommand_method,
             create_done_files_method,
