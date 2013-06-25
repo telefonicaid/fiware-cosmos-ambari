@@ -100,5 +100,3 @@ case "$1" in
         echo "Usage: /usr/sbin/ambari-server {start|stop|restart|setup|upgrade|status|upgradestack} [options]"
         exit 1
 esac
-
-exit 0
