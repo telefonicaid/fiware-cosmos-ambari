@@ -51,6 +51,7 @@
     <module>ambari-project</module>
     <module>ambari-server</module>
     <module>ambari-agent</module>
+    <module>contrib/ambari-log4j</module>
   </modules>
   <build>
     <pluginManagement>
