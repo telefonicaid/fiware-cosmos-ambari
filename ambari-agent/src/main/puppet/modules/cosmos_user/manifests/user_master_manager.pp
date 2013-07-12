@@ -37,7 +37,6 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
 
     # Create HDFS user home directory
     hdp-hadoop::hdfs::directory{ $params_for_user['hdfs_user_dir']:
-      service_state   => $service_state,
       mode            => $cosmos_user::params::hdfs_user_dir_mode,
       owner           => $params_for_user['username'],
       recursive_chmod => true
