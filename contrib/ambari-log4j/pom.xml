@@ -186,4 +186,17 @@
     </plugins>
   </build>
 
+  <distributionManagement>
+      <repository>
+          <id>${repoMavenId}</id>
+          <name>${repoMavenName}</name>
+          <url>${repoMavenUrl}</url>
+      </repository>
+      <snapshotRepository>
+          <id>${repoMavenSnapshotId}</id>
+          <name>${repoMavenSnapshotName}</name>
+          <url>${repoMavenSnapshotUrl}</url>
+      </snapshotRepository>
+  </distributionManagement>
+
 </project>
