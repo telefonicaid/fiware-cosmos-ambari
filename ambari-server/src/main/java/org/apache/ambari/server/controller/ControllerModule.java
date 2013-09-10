@@ -24,7 +24,6 @@ import com.google.inject.Scopes;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 import com.google.inject.persist.jpa.JpaPersistModule;
 import org.apache.ambari.server.actionmanager.*;
-import org.apache.ambari.server.api.services.AmbariMetaInfo;
 import org.apache.ambari.server.configuration.Configuration;
 import org.apache.ambari.server.orm.PersistenceType;
 import org.apache.ambari.server.serveraction.ServerActionManager;
@@ -43,6 +42,8 @@ import org.apache.ambari.server.state.svccomphost.ServiceComponentHostImpl;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.password.StandardPasswordEncoder;
 
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 /**
@@ -51,18 +52,15 @@ import java.util.Properties;
 public class ControllerModule extends AbstractModule {
 
   private final Configuration configuration;
-  private final AmbariMetaInfo ambariMetaInfo;
   private final HostsMap hostsMap;
 
   public ControllerModule() throws Exception {
     configuration = new Configuration();
-    ambariMetaInfo = new AmbariMetaInfo(configuration);
     hostsMap = new HostsMap(configuration);
   }
 
   public ControllerModule(Properties properties) throws Exception {
     configuration = new Configuration(properties);
-    ambariMetaInfo = new AmbariMetaInfo(configuration);
     hostsMap = new HostsMap(configuration);
   }
 
@@ -71,7 +69,6 @@ public class ControllerModule extends AbstractModule {
     installFactories();
 
     bind(Configuration.class).toInstance(configuration);
-    bind(AmbariMetaInfo.class).toInstance(ambariMetaInfo);
     bind(HostsMap.class).toInstance(hostsMap);
     bind(PasswordEncoder.class).toInstance(new StandardPasswordEncoder());
 
@@ -82,10 +79,19 @@ public class ControllerModule extends AbstractModule {
     bind(ActionDBAccessor.class).to(ActionDBAccessorImpl.class);
     bindConstant().annotatedWith(Names.named("schedulerSleeptime")).to(10000L);
     bindConstant().annotatedWith(Names.named("actionTimeout")).to(600000L);
+
+    //ExecutionCommands cache size
+
+    bindConstant().annotatedWith(Names.named("executionCommandCacheSize")).
+        to(configuration.getExecutionCommandsCacheSize());
+
     bind(AmbariManagementController.class)
         .to(AmbariManagementControllerImpl.class);
+    bind(AbstractRootServiceResponseFactory.class).to(RootServiceResponseFactory.class);
     bind(HBaseMasterPortScanner.class).in(Singleton.class);
     bind(ServerActionManager.class).to(ServerActionManagerImpl.class);
+
+    requestStaticInjection(ExecutionCommandWrapper.class);
   }
 
   private JpaPersistModule buildJpaPersistModule() {
@@ -93,6 +99,16 @@ public class ControllerModule extends AbstractModule {
     JpaPersistModule jpaPersistModule = new JpaPersistModule(Configuration.JDBC_UNIT_NAME);
 
     Properties properties = new Properties();
+
+    // custom jdbc properties
+    Map<String, String> custom = configuration.getDatabaseCustomProperties();
+    
+    if (0 != custom.size()) {
+      for (Entry<String, String> entry : custom.entrySet()) {
+        properties.setProperty("eclipselink.jdbc.property." + entry.getKey(),
+           entry.getValue());
+      }
+    }    
 
     switch (persistenceType) {
       case IN_MEMORY:
@@ -107,7 +123,7 @@ public class ControllerModule extends AbstractModule {
         properties.put("javax.persistence.jdbc.driver", configuration.getDatabaseDriver());
         break;
       case LOCAL:
-        properties.put("javax.persistence.jdbc.url", Configuration.JDBC_LOCAL_URL);
+        properties.put("javax.persistence.jdbc.url", configuration.getLocalDatabaseUrl());
         properties.put("javax.persistence.jdbc.driver", Configuration.JDBC_LOCAL_DRIVER);
         break;
     }
@@ -121,6 +137,8 @@ public class ControllerModule extends AbstractModule {
         break;
       case DROP_AND_CREATE:
         properties.setProperty("eclipselink.ddl-generation", "drop-and-create-tables");
+        break;
+      default:
         break;
     }
     properties.setProperty("eclipselink.ddl-generation.output-mode", "both");
@@ -148,7 +166,7 @@ public class ControllerModule extends AbstractModule {
     install(new FactoryModuleBuilder().implement(
         Config.class, ConfigImpl.class).build(ConfigFactory.class));
     install(new FactoryModuleBuilder().build(StageFactory.class));
-    install(new FactoryModuleBuilder().build(HostRoleCommandFactory.class));
+    bind(HostRoleCommandFactory.class).to(HostRoleCommandFactoryImpl.class);
   }
 
 }

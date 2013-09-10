@@ -27,20 +27,25 @@ App.MainAdminView = Em.View.extend({
       url: 'adminUser',
       label: Em.I18n.t('common.users')
     }];
+    if (App.get('isHadoop2Stack') && App.supports.highAvailability) {
+      items.push({
+        name: 'highAvailability',
+        url: 'adminHighAvailability',
+        label: Em.I18n.t('admin.highAvailability')
+      });
+    }
     if (App.supports.secureCluster) {
       items.push({
         name: 'security',
         url: 'adminSecurity.index',
         label: Em.I18n.t('common.security')
       });
-    }
-    if (App.supports.stackUpgrade) {
-      items.push({
-        name: 'cluster',
-        url: 'adminCluster',
-        label: Em.I18n.t('common.cluster')
-      });
-    }
+    };
+    items.push({
+      name: 'cluster',
+      url: 'adminCluster',
+      label: Em.I18n.t('common.cluster')
+    });
     items.push({
       name: 'misc',
       url: 'adminMisc',

@@ -32,7 +32,8 @@ class LiveStatus:
   SERVICES = [
     "HDFS", "MAPREDUCE", "GANGLIA", "HBASE",
     "NAGIOS", "ZOOKEEPER", "OOZIE", "HCATALOG",
-    "KERBEROS", "TEMPLETON", "HIVE", "WEBHCAT"
+    "KERBEROS", "TEMPLETON", "HIVE", "WEBHCAT",
+    "YARN", "MAPREDUCE2", "FLUME"
   ]
 
   COMPONENTS = [
@@ -42,50 +43,61 @@ class LiveStatus:
        "componentName" : "NAMENODE"},
       {"serviceName" : "HDFS",
        "componentName" : "SECONDARY_NAMENODE"},
-#      {"serviceName" : "HDFS",
-#       "componentName" : "HDFS_CLIENT"},
+      {"serviceName" : "HDFS",
+       "componentName" : "JOURNALNODE"},
+      {"serviceName" : "HDFS",
+       "componentName" : "ZKFC"},
+
       {"serviceName" : "MAPREDUCE",
        "componentName" : "JOBTRACKER"},
       {"serviceName" : "MAPREDUCE",
        "componentName" : "TASKTRACKER"},
-#      {"serviceName" : "MAPREDUCE",
-#       "componentName" : "MAPREDUCE_CLIENT"},
-      {"serviceName" : "GANGLIA",             #!
+
+      {"serviceName" : "GANGLIA",
        "componentName" : "GANGLIA_SERVER"},
-      {"serviceName" : "GANGLIA",             #!
+      {"serviceName" : "GANGLIA",
        "componentName" : "GANGLIA_MONITOR"},
-      {"serviceName" : "HBASE",               #!
+
+      {"serviceName" : "HBASE",
        "componentName" : "HBASE_MASTER"},
-      {"serviceName" : "HBASE",              #!
+      {"serviceName" : "HBASE",
        "componentName" : "HBASE_REGIONSERVER"},
-#      {"serviceName" : "HBASE",
-#       "componentName" : "HBASE_CLIENT"},
-      {"serviceName" : "NAGIOS",             #!
+
+      {"serviceName" : "NAGIOS",
        "componentName" : "NAGIOS_SERVER"},
+
+      {"serviceName" : "FLUME",
+       "componentName" : "FLUME_SERVER"},
+
       {"serviceName" : "ZOOKEEPER",
        "componentName" : "ZOOKEEPER_SERVER"},
-#      {"serviceName" : "ZOOKEEPER",
-#       "componentName" : "ZOOKEEPER_CLIENT"},
+
       {"serviceName" : "OOZIE",
        "componentName" : "OOZIE_SERVER"},
-#      {"serviceName" : "OOZIE",
-#       "componentName" : "OOZIE_CLIENT"},
-      {"serviceName" : "HCATALOG",            #!
+
+      {"serviceName" : "HCATALOG",
        "componentName" : "HCATALOG_SERVER"},
+
       {"serviceName" : "KERBEROS",
-       "componentName" : "KERBEROS_SERVER"}, #!
-#      {"serviceName" : "TEMPLETON",
-#       "componentName" : "TEMPLETON_SERVER"},
-#      {"serviceName" : "TEMPLETON",
-#       "componentName" : "TEMPLETON_CLIENT"},
-      {"serviceName" : "HIVE",               #!
+       "componentName" : "KERBEROS_SERVER"},
+
+      {"serviceName" : "HIVE",
        "componentName" : "HIVE_SERVER"},
-      {"serviceName" : "HIVE",               #!
+      {"serviceName" : "HIVE",
        "componentName" : "HIVE_METASTORE"},
-      {"serviceName" : "HIVE",               #!
+      {"serviceName" : "HIVE",
        "componentName" : "MYSQL_SERVER"},
+
       {"serviceName" : "WEBHCAT",
        "componentName" : "WEBHCAT_SERVER"},
+
+      {"serviceName" : "YARN",
+       "componentName" : "RESOURCEMANAGER"},
+      {"serviceName" : "YARN",
+       "componentName" : "NODEMANAGER"},
+
+      {"serviceName" : "MAPREDUCE2",
+       "componentName" : "HISTORYSERVER"},
   ]
 
   LIVE_STATUS = "STARTED"
@@ -107,7 +119,9 @@ class LiveStatus:
   # Live status was stripped from heartbeat after revision e1718dd
   def build(self):
     global SERVICES, COMPONENTS, LIVE_STATUS, DEAD_STATUS
-    statusCheck = StatusCheck(AmbariConfig.servicesToPidNames, AmbariConfig.pidPathesVars, self.globalConfig, AmbariConfig.linuxUserPattern)
+    statusCheck = StatusCheck(AmbariConfig.servicesToPidNames,
+      AmbariConfig.pidPathesVars, self.globalConfig,
+      AmbariConfig.servicesToLinuxUser)
     livestatus = None
     for component in self.COMPONENTS:
       if component["serviceName"] == self.service and component["componentName"] == self.component:

@@ -20,11 +20,15 @@ var App = require('app');
 App.servicesMapper = App.QuickDataMapper.create({
   servicesSortOrder: [
     'HDFS',
+    'YARN',
     'MAPREDUCE',
+    'MAPREDUCE2',
+    'TEZ',
     'HBASE',
     'HIVE',
     'HCATALOG',
     'WEBHCAT',
+    'FLUME',
     'OOZIE',
     'GANGLIA',
     'NAGIOS',
@@ -58,6 +62,7 @@ App.servicesMapper = App.QuickDataMapper.create({
     name_node_id: 'nameNodeComponent.host_components[0].HostRoles.host_name',
     sname_node_id: 'snameNodeComponent.host_components[0].HostRoles.host_name',
     data_nodes: 'data_nodes',
+    journal_nodes: 'journal_nodes',
     name_node_start_time: 'nameNodeComponent.ServiceComponentInfo.StartTime',
     jvm_memory_heap_used: 'nameNodeComponent.host_components[0].metrics.jvm.memHeapUsedM',
     jvm_memory_heap_committed: 'nameNodeComponent.host_components[0].metrics.jvm.memHeapCommittedM',
@@ -73,7 +78,42 @@ App.servicesMapper = App.QuickDataMapper.create({
     dfs_under_replicated_blocks: 'nameNodeComponent.ServiceComponentInfo.UnderReplicatedBlocks',
     dfs_total_files: 'nameNodeComponent.ServiceComponentInfo.TotalFiles',
     upgrade_status: 'nameNodeComponent.ServiceComponentInfo.UpgradeFinalized',
-    safe_mode_status: 'nameNodeComponent.ServiceComponentInfo.Safemode'
+    safe_mode_status: 'nameNodeComponent.ServiceComponentInfo.Safemode',
+    name_node_cpu: 'nameNodeComponent.host_components[0].metrics.cpu.cpu_wio',
+    name_node_rpc: 'nameNodeComponent.host_components[0].metrics.rpc.RpcQueueTime_avg_time'
+  },
+  yarnConfig: {
+    version: 'resourceManagerComponent.ServiceComponentInfo.Version',
+    resource_manager_node_id: 'resourceManagerComponent.host_components[0].HostRoles.host_name',
+    node_manager_nodes: 'node_manager_nodes',
+    node_manager_live_nodes: 'node_manager_live_nodes',
+    yarn_client_nodes: 'yarn_client_nodes',
+    resource_manager_start_time: 'resourceManagerComponent.ServiceComponentInfo.StartTime',
+    jvm_memory_heap_used: 'resourceManagerComponent.host_components[0].metrics.jvm.memHeapUsedM',
+    jvm_memory_heap_committed: 'resourceManagerComponent.host_components[0].metrics.jvm.memHeapCommittedM',
+    containers_allocated: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AllocatedContainers',
+    containers_pending: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.PendingContainers',
+    containers_reserved: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.ReservedContainers',
+    apps_submitted: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AppsSubmitted',
+    apps_running: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AppsRunning',
+    apps_pending: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AppsPending',
+    apps_completed: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AppsCompleted',
+    apps_killed: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AppsKilled',
+    apps_failed: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AppsFailed',
+    node_managers_count_active: 'resourceManagerComponent.ServiceComponentInfo.rm_metrics.cluster.activeNMcount',
+    //node_managers_count_lost: 'resourceManagerComponent.ServiceComponentInfo.rm_metrics.cluster.lostNMcount',
+    node_managers_count_unhealthy: 'resourceManagerComponent.ServiceComponentInfo.rm_metrics.cluster.unhealthyNMcount',
+    node_managers_count_rebooted: 'resourceManagerComponent.ServiceComponentInfo.rm_metrics.cluster.rebootedNMcount',
+    node_managers_count_decommissioned: 'resourceManagerComponent.ServiceComponentInfo.rm_metrics.cluster.decommissionedNMcount',
+    allocated_memory: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AllocatedMB',
+    available_memory: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.AvailableMB',
+    reserved_memory: 'resourceManagerComponent.host_components[0].metrics.yarn.Queue.root.ReservedMB',
+    queue: 'resourceManagerComponent.queue'
+  },
+  mapReduce2Config: {
+    version: 'jobHistoryServerComponent.ServiceComponentInfo.Version',
+    job_history_server_id: 'jobHistoryServerComponent.host_components[0].HostRoles.host_name',
+    map_reduce2_clients: 'map_reduce2_clients'
   },
   mapReduceConfig: {
     version: 'jobTrackerComponent.ServiceComponentInfo.Version',
@@ -89,6 +129,7 @@ App.servicesMapper = App.QuickDataMapper.create({
     reduce_slots: 'reduce_slots',
     jobs_submitted: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.jobs_submitted',
     jobs_completed: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.jobs_completed',
+    jobs_running: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.jobs_running',
     map_slots_occupied: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.occupied_map_slots',
     map_slots_reserved: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.reserved_map_slots',
     reduce_slots_occupied: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.occupied_reduce_slots',
@@ -97,7 +138,9 @@ App.servicesMapper = App.QuickDataMapper.create({
     maps_waiting: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.waiting_maps',
     reduces_running: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.running_reduces',
     reduces_waiting: 'jobTrackerComponent.ServiceComponentInfo.jobtracker.waiting_reduces',
-    trackers_decommissioned: 'jobTrackerComponent.host_components[0].metrics.mapred.jobtracker.trackers_decommissioned'
+    trackers_decommissioned: 'jobTrackerComponent.host_components[0].metrics.mapred.jobtracker.trackers_decommissioned',
+    job_tracker_cpu: 'jobTrackerComponent.host_components[0].metrics.cpu.cpu_wio',
+    job_tracker_rpc: 'jobTrackerComponent.host_components[0].metrics.rpc.RpcQueueTime_avg_time'
   },
   hbaseConfig: {
     version: 'masterComponent.ServiceComponentInfo.Version',
@@ -150,26 +193,42 @@ App.servicesMapper = App.QuickDataMapper.create({
           finalJson.rand = Math.random();
           result.push(finalJson);
           App.store.load(App.HDFSService, finalJson);
-        }
-        else
-          if (item && item.ServiceInfo && item.ServiceInfo.service_name == "MAPREDUCE") {
-            finalJson = this.mapreduceMapper(item);
-            finalJson.rand = Math.random();
-            result.push(finalJson);
-            App.store.load(App.MapReduceService, finalJson);
+        }else if (item && item.ServiceInfo && item.ServiceInfo.service_name == "MAPREDUCE") {
+          finalJson = this.mapreduceMapper(item);
+          finalJson.rand = Math.random();
+          result.push(finalJson);
+          App.store.load(App.MapReduceService, finalJson);
+        }else if (item && item.ServiceInfo && item.ServiceInfo.service_name == "HBASE") {
+          finalJson = this.hbaseMapper(item);
+          finalJson.rand = Math.random();
+          result.push(finalJson);
+          App.store.load(App.HBaseService, finalJson);
+        }else if (item && item.ServiceInfo && item.ServiceInfo.service_name == "FLUME") {
+          finalJson = this.flumeMapper(item);
+          finalJson.rand = Math.random();
+          result.push(finalJson);
+          if(finalJson.nodeObjs){
+            finalJson.nodeObjs.forEach(function(no){
+              App.store.load(App.FlumeNode, no);
+            });
           }
-          else
-            if (item && item.ServiceInfo && item.ServiceInfo.service_name == "HBASE") {
-              finalJson = this.hbaseMapper(item);
-              finalJson.rand = Math.random();
-              result.push(finalJson);
-              App.store.load(App.HBaseService, finalJson);
-            }
-            else {
-              finalJson = this.parseIt(item, this.config);
-              finalJson.rand = Math.random();
-              result.push(finalJson);
-            }
+          App.store.load(App.FlumeService, finalJson);
+        }else if (item && item.ServiceInfo && item.ServiceInfo.service_name == "YARN") {
+          finalJson = this.yarnMapper(item);
+          finalJson.rand = Math.random();
+          result.push(finalJson);
+          App.store.load(App.YARNService, finalJson);
+        }else if (item && item.ServiceInfo && item.ServiceInfo.service_name == "MAPREDUCE2") {
+          finalJson = this.mapreduce2Mapper(item);
+          finalJson.rand = Math.random();
+          result.push(finalJson);
+          App.store.load(App.MapReduce2Service, finalJson);
+        }else {
+          finalJson = this.parseIt(item, this.config);
+          finalJson.rand = Math.random();
+          this.mapQuickLinks(finalJson, item);
+          result.push(finalJson);
+        }
       }, this);
 
 
@@ -195,6 +254,32 @@ App.servicesMapper = App.QuickDataMapper.create({
         this.calculateState(hcJson);
       }, this);
 
+      var oldHostComponents = App.HostComponent.find();
+      var item;
+      var currentHCWithComponentNames = {};
+      var currentComponentNameHostNames = {};
+      for ( var i = 0; i < oldHostComponents.content.length; i++) {
+        item = oldHostComponents.objectAt(i);
+        if (item && !result.findProperty('id', item.get('id'))) {
+          item.deleteRecord();
+        } else {
+          var componentName = item.get('componentName');
+          if (componentName) {
+            currentHCWithComponentNames[item.get('id')] = item.get('id');
+          }
+          if (!currentComponentNameHostNames[componentName]) {
+            currentComponentNameHostNames[componentName] = [];
+          }
+          currentComponentNameHostNames[componentName].pushObject(item.get('host.hostName'));
+        }
+      }
+      result.forEach(function (item) {
+        if (currentHCWithComponentNames[item.id] != null && 
+            !currentComponentNameHostNames[item.component_name].contains(item.host_id)) {
+          item.id = (new Date).getTime();
+        }
+      });
+      
       App.store.loadMany(this.get('model3'), result);
       for(var hostComponentId in hostComponentToActualConfigsMap){
         var hostComponentObj = App.HostComponent.find(hostComponentId);
@@ -225,8 +310,24 @@ App.servicesMapper = App.QuickDataMapper.create({
     console.log('out service mapper.  Took ' + (new Date().getTime() - start) + 'ms');
   },
 
+  /**
+   * Map quick links to services:OOZIE,GANGLIA,NAGIOS,HUE
+   * @param finalJson
+   * @param item
+   */
+  mapQuickLinks: function (finalJson, item){
+    if(item && item.ServiceInfo && item.ServiceInfo.service_name == "OOZIE"){
+      finalJson.quick_links = [19];
+    }else if(item && item.ServiceInfo && item.ServiceInfo.service_name == "GANGLIA"){
+      finalJson.quick_links = [20];
+    }else if(item && item.ServiceInfo && item.ServiceInfo.service_name == "NAGIOS"){
+      finalJson.quick_links = [21];
+    }else if(item && item.ServiceInfo && item.ServiceInfo.service_name == "HUE"){
+      finalJson.quick_links = [22];
+    }
+  },
+
   hdfsMapper: function (item) {
-    var result = [];
     var finalConfig = jQuery.extend({}, this.config);
     // Change the JSON so that it is easy to map
     var hdfsConfig = this.hdfsConfig;
@@ -254,6 +355,16 @@ App.servicesMapper = App.QuickDataMapper.create({
       if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "SECONDARY_NAMENODE") {
         item.snameNodeComponent = component;
       }
+      if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "JOURNALNODE") {
+        if (!item.journal_nodes) {
+          item.journal_nodes = [];
+        }
+        if (component.host_components) {
+          component.host_components.forEach(function (hc) {
+            item.journal_nodes.push(hc.HostRoles.host_name);
+          });
+        }
+      }
       if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "DATANODE") {
         if (!item.data_nodes) {
           item.data_nodes = [];
@@ -268,6 +379,106 @@ App.servicesMapper = App.QuickDataMapper.create({
     // Map
     var finalJson = this.parseIt(item, finalConfig);
     finalJson.quick_links = [1, 2, 3, 4];
+
+    return finalJson;
+  },
+  yarnMapper: function (item) {
+    var result = [];
+    var self = this;
+    var finalConfig = jQuery.extend({}, this.config);
+    // Change the JSON so that it is easy to map
+    var yarnConfig = this.yarnConfig;
+    item.components.forEach(function (component) {
+      if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "RESOURCEMANAGER") {
+        item.resourceManagerComponent = component;
+        // live nodes calculation
+        var nmList = [];
+        if (component.ServiceComponentInfo.rm_metrics && component.ServiceComponentInfo.rm_metrics.cluster && component.ServiceComponentInfo.rm_metrics.cluster.nodeManagers) {
+          nmList = App.parseJSON(component.ServiceComponentInfo.rm_metrics.cluster.nodeManagers);
+        }
+        nmList.forEach(function (nm) {
+          if (nm.State === "RUNNING") {
+            if (!item.node_manager_live_nodes) {
+              item.node_manager_live_nodes = [];
+            }
+            item.node_manager_live_nodes.push(nm.HostName);
+          }
+        });
+
+        if (component.host_components[0].metrics && component.host_components[0].metrics.yarn) {
+          var root = component.host_components[0].metrics.yarn.Queue.root;
+          var queue = JSON.stringify({
+            'root': self.parseObject(root)
+          });
+          component.queue = queue;
+        }
+        // extend config
+        finalConfig = jQuery.extend(finalConfig, yarnConfig);
+      }
+      if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "NODEMANAGER") {
+        if (!item.node_manager_nodes) {
+          item.node_manager_nodes = [];
+        }
+        if (component.host_components) {
+          component.host_components.forEach(function (hc) {
+            item.node_manager_nodes.push(hc.HostRoles.host_name);
+          });
+        }
+      }
+      if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "YARN_CLIENT") {
+        if (!item.yarn_client_nodes) {
+          item.yarn_client_nodes = [];
+        }
+        if (component.host_components) {
+          component.host_components.forEach(function (hc) {
+            item.yarn_client_nodes.push(hc.HostRoles.host_name);
+          });
+        }
+      }
+    });
+    // Map
+    var finalJson = this.parseIt(item, finalConfig);
+    finalJson.quick_links = [ 23, 24, 25, 26 ];
+
+    return finalJson;
+  },
+
+  parseObject: function(obj) {
+    var res = {};
+    for (var p in obj) {
+      if (obj.hasOwnProperty(p)) {
+        if (obj[p] instanceof Object) {
+          res[p] = this.parseObject(obj[p]);
+        }
+      }
+    }
+    return res;
+  },
+
+  mapreduce2Mapper: function (item) {
+    var result = [];
+    var finalConfig = jQuery.extend({}, this.config);
+    // Change the JSON so that it is easy to map
+    var mapReduce2Config = this.mapReduce2Config;
+    item.components.forEach(function (component) {
+      if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "HISTORYSERVER") {
+        item.jobHistoryServerComponent = component;
+        finalConfig = jQuery.extend(finalConfig, mapReduce2Config);
+      }
+      if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "MAPREDUCE2_CLIENT") {
+        if (!item.map_reduce2_clients) {
+          item.map_reduce2_clients = [];
+        }
+        if (component.host_components) {
+          component.host_components.forEach(function (hc) {
+            item.map_reduce2_clients.push(hc.HostRoles.host_name);
+          });
+        }
+      }
+    });
+    // Map
+    var finalJson = this.parseIt(item, finalConfig);
+    finalJson.quick_links = [27, 28, 29, 30];
 
     return finalJson;
   },
@@ -331,7 +542,6 @@ App.servicesMapper = App.QuickDataMapper.create({
   },
   hbaseMapper: function (item) {
     // Change the JSON so that it is easy to map
-    var result = [];
     var finalConfig = jQuery.extend({}, this.config);
     var hbaseConfig = this.hbaseConfig;
     item.components.forEach(function (component) {
@@ -339,7 +549,12 @@ App.servicesMapper = App.QuickDataMapper.create({
         item.masterComponent = component;
         finalConfig = jQuery.extend(finalConfig, hbaseConfig);
         var regionsArray = App.parseJSON(component.ServiceComponentInfo.RegionsInTransition);
-        item.regions_in_transition = regionsArray == null ? 0 : regionsArray.length;
+        //regions_in_transition can have various type of value: null, array or int
+        if (Array.isArray(regionsArray)) {
+          item.regions_in_transition = regionsArray.length;
+        } else {
+          item.regions_in_transition = regionsArray == null ? 0 : regionsArray;
+        }
       }
       if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "HBASE_REGIONSERVER") {
         if (!item.region_servers) {
@@ -354,7 +569,70 @@ App.servicesMapper = App.QuickDataMapper.create({
     });
     // Map
     finalJson = this.parseIt(item, finalConfig);
+    finalJson.average_load = parseFloat(finalJson.average_load).toFixed(2);
     finalJson.quick_links = [13, 14, 15, 16, 17, 18];
+    return finalJson;
+  },
+  
+  /**
+   * Flume is different from other services, in that the important
+   * data is in customizeable channels. Hence we directly transfer 
+   * data into the JSON object.
+   */
+  flumeMapper: function (item) {
+    var finalConfig = jQuery.extend({}, this.config);
+    var finalJson = this.parseIt(item, finalConfig);
+    item.components.forEach(function (component) {
+      if (component.ServiceComponentInfo && component.ServiceComponentInfo.component_name == "FLUME_SERVER") {
+        if (!finalJson.nodes) {
+          finalJson.nodes = [];
+        }
+        if (!finalJson.nodeObjs) {
+          finalJson.nodeObjs = [];
+        }
+        if (component.host_components) {
+          component.host_components.forEach(function (hc) {
+            var fnode = {};
+            fnode.id = hc.HostRoles.host_name;
+            fnode.host_id = hc.HostRoles.host_name;
+            fnode.channels = "";
+            fnode.sources = "";
+            fnode.sinks = "";
+            if (hc.metrics != null && hc.metrics.flume && hc.metrics.flume.flume && hc.metrics.flume.flume) {
+              if (hc.metrics.flume.flume.CHANNEL) {
+                for ( var c in hc.metrics.flume.flume.CHANNEL) {
+                  if (fnode.channels.length < 1) {
+                    fnode.channels += c;
+                  } else {
+                    fnode.channels += ("," + c);
+                  }
+                }
+              }
+              if (hc.metrics.flume.flume.SINK) {
+                for ( var c in hc.metrics.flume.flume.SINK) {
+                  if (fnode.sinks.length < 1) {
+                    fnode.sinks += c;
+                  } else {
+                    fnode.sinks += ("," + c);
+                  }
+                }
+              }
+              if (hc.metrics.flume.flume.SOURCE) {
+                for ( var c in hc.metrics.flume.flume.SOURCE) {
+                  if (fnode.sources.length < 1) {
+                    fnode.sources += c;
+                  } else {
+                    fnode.sources += ("," + c);
+                  }
+                }
+              }
+            }
+            finalJson.nodeObjs.push(fnode);
+            finalJson.nodes.push(hc.HostRoles.host_name);
+          });
+        }
+      }
+    });
     return finalJson;
   }
 });

@@ -29,6 +29,7 @@ class hdp-hbase(
   
   $hdp::params::component_exists['hdp-hbase'] = true
   $smokeuser = $hdp::params::smokeuser
+  $security_enabled = $hdp::params::security_enabled
 
   #Configs generation  
 
@@ -43,6 +44,22 @@ class hdp-hbase(
     }
   } else { # Manually overriding ownership of file installed by hadoop package
     file { "${hdp-hbase::params::conf_dir}/hbase-site.xml":
+      owner => $hbase_user,
+      group => $hdp::params::user_group
+    }
+  }
+
+  if has_key($configuration, 'hdfs-site') {
+    configgenerator::configfile{'hdfs-site':
+      modulespath => $hdp-hbase::params::conf_dir,
+      filename => 'hdfs-site.xml',
+      module => 'hdp-hbase',
+      configuration => $configuration['hdfs-site'],
+      owner => $hbase_user,
+      group => $hdp::params::user_group
+    }
+  } else { # Manually overriding ownership of file installed by hadoop package
+    file { "${hdp-hbase::params::conf_dir}/hdfs-site.xml":
       owner => $hbase_user,
       group => $hdp::params::user_group
     }
@@ -81,10 +98,6 @@ class hdp-hbase(
   } else {  
     hdp::package { 'hbase': }
   
-    hdp::user{ $hbase_user:
-      groups => [$hdp::params::user_group]
-    }
- 
     hdp::directory { $config_dir: 
       service_state => $service_state,
       force => true,
@@ -93,41 +106,22 @@ class hdp-hbase(
       override_owner => true
     }
 
-   hdp-hbase::configfile { ['hbase-env.sh','log4j.properties','hadoop-metrics.properties']: 
+   hdp-hbase::configfile { ['hbase-env.sh',  $hdp-hbase::params::metric-prop-file-name ]: 
       type => $type
     }
 
     hdp-hbase::configfile { 'regionservers':}
 
     if ($security_enabled == true) {
-      if ($type == 'master') {
+      if ($type == 'master' and $service_state == 'running') {
         hdp-hbase::configfile { 'hbase_master_jaas.conf' : }
-
-        $hbase_grant_premissions_file = '/tmp/hbase_grant_permissions.sh'
-
-        file { $hbase_grant_premissions_file:
-          owner   => $hbase_user,
-          group   => $hdp::params::user_group,
-          mode => '0644',
-          content => template('hdp-hbase/hbase_grant_permissions.erb')
-        }
-
-        hdp::exec { '${smokeuser}_grant_privileges' :
-          command => "su - ${smoke_test_user} -c 'hbase --config $conf_dir shell ${hbase_grant_premissions_file}'",
-          require => File[$hbase_grant_premissions_file]
-        }
-
-        Hdp-hbase::Configfile<||> -> File[$hbase_grant_premissions_file] ->
-        Hdp::Exec['${smokeuser}_grant_privileges'] -> Anchor['hdp-hbase::end']
-
-      } elsif ($type == 'regionserver') {
+      } elsif ($type == 'regionserver' and $service_state == 'running') {
         hdp-hbase::configfile { 'hbase_regionserver_jaas.conf' : }
-      } else {
+      } elsif ($type == 'client') {
         hdp-hbase::configfile { 'hbase_client_jaas.conf' : }
       }
     }
-
-    Anchor['hdp-hbase::begin'] -> Hdp::Package['hbase'] -> Hdp::User[$hbase_user] -> Hdp::Directory[$config_dir] -> 
+    Anchor['hdp-hbase::begin'] -> Hdp::Package['hbase'] -> Hdp::Directory[$config_dir] ->
     Hdp-hbase::Configfile<||> ->  Anchor['hdp-hbase::end']
   }
 }
@@ -141,7 +135,7 @@ define hdp-hbase::configfile(
   $conf_dir = $hdp-hbase::params::conf_dir
 ) 
 {
-  if ($name == 'hadoop-metrics.properties') {
+  if ($name == $hdp-hbase::params::metric-prop-file-name) {
     if ($type == 'master') {
       $tag = GANGLIA-MASTER
     } else {

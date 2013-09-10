@@ -49,12 +49,13 @@ class BSActionRunner extends Thread {
   private final boolean verbose;
   private final BootStrapImpl bsImpl;
   private final String clusterOsType;
-  private final String projectVersion;
+  private String projectVersion;
+  private int serverPort;
 
   public BSActionRunner(BootStrapImpl impl, SshHostInfo sshHostInfo, String bootDir,
       String bsScript, String agentSetupScript, String agentSetupPassword,
-      int requestId, String hostName, boolean isVerbose, String clusterOsType,
-      String projectVersion)
+      int requestId, long timeout, String hostName, boolean isVerbose, String clusterOsType,
+      String projectVersion, int serverPort)
   {
     this.requestId = requestId;
     this.sshHostInfo = sshHostInfo;
@@ -69,6 +70,7 @@ class BSActionRunner extends Thread {
     this.clusterOsType = clusterOsType;
     this.projectVersion = projectVersion;
     this.bsImpl = impl;
+    this.serverPort = serverPort;
     BootStrapRequest status = new BootStrapRequest();
     status.setLog("RUNNING");
     status.setStatus(BSStat.RUNNING);
@@ -164,7 +166,6 @@ class BSActionRunner extends Thread {
     if (user == null || user.isEmpty()) {
       user = DEFAULT_USER;
     }
-
     String shellCommand[] = new String[3];
     BSStat stat = BSStat.RUNNING;
     String scriptlog = "";

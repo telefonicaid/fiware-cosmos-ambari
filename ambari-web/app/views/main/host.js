@@ -27,7 +27,7 @@ App.MainHostView = App.TableView.extend({
     return this.get('controller.content');
   }.property('controller.content.length'),
 
-  didInsertElement:function () {
+  willInsertElement: function() {
     this._super();
   },
 
@@ -60,38 +60,35 @@ App.MainHostView = App.TableView.extend({
     displayName: Em.I18n.t('common.loadAvg'),
     type: 'number'
   }),
+
   HostView:Em.View.extend({
     content:null,
     tagName: 'tr',
     didInsertElement: function(){
       this.$("[rel='HealthTooltip'], [rel='UsageTooltip']").tooltip();
     },
-    shortLabels: function() {
-      var labels = this.get('content.hostComponents').getEach('displayName');
-      var shortLabels = '';
-      var c = 0;
-      labels.forEach(function(label) {
-        if (label) {
-          if (c < 2) {
-            shortLabels += label.replace(/[^A-Z]/g, '') + ', ';
-            c++;
-          }
-        }
-      });
-      shortLabels = shortLabels.substr(0, shortLabels.length - 2);
-      if (labels.length > 2) {
-        shortLabels += ' ' + Em.I18n.t('and') + ' ' + (labels.length - 2) + ' ' + Em.I18n.t('more');
-      }
-      return shortLabels;
-    }.property('labels'),
 
-    labels: function(){
-      return this.get('content.hostComponents').getEach('displayName').join('\n');
+    toggleComponents: function(event) {
+      this.$(event.target).find('.caret').toggleClass('right');
+      this.$('.host-components').toggle();
+    },
+
+    componentsMessage: function() {
+      var count = this.get('content.hostComponents.length');
+      if (count == 1) {
+        return count + ' ' + Em.I18n.t('common.component');
+      }
+      else {
+        return count + ' ' + Em.I18n.t('common.components');
+      }
+    }.property('content.hostComponents.@each'),
+
+    labels: function() {
+      return this.get('content.hostComponents').getEach('displayName').join("<br />");
     }.property('content.hostComponents.@each'),
 
     usageStyle:function () {
       return "width:" + this.get('content.diskUsage') + "%";
-      //return "width:" + (25+Math.random()*50) + "%"; // Just for tests purposes
     }.property('content.diskUsage')
 
   }),
@@ -111,58 +108,87 @@ App.MainHostView = App.TableView.extend({
       } else {
         return this.get('view.content').filterProperty('healthClass', statusString ).get('length');
       }
-
-    }.property('view.content.@each.healthClass'),
+    }.property('view.content.@each.healthClass', 'view.content.@each.criticalAlertsCount'),
 
     label: function () {
       return "%@ (%@)".fmt(this.get('value'), this.get('hostsCount'));
     }.property('value', 'hostsCount')
   }),
 
-  getCategory: function(field, value){
-    return this.get('categories').find(function(item) {
-      return item.get(field) == value;
-    });
-  },
-
   categories: function () {
     var self = this;
     self.categoryObject.reopen({
       view: self,
-      isActive: function() {
-        return this.get('view.category') == this;
-      }.property('view.category'),
+      isActive: false,
       itemClass: function() {
         return this.get('isActive') ? 'active' : '';
       }.property('isActive')
     });
 
     var categories = [
-      self.categoryObject.create({value: Em.I18n.t('common.all'), healthStatusValue: ''}),
-      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.green'), healthStatusValue: 'health-status-LIVE'}),
-      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.red'), healthStatusValue: 'health-status-DEAD-RED'}),
-      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.orange'), healthStatusValue: 'health-status-DEAD-ORANGE'}),
-      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.yellow'), healthStatusValue: 'health-status-DEAD-YELLOW'}),
-      self.categoryObject.create({value: Em.I18n.t('hosts.host.alerts.label'), healthStatusValue: '', last: true, alerts: true })
+      self.categoryObject.create({value: Em.I18n.t('common.all'), healthStatusValue: '', isActive: true, isVisible: false}),
+      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.green'), healthStatusValue: 'health-status-LIVE', isVisible: true}),
+      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.red'), healthStatusValue: 'health-status-DEAD-RED', isVisible: true}),
+      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.orange'), healthStatusValue: 'health-status-DEAD-ORANGE', isVisible: true}),
+      self.categoryObject.create({value: Em.I18n.t('hosts.host.healthStatusCategory.yellow'), healthStatusValue: 'health-status-DEAD-YELLOW', isVisible: true}),
+      self.categoryObject.create({value: Em.I18n.t('hosts.host.alerts.label'), healthStatusValue: 'health-status-WITH-ALERTS', last: true, alerts: true, isVisible: true })
     ];
-
-    this.set('category', categories.get('firstObject'));
 
     return categories;
   }.property(),
 
-  category: false,
 
-  selectCategory: function(event, context){
-    this.set('category', event.context);
-    if(event.context.get('alerts')){
-      this.updateFilter(0, '', 'string');
-      this.updateFilter(7, '>0', 'number');
-    } else {
-      this.updateFilter(7, '', 'number');
-      this.updateFilter(0, event.context.get('healthStatusValue'), 'string');
+  statusFilter: Em.View.extend({
+    column: 0,
+    categories: [],
+    value: null,
+    /**
+     * switch active category label
+     */
+    onCategoryChange: function(){
+      this.get('categories').setEach('isActive', false);
+      this.get('categories').findProperty('healthStatusValue', this.get('value')).set('isActive', true);
+    }.observes('value'),
+    showClearFilter: function(){
+      var mockEvent = {
+        context: this.get('categories').findProperty('healthStatusValue', this.get('value'))
+      };
+      this.selectCategory(mockEvent);
+    },
+    selectCategory: function(event){
+      var category = event.context;
+      this.set('value', category.get('healthStatusValue'));
+      if(category.get('alerts')){
+        this.get('parentView').updateFilter(0, '', 'string');
+        this.get('parentView').updateFilter(7, '>0', 'number');
+      } else {
+        this.get('parentView').updateFilter(7, '', 'number');
+        this.get('parentView').updateFilter(0, category.get('healthStatusValue'), 'string');
+      }
+    },
+    clearFilter: function() {
+      this.get('categories').setEach('isActive', false);
+      this.set('value', '');
+      this.showClearFilter();
     }
-  },
+  }),
+
+  /**
+   * view of the alert filter implemented as a category of host statuses
+   */
+  alertFilter: Em.View.extend({
+    column: 7,
+    value: null,
+    classNames: ['noDisplay'],
+    showClearFilter: function(){
+      var mockEvent = {
+        context: this.get('parentView.categories').findProperty('healthStatusValue', 'health-status-WITH-ALERTS')
+      };
+      if(this.get('value')) {
+        this.get('parentView.childViews').findProperty('column', 0).selectCategory(mockEvent);
+      }
+    }
+  }),
 
 
   /**
@@ -178,8 +204,10 @@ App.MainHostView = App.TableView.extend({
    * Based on <code>filters</code> library
    */
   nameFilterView: filters.createTextView({
+    column: 1,
+    fieldType: 'input-xlarge',
     onChangeValue: function(){
-      this.get('parentView').updateFilter(1, this.get('value'), 'string');
+      this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'string');
     }
   }),
 
@@ -188,8 +216,10 @@ App.MainHostView = App.TableView.extend({
    * Based on <code>filters</code> library
    */
   ipFilterView: filters.createTextView({
+    column: 2,
+    fieldType: 'input-small',
     onChangeValue: function(){
-      this.get('parentView').updateFilter(2, this.get('value'), 'string');
+      this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'string');
     }
   }),
 
@@ -200,8 +230,9 @@ App.MainHostView = App.TableView.extend({
   cpuFilterView: filters.createTextView({
     fieldType: 'input-mini',
     fieldId: 'cpu_filter',
+    column: 3,
     onChangeValue: function(){
-      this.get('parentView').updateFilter(3, this.get('value'), 'number');
+      this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'number');
     }
   }),
 
@@ -212,8 +243,9 @@ App.MainHostView = App.TableView.extend({
   loadAvgFilterView: filters.createTextView({
     fieldType: 'input-mini',
     fieldId: 'load_avg_filter',
+    column: 5,
     onChangeValue: function(){
-      this.get('parentView').updateFilter(5, this.get('value'), 'number');
+      this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'number');
     }
   }),
 
@@ -224,8 +256,9 @@ App.MainHostView = App.TableView.extend({
   ramFilterView: filters.createTextView({
     fieldType: 'input-mini',
     fieldId: 'ram_filter',
+    column: 4,
     onChangeValue: function(){
-      this.get('parentView').updateFilter(4, this.get('value'), 'ambari-bandwidth');
+      this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'ambari-bandwidth');
     }
   }),
 
@@ -234,6 +267,9 @@ App.MainHostView = App.TableView.extend({
    * Based on <code>filters</code> library
    */
   componentsFilterView: filters.createComponentView({
+
+    column: 6,
+
     /**
      * Inner FilterView. Used just to render component. Value bind to <code>mainview.value</code> property
      * Base methods was implemented in <code>filters.componentFieldView</code>
@@ -293,7 +329,7 @@ App.MainHostView = App.TableView.extend({
        */
       applyFilter:function() {
         this._super();
-
+        var self = this;
         var chosenComponents = [];
 
         this.get('masterComponents').filterProperty('checkedForHostFilter', true).forEach(function(item){
@@ -305,21 +341,42 @@ App.MainHostView = App.TableView.extend({
         this.get('clientComponents').filterProperty('checkedForHostFilter', true).forEach(function(item){
           chosenComponents.push(item.get('id'));
         });
-        this.set('value', chosenComponents.toString());
+        Em.run.next(function() {
+          self.set('value', chosenComponents.toString());
+        });
       },
 
-      didInsertElement:function () {
-        if (this.get('controller.comeWithFilter')) {
-          this.applyFilter();
-          this.set('controller.comeWithFilter', false);
-        } else {
-          this.clearFilter();
+      /**
+       * Verify that checked checkboxes are equal to value stored in hidden field (components ids list)
+       */
+      checkComponents: function() {
+        var components = this.get('value').split(',');
+        var self = this;
+        if (components) {
+          components.forEach(function(componentId) {
+            if(!self.tryCheckComponent(self, 'masterComponents', componentId)) {
+              if(!self.tryCheckComponent(self, 'slaveComponents', componentId)) {
+                self.tryCheckComponent(self, 'clientComponents', componentId);
+              }
+            }
+          });
         }
+      }.observes('value'),
+
+      tryCheckComponent: function(self, category, componentId) {
+        var c = self.get(category).findProperty('id', componentId);
+        if (c) {
+          if (!c.get('checkedForHostFilter')) {
+            c.set('checkedForHostFilter', true);
+            return true;
+          }
+        }
+        return false;
       }
 
     }),
     onChangeValue: function(){
-      this.get('parentView').updateFilter(6, this.get('value'), 'multiple');
+      this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'multiple');
     }
   }),
 

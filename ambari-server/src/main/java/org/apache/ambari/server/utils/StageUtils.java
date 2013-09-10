@@ -89,7 +89,10 @@ public class StageUtils {
     componentToClusterInfoKeyMap.put("RESOURCEMANAGER", "rm_host");
     componentToClusterInfoKeyMap.put("NODEMANAGER", "nm_hosts");
     componentToClusterInfoKeyMap.put("HISTORYSERVER", "hs_host");
+    componentToClusterInfoKeyMap.put("JOURNALNODE", "journalnode_hosts");
+    componentToClusterInfoKeyMap.put("ZKFC", "zkfc_hosts");
     componentToClusterInfoKeyMap.put("ZOOKEEPER_SERVER", "zookeeper_hosts");
+    componentToClusterInfoKeyMap.put("FLUME_SERVER", "flume_hosts");
     componentToClusterInfoKeyMap.put("HBASE_MASTER", "hbase_master_hosts");
     componentToClusterInfoKeyMap.put("HBASE_REGIONSERVER", "hbase_rs_hosts");
     componentToClusterInfoKeyMap.put("HIVE_SERVER", "hive_server_host");
@@ -192,6 +195,7 @@ public class StageUtils {
       Injector injector) throws AmbariException {
     Map<String, List<String>> info = new HashMap<String, List<String>>();
     if (cluster.getServices() != null) {
+      String hostName = getHostName();
       for (String serviceName : cluster.getServices().keySet()) {
         if (cluster.getServices().get(serviceName) != null) {
           for (String componentName : cluster.getServices().get(serviceName)
@@ -217,7 +221,7 @@ public class StageUtils {
             Configuration configuration = injector.getInstance(Configuration.class);
             String url = configuration.getRcaDatabaseUrl();
             if (url.contains(Configuration.HOSTNAME_MACRO)) {
-              url = url.replace(Configuration.HOSTNAME_MACRO, hostsMap.getHostMap(getHostName()));
+              url = url.replace(Configuration.HOSTNAME_MACRO, hostsMap.getHostMap(hostName));
             }
             info.put("ambari_db_rca_url", Arrays.asList(url));
             info.put("ambari_db_rca_driver", Arrays.asList(configuration.getRcaDatabaseDriver()));
@@ -229,13 +233,15 @@ public class StageUtils {
       }
     }
 
-    // Add a list of all host for agent and host monitoring
+    // Add a lists of all hosts and all ping ports for agents and hosts monitoring
     List<String> allHostNames = new ArrayList<String>();
+    List<String> allHostPingPorts = new ArrayList<String>();
     for (Host host : allHosts.values()) {
       allHostNames.add(host.getHostName());
+      allHostPingPorts.add(host.getCurrentPingPort() == null ? null : host.getCurrentPingPort().toString());
     }
     info.put("all_hosts", allHostNames);
-
+    info.put("all_ping_ports", allHostPingPorts);
     return info;
   }
 

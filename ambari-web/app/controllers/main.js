@@ -26,7 +26,6 @@ App.MainController = Em.Controller.extend({
     var name = App.router.get('clusterController.clusterName');
     if (name) {
       name = name.length > 13 ? name.substr(0, 10) + "..." : name;
-      name = name.capitalize();
     } else {
       name = Em.I18n.t('common.loading');
     }
@@ -90,9 +89,11 @@ App.MainController = Em.Controller.extend({
 
     this.set('reloadTimeOut',
         setTimeout(function () {
-          location.reload()
+          if (App.clusterStatus.get('isInstalled')) {
+            location.reload();
+          }
         }, App.pageReloadTime)
     );
-  }.observes("App.router.location.lastSetURL")
+  }.observes("App.router.location.lastSetURL", "App.clusterStatus.isInstalled")
 
 })

@@ -23,15 +23,13 @@ var misc = require('utils/misc');
 
 App.Run = DS.Model.extend({
   appName: DS.attr('string'),
-  type: DS.attr('string'),
   userName:DS.attr('string'),
   numJobsTotal: DS.attr('number'),
   numJobsCompleted: DS.attr('number'),
   startTime:DS.attr('string'),
   elapsedTime:DS.attr('string'),
   workflowContext:DS.attr('string'),
-  input: DS.attr('number'),
-  output: DS.attr('number'),
+  tags: DS.attr('string'),
 
   loadAllJobs : false,
 
@@ -64,23 +62,6 @@ App.Run = DS.Model.extend({
   isRunning: function () {
     return !this.get('numJobsTotal') == this.get('numJobsCompleted');
   }.property('numJobsTotal', 'numJobsCompleted'),
-  /**
-   * Sum of input bandwidth for all jobs with appropriate measure
-   */
-  inputFormatted: function () {
-    var input = this.get('input');
-    input = misc.formatBandwidth(input);
-    return input;
-  }.property('input'),
-
-  /**
-   *  Sum of output bandwidth for all jobs with appropriate measure
-   */
-  outputFormatted: function () {
-    var output = this.get('output');
-    output = misc.formatBandwidth(output);
-    return output;
-  }.property('output'),
 
   /**
    *
@@ -107,7 +88,7 @@ App.Run = DS.Model.extend({
     if (this.get('id').indexOf('hive_') === 0) {
       return 'Hive';
     }
-    if (this.get('id').indexOf('mr_') === 0) {
+    if (this.get('id').indexOf('mr_') === 0 || this.get('id').indexOf('mapreduce_') === 0) {
       return 'MapReduce';
     }
   }.property('id')

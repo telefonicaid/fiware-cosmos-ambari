@@ -22,34 +22,32 @@ class hdp-ganglia(
   $service_state
 )
 {
-  if (($service_state != 'no_op') or ($service_state != 'uninstalled')) {
+  if ! ($service_state in ['no_op', 'uninstalled']) {
     include hdp-ganglia::params
     $gmetad_user = $hdp-ganglia::params::gmetad_user
     $gmond_user = $hdp-ganglia::params::gmond_user
 
-    group { $gmetad_user :
-      ensure => present
+    hdp::group { 'gmetad_group' :
+      group_name => $gmetad_user,
     }
 
-    if ($gmetad_user != $gmond_user) {
-      group { $gmond_user :
-        ensure => present
-      }
+    hdp::group { 'gmond_group':
+      group_name => $gmond_user,
     }
 
-    hdp::user { $gmond_user: 
+    hdp::user { 'gmond_user': 
+      user_name =>  $gmond_user,
       gid    => $gmond_user,
       groups => ["$gmond_user"]
     }
   
-    if ( $gmetad_user != $gmond_user) {
-      hdp::user { $gmetad_user: 
-        gid    => $gmetad_user,
-        groups => ["$gmetad_user"]
-      }
+    hdp::user { 'gmetad_user':
+      user_name => $gmetad_user,
+      gid    => $gmetad_user,
+      groups => ["$gmetad_user"]
     }
 
-    anchor{'hdp-ganglia::begin':} -> Group<|title == $gmond_user or title == $gmetad_user|> -> User<|title == $gmond_user or title == $gmetad_user|> ->  anchor{'hdp-ganglia::end':}
+    anchor{'hdp-ganglia::begin':} -> Hdp::Group<|title == 'gmond_group' or title == 'gmetad_group'|> -> Hdp::User['gmond_user'] -> Hdp::User['gmetad_user'] ->  anchor{'hdp-ganglia::end':}
   }
 }
 

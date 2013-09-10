@@ -33,8 +33,10 @@ from shell import killstaleprocesses
 import AmbariConfig
 from security import CertificateManager
 from NetUtil import NetUtil
+from PingPortListener import PingPortListener
 import security
-
+import hostname
+from DataCleaner import DataCleaner
 
 logger = logging.getLogger()
 formatstr = "%(levelname)s %(asctime)s %(filename)s:%(lineno)d - %(message)s"
@@ -119,7 +121,20 @@ def resolve_ambari_config():
   return config
 
 
-def perform_prestart_checks():
+def perform_prestart_checks(expected_hostname):
+  # Check if current hostname is equal to expected one (got from the server
+  # during bootstrap.
+  if expected_hostname is not None:
+    current_hostname = hostname.hostname()
+    if current_hostname != expected_hostname:
+      print("Determined hostname does not match expected. Please check agent "
+            "log for details")
+      msg = "Ambari agent machine hostname ({0}) does not match expected ambari " \
+            "server hostname ({1}). Aborting registration. Please check hostname, " \
+            "hostname -f and /etc/hosts file to confirm your " \
+            "hostname is setup correctly".format(current_hostname, expected_hostname)
+      logger.error(msg)
+      sys.exit(1)
   # Check if there is another instance running
   if os.path.isfile(ProcessHelper.pidfile):
     print("%s already exists, exiting" % ProcessHelper.pidfile)
@@ -166,7 +181,11 @@ def main():
   global config
   parser = OptionParser()
   parser.add_option("-v", "--verbose", dest="verbose", action="store_true", help="verbose log output", default=False)
+  parser.add_option("-e", "--expected-hostname", dest="expected_hostname", action="store",
+                    help="expected hostname of current host. If hostname differs, agent will fail", default=None)
   (options, args) = parser.parse_args()
+
+  expected_hostname = options.expected_hostname
 
   setup_logging(options.verbose)
 
@@ -179,10 +198,21 @@ def main():
 
   # Check for ambari configuration file.
   config = resolve_ambari_config()
-  perform_prestart_checks()
+
+  # Starting data cleanup daemon
+  data_cleaner = None
+  if int(config.get('agent','data_cleanup_interval')) > 0:
+    data_cleaner = DataCleaner(config)
+    data_cleaner.start()
+
+  perform_prestart_checks(expected_hostname)
   daemonize()
 
   killstaleprocesses()
+
+  # Starting ping port listener
+  ping_port_listener = PingPortListener(config)
+  ping_port_listener.start()
 
   update_log_level(config)
 
@@ -194,15 +224,8 @@ def main():
   netutil = NetUtil()
   netutil.try_to_connect(server_url, -1, logger)
 
-  #Initiate security
-  """ Check if security is enable if not then disable it"""
-  logger.info("Creating certs")
-  certMan = security.CertificateManager(config)
-  certMan.initSecurity()
-
   # Launch Controller communication
   controller = Controller(config)
-  controller.start()
   if (len(sys.argv) >1) and sys.argv[1]=='unregister':
     controller.unregisterWithServer()
     if not certMan.reqCrtRevoke():
@@ -213,7 +236,9 @@ def main():
   pid = str(os.getpid())
   file(ProcessHelper.pidfile, 'w').write(pid)
 
-  controller.run()
+  controller.start()
+  controller.join()
+  stop_agent()
   logger.info("finished")
 
 if __name__ == "__main__":

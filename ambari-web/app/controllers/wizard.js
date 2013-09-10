@@ -82,6 +82,10 @@ App.WizardController = Em.Controller.extend({
 
   clusters: null,
 
+  isStep0: function () {
+    return this.get('currentStep') == 0;
+  }.property('currentStep'),
+
   isStep1: function () {
     return this.get('currentStep') == 1;
   }.property('currentStep'),
@@ -124,7 +128,7 @@ App.WizardController = Em.Controller.extend({
 
   gotoStep: function (step) {
     if (this.get('isStepDisabled').findProperty('step', step).get('value') !== false) {
-      return;
+      return false;
     }
     // if going back from Step 9 in Install Wizard, delete the checkpoint so that the user is not redirected
     // to Step 9
@@ -148,6 +152,11 @@ App.WizardController = Em.Controller.extend({
     } else {
       App.router.send('gotoStep' + step);
     }
+    return true;
+  },
+
+  gotoStep0: function () {
+    this.gotoStep(0);
   },
 
   gotoStep1: function () {
@@ -421,7 +430,6 @@ App.WizardController = Em.Controller.extend({
     App.db.setSlaveComponentHosts(undefined);
     App.db.setCluster(undefined);
     App.db.setAllHostNames(undefined);
-    App.db.setSlaveProperties(undefined);
     App.db.setInstallOptions(undefined);
     App.db.setAllHostNamesPattern(undefined);
   },
@@ -430,7 +438,6 @@ App.WizardController = Em.Controller.extend({
     hostNames: "", //string
     manualInstall: false, //true, false
     useSsh: true, //bool
-    isJavaHome : false, //bool
     javaHome: App.defaultJavaHome, //string
     localRepo: false, //true, false
     sshKey: "", //string
@@ -449,7 +456,8 @@ App.WizardController = Em.Controller.extend({
       name: 'wizard.service_components',
       sender: this,
       data: {
-        stackUrl: App.get('stack2VersionURL')
+        stackUrl: App.get('stack2VersionURL'),
+        stackVersion: App.get('currentStackVersionNumber')
       },
       success: 'loadServiceComponentsSuccessCallback',
       error: 'loadServiceComponentsErrorCallback'
@@ -482,7 +490,7 @@ App.WizardController = Em.Controller.extend({
         var myService = Service.create({
           serviceName: entry.StackServices.service_name,
           displayName: displayOrderConfig[i].displayName,
-          isDisabled: i === 0,
+          isDisabled: displayOrderConfig[i].isDisabled,
           isSelected: displayOrderConfig[i].isSelected,
           canBeSelected: displayOrderConfig[i].canBeSelected,
           isInstalled: false,
@@ -683,12 +691,12 @@ App.WizardController = Em.Controller.extend({
   saveServiceConfigProperties: function (stepController) {
     var serviceConfigProperties = [];
     stepController.get('stepConfigs').forEach(function (_content) {
+
+      if(_content.serviceName === 'YARN' && !App.supports.capacitySchedulerUi){
+        _content.set('configs', App.config.textareaIntoFileConfigs(_content.get('configs'), 'capacity-scheduler.xml'));
+      }
+
       _content.get('configs').forEach(function (_configProperties) {
-        var displayType = _configProperties.get('displayType');
-        if (displayType === 'directories' || displayType === 'directory') {
-          var value = _configProperties.get('value').trim().split(/\s+/g).join(',');
-          _configProperties.set('value', value);
-        }
         var overrides = _configProperties.get('overrides');
         var overridesArray = [];
         if(overrides!=null){
@@ -712,6 +720,7 @@ App.WizardController = Em.Controller.extend({
           serviceName: _configProperties.get('serviceName'),
           domain:  _configProperties.get('domain'),
           filename: _configProperties.get('filename'),
+          displayType: _configProperties.get('displayType'),
           overrides: overridesArray
         };
         serviceConfigProperties.push(configProperty);

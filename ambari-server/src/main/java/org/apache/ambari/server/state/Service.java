@@ -19,6 +19,7 @@
 package org.apache.ambari.server.state;
 
 import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
 
 import com.google.inject.persist.Transactional;
 import org.apache.ambari.server.AmbariException;
@@ -85,8 +86,15 @@ public interface Service {
 
   public void delete() throws AmbariException;
 
+  /**
+   * Get lock to control access to cluster structure
+   * @return cluster-global lock
+   */
+  ReadWriteLock getClusterGlobalLock();
+
   public enum Type {
     HDFS,
+    HCFS,
     MAPREDUCE,
     HBASE,
     HIVE,
@@ -97,6 +105,7 @@ public interface Service {
     GANGLIA,
     ZOOKEEPER,
     PIG,
-    HCATALOG
+    HCATALOG,
+    FLUME
   }
 }

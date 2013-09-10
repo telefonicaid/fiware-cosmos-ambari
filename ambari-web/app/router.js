@@ -73,7 +73,7 @@ App.Router = Em.Router.extend({
     var currentStep = App.db.getWizardCurrentStep(wizardType);
     console.log('getWizardCurrentStep: loginName=' + loginName + ", currentStep=" + currentStep);
     if (!currentStep) {
-      currentStep = '1';
+      currentStep = wizardType === 'installer' ? '0' : '1';
     }
     console.log('returning currentStep=' + currentStep);
     return currentStep;
@@ -182,6 +182,7 @@ App.Router = Em.Router.extend({
     var d = data;
     var isAdmin = data.Users.roles.indexOf('admin') >= 0;
     if (isAdmin) {
+      App.set('isAdmin', true);
       var controller = this.get('loginController');
       this.setAuthenticated(true);
       this.setLoginName(params.loginName);
@@ -268,11 +269,16 @@ App.Router = Em.Router.extend({
     }
     App.clusterStatus.updateFromServer();
     var clusterStatusOnServer = App.clusterStatus.get('value');
-    if (!localStorage.getObject('ambari').app.user.admin || clusterStatusOnServer && (clusterStatusOnServer.clusterState === 'CLUSTER_STARTED_5' || clusterStatusOnServer.clusterState === 'ADD_HOSTS_COMPLETED_5' || clusterStatusOnServer.clusterState === 'STACK_UPGRADE_COMPLETED' || clusterStatusOnServer.clusterState === 'REASSIGN_MASTER_COMPLETED')) {
+    if (!localStorage.getObject('ambari').app.user.admin || clusterStatusOnServer && (clusterStatusOnServer.clusterState === 'CLUSTER_STARTED_5' ||
+      clusterStatusOnServer.clusterState === 'ADD_HOSTS_COMPLETED_5' || clusterStatusOnServer.clusterState === 'STACK_UPGRADE_COMPLETED' ||
+      clusterStatusOnServer.clusterState === 'REASSIGN_MASTER_COMPLETED' || clusterStatusOnServer.clusterState === 'SECURITY_COMPLETED' || clusterStatusOnServer.clusterState === 'HIGH_AVAILABILITY_COMPLETED')) {
       return 'main.index';
     } else if (clusterStatusOnServer && clusterStatusOnServer.wizardControllerName === App.router.get('addHostController.name')) {
       // if wizardControllerName == "addHostController", then it means someone closed the browser or the browser was crashed when we were last in Add Hosts wizard
       return 'main.hostAdd';
+    } else if (clusterStatusOnServer && (clusterStatusOnServer.wizardControllerName === App.router.get('addSecurityController.name') || clusterStatusOnServer.wizardControllerName === App.router.get('mainAdminSecurityDisableController.name'))) {
+      // if wizardControllerName == "addSecurityController", then it means someone closed the browser or the browser was crashed when we were last in Add Security wizard
+      return 'main.admin.adminSecurity';
     } else if (clusterStatusOnServer && clusterStatusOnServer.wizardControllerName === App.router.get('addServiceController.name')) {
       // if wizardControllerName == "addHostController", then it means someone closed the browser or the browser was crashed when we were last in Add Hosts wizard
       return 'main.serviceAdd';
@@ -282,6 +288,9 @@ App.Router = Em.Router.extend({
     } else if (clusterStatusOnServer && clusterStatusOnServer.wizardControllerName === App.router.get('reassignMasterController.name')) {
       // if wizardControllerName == "reassignMasterController", then it means someone closed the browser or the browser was crashed when we were last in Reassign Master wizard
       return 'main.reassignMaster';
+    } else if (clusterStatusOnServer && clusterStatusOnServer.wizardControllerName === App.router.get('highAvailabilityWizardController.name')) {
+      // if wizardControllerName == "highAvailabilityWizardController", then it means someone closed the browser or the browser was crashed when we were last in NameNode High Availability wizard
+      return 'main.admin.enableHighAvailability';
     } else {
       // if wizardControllerName == "installerController", then it means someone closed the browser or the browser was crashed when we were last in Installer wizard
       return 'installer';

@@ -21,6 +21,7 @@ package org.apache.ambari.server.state;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
 
 import org.apache.ambari.server.AmbariException;
 import org.apache.ambari.server.controller.ClusterResponse;
@@ -68,6 +69,13 @@ public interface Cluster {
    */
   public List<ServiceComponentHost> getServiceComponentHosts(String hostname);
 
+  /**
+   * Remove ServiceComponentHost from cluster
+   * @param ServiceComponentHost
+   */  
+  public void removeServiceComponentHost(ServiceComponentHost svcCompHost) throws AmbariException;
+  
+  
   /**
    * Get desired stack version
    * @return
@@ -126,9 +134,12 @@ public interface Cluster {
   /**
    * Adds and sets a DESIRED configuration to be applied to a cluster.  There
    * can be only one selected config per type.
+   * @param user the user making the change for audit purposes
    * @param config  the {@link Config} object to set as desired
+   * @return <code>true</code> if the config was added, or <code>false</code>
+   * if the config is already set as the current
    */
-  public void addDesiredConfig(Config config);
+  public boolean addDesiredConfig(String user, Config config);
 
   /**
    * Gets the desired (and selected) config by type.
@@ -196,4 +207,22 @@ public interface Cluster {
    */
   Service addService(String serviceName) throws AmbariException;
 
+  /**
+   * Get lock to control access to cluster structure
+   * @return cluster-global lock
+   */
+  ReadWriteLock getClusterGlobalLock();
+
+  /**
+   * Fetch desired configs for list of hosts in cluster
+   * @param hostnames
+   * @return
+   */
+  Map<String, Map<String, DesiredConfig>> getHostsDesiredConfigs(Collection<String> hostnames);
+
+  /**
+   * Fetch desired configs for all hosts in cluster
+   * @return
+   */
+  Map<String, Map<String, DesiredConfig>> getAllHostsDesiredConfigs();
 }

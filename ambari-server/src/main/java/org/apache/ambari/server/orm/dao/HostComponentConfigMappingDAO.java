@@ -24,6 +24,7 @@ import java.util.List;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+import com.google.inject.Singleton;
 import com.google.inject.persist.Transactional;
 
 import javax.persistence.EntityManager;
@@ -31,12 +32,18 @@ import javax.persistence.TypedQuery;
 
 import org.apache.ambari.server.orm.entities.HostComponentConfigMappingEntity;
 
+@Singleton
 public class HostComponentConfigMappingDAO {
 
   @Inject
   Provider<EntityManager> entityManagerProvider;
   @Inject
   DaoUtils daoUtils;
+
+  @Transactional
+  public void create(HostComponentConfigMappingEntity entity) {
+    entityManagerProvider.get().persist(entity);
+  }
 
   @Transactional
   public List<HostComponentConfigMappingEntity> findByType(

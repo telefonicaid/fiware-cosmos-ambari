@@ -49,7 +49,7 @@ App.WizardStep2View = Em.View.extend({
 
   didInsertElement: function () {
     //TODO: move it to separate function in Ember.View using reopenClass
-    $("[rel=popover]").popover({'placement': 'right', 'trigger': 'hover'});
+    App.popover($("[rel=popover]"), {'placement': 'right', 'trigger': 'hover'});
 
     //todo: move them to conroller
     this.set('controller.hostsError',null);
@@ -64,21 +64,6 @@ App.WizardStep2View = Em.View.extend({
   isFileApi: function () {
     return (window.File && window.FileReader && window.FileList) ? true : false ;
   }.property(),
-
-  manualInstallPopup: function(){
-    if(!this.get('controller.content.installOptions.useSsh')){
-      App.ModalPopup.show({
-        header: Em.I18n.t('common.warning'),
-        body: Em.I18n.t('installer.step2.manualInstall.info'),
-        encodeBody: false,
-        onPrimary: function () {
-          this.hide();
-        },
-        secondary: null
-      });
-    }
-    this.set('controller.content.installOptions.manualInstall', !this.get('controller.content.installOptions.useSsh'));
-  }.observes('controller.content.installOptions.useSsh'),
 
   //TODO: replace next 2 properties with new one used in both places
   providingSSHKeyRadioButton: Ember.Checkbox.extend({
@@ -111,8 +96,8 @@ App.WizardStep2View = Em.View.extend({
 
   textFieldView: Ember.TextField.extend({
     disabled: function(){
-      return !this.get('controller.content.installOptions.useSsh');
-    }.property('controller.content.installOptions.useSsh')
+      return !this.get('isEnabled');
+    }.property('isEnabled')
   })
 });
 

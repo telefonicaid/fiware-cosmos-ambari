@@ -33,23 +33,15 @@ from pprint import pformat
 class SSH(threading.Thread):
 
     """ Ssh implementation of this """
-    def __init__(self, user, sshKeyFile, host, command, bootdir, errorMessage=None):
+    def __init__(self, user, sshkey_file, host, command, bootdir, host_log, errorMessage=None):
         self.user = user
-        self.sshKeyFile = sshKeyFile
+        self.sshkey_file = sshkey_file
         self.host = host
         self.command = command
         self.bootdir = bootdir
         self.errorMessage = errorMessage
-        self.ret = {"exitstatus": -1, "log": "FAILED"}
-        threading.Thread.__init__(self)
-        self.daemon = True
+        self.host_log = host_log
         pass
-
-    def getHost(self):
-        return self.host
-
-    def getStatus(self):
-        return self.ret
 
     def run(self):
         sshcommand = ["ssh",
@@ -59,36 +51,20 @@ class SSH(threading.Thread):
                       "-tt",
                       # Should prevent "tput: No value for $TERM and no -T
                       # specified" warning
-                      "-i", self.sshKeyFile,
+                      "-i", self.sshkey_file,
                       self.user + "@" + self.host, self.command]
-        logging.info("Running ssh command " + ' '.join(sshcommand))
+        if DEBUG:
+            self.host_log.write("Running ssh command " + ' '.join(sshcommand))
         sshstat = subprocess.Popen(sshcommand, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         log = sshstat.communicate()
-        self.ret["exitstatus"] = sshstat.returncode
         errorMsg = log[1]
         if self.errorMessage and sshstat.returncode != 0:
             errorMsg = self.errorMessage + "\n" + errorMsg
-        self.ret["log"] = "STDOUT\n" + log[0] + "\nSTDERR\n" + errorMsg
+        log = "STDOUT\n" + log[0] + "\nSTDERR\n" + errorMsg
         logFilePath = os.path.join(self.bootdir, self.host + ".log")
-        self.writeLogToFile(logFilePath)
+        self.host_log.write(log)
 
-        doneFilePath = os.path.join(self.bootdir, self.host + ".done")
-        self.writeDoneToFile(doneFilePath, str(sshstat.returncode))
-
-        logging.info("Setup agent done for host " +
-                     self.host + ", exitcode=" + str(sshstat.returncode))
-        pass
-
-    def writeLogToFile(self, logFilePath):
-        logFile = open(logFilePath, "a+")
-        logFile.write(self.ret["log"])
-        logFile.close
-        pass
-
-    def writeDoneToFile(self, doneFilePath, returncode):
-        doneFile = open(doneFilePath, "w+")
-        doneFile.write(str(returncode))
-        doneFile.close()
-        pass
-pass
+        self.host_log.write("SSH command execution finished for host " + self.host +
+                 ", exitcode=" + str(sshstat.returncode))
+        return sshstat.returncode

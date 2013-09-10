@@ -20,16 +20,6 @@
 var App = require('app');
 var misc = require('utils/misc');
 
-DS.attr.transforms.object = {
-  from: function(serialized) {
-    return Ember.none(serialized) ? null : Object(serialized);
-  },
-
-  to: function(deserialized) {
-    return Ember.none(deserialized) ? null : Object(deserialized);
-  }
-};
-
 App.Host = DS.Model.extend({
   hostName: DS.attr('string'),
   publicHostName: DS.attr('string'),
@@ -57,7 +47,7 @@ App.Host = DS.Model.extend({
   }.property('App.router.clusterController.alerts.length'),
 
   publicHostNameFormatted: function() {
-    return this.get('publicHostName').substr(0, 20) + ' ...';
+    return this.get('publicHostName').length < 43 ? this.get('publicHostName') : this.get('publicHostName').substr(0, 40) + '...';
   }.property('publicHostName'),
   /**
    * API return diskTotal and diskFree. Need to save their different
@@ -101,7 +91,8 @@ App.Host = DS.Model.extend({
     if (isNaN(this.get('diskUsage')) || this.get('diskUsage') < 0) {
       return this.get('diskUsageFormatted');
     }
-    return this.get('diskUsedFormatted') + '/' + this.get('diskTotalFormatted') + ' (' + this.get('diskUsageFormatted') + ' used)';
+    return this.get('diskUsedFormatted') + '/' + this.get('diskTotalFormatted') + ' (' + this.get('diskUsageFormatted')
+      + ' ' + Em.I18n.t('services.service.summary.diskInfoBar.used') + ')';
   }.property('diskUsedFormatted', 'diskTotalFormatted'),
   /**
    * formatted bytes to appropriate value

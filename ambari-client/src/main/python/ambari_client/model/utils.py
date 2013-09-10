@@ -14,11 +14,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-'''
 
-
-
-'''
 import logging
 import sys
 
@@ -120,7 +116,6 @@ def get_unicode( v):
   return v
   
 def retain_self_helper(self=None, **kwargs):
-    #print" ================== retain_self_helper\n"
     #print locals()
     from ambari_client.model.base_model import  BaseModel 
     BaseModel.__init__(self, **kwargs)

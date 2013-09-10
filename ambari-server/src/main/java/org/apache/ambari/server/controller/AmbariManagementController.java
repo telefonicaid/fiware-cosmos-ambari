@@ -231,7 +231,7 @@ public interface AmbariManagementController {
    * values carried by the given request object.
    *
    *
-   * @param request           request object which defines which cluster to
+   * @param requests          request objects which define which cluster to
    *                          update and the values to set
    * @param requestProperties request specific properties independent of resource
    *
@@ -239,8 +239,8 @@ public interface AmbariManagementController {
    *
    * @throws AmbariException thrown if the resource cannot be updated
    */
-  public RequestStatusResponse updateCluster(ClusterRequest request,
-                                             Map<String, String> requestProperties)
+  public RequestStatusResponse updateClusters(Set<ClusterRequest> requests,
+                                              Map<String, String> requestProperties)
       throws AmbariException;
 
   /**
@@ -423,7 +423,14 @@ public interface AmbariManagementController {
    * @throws  AmbariException if the resources cannot be read
    */
   public Set<StackResponse> getStacks(Set<StackRequest> requests) throws AmbariException;
-  
+
+  /**
+   * Update stacks from the files at stackRoot.
+   *
+   * @return a track action response
+   * @throws AmbariException if
+   */
+  public RequestStatusResponse updateStacks() throws AmbariException;
   
   /**
    * Get supported stacks versions.
@@ -447,6 +454,15 @@ public interface AmbariManagementController {
    * @throws  AmbariException if the resources cannot be read
    */
   public Set<RepositoryResponse> getRepositories(Set<RepositoryRequest> requests) throws AmbariException;
+
+  /**
+   * Updates repositories by stack name, version and operating system.
+   * 
+   * @param requests the repositories
+   * 
+   * @throws AmbariException
+   */
+  void updateRespositories(Set<RepositoryRequest> requests) throws AmbariException;
 
   
   /**
@@ -495,4 +511,38 @@ public interface AmbariManagementController {
    * @throws  AmbariException if the resources cannot be read
    */
   public Set<OperatingSystemResponse> getStackOperatingSystems(Set<OperatingSystemRequest> requests) throws AmbariException;
+
+  /**
+   * Get all top-level services of Ambari, not related to certain cluster.
+   * 
+   * @param requests the top-level services 
+   * 
+   * @return a set of top-level services 
+   * 
+   * @throws  AmbariException if the resources cannot be read
+   */
+  
+  public Set<RootServiceResponse> getRootServices(Set<RootServiceRequest> requests) throws AmbariException;
+  /**
+   * Get all components of top-level services of Ambari, not related to certain cluster.
+   * 
+   * @param requests the components of top-level services 
+   * 
+   * @return a set of components 
+   * 
+   * @throws  AmbariException if the resources cannot be read
+   */
+  public Set<RootServiceComponentResponse> getRootServiceComponents(Set<RootServiceComponentRequest> requests) throws AmbariException;
+
+  /**
+   * Get all hosts components of top-level services of Ambari, not related to certain cluster.
+   * 
+   * @param requests the host components of top-level services 
+   * 
+   * @return a set of host components 
+   * 
+   * @throws  AmbariException if the resources cannot be read
+   */
+  public Set<RootServiceHostComponentResponse> getRootServiceHostComponents(Set<RootServiceHostComponentRequest> requests) throws AmbariException;
 }
+  

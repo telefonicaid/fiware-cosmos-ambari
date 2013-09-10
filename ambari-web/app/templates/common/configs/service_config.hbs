@@ -45,7 +45,7 @@
 	</div>
 	{{/if}}
 {{/if}}
-          
+
 <div class="accordion">
   {{#each category in selectedService.configCategories}}
     {{#if category.isCustomView}}
@@ -62,7 +62,7 @@
 
             <div class="accordion-body collapse in">
               <div class="accordion-inner service-config-section">
-                <form class="form-horizontal">
+                <form class="form-horizontal" autocomplete="off">
 
                   {{#each view.filteredCategoryConfigs}}
                       <div {{bindAttr class=":entry-row isOverridden:overridden-property"}}>
@@ -74,6 +74,11 @@
 		                            {{/if}}
 		                          {{/if}}
                               {{displayName}}
+                              {{#if App.supports.secureCluster}}
+                                {{#if isSecureConfig}}
+                                  <a href="javascript:void(null);"><i class="icon-lock" rel="tooltip" data-toggle="tooltip" title="security knob"></i></a>
+                                {{/if}}
+                              {{/if}}
                             </label>
                           </span>
                           <div class="controls">
@@ -105,13 +110,15 @@
                   {{/each}}
 
                   {{! For Advanced, Advanced Core Site, Advanced HDFS Site sections, show the 'Add Property' link.}}
-                  {{#if view.canEdit}}
-	                  {{#if category.canAddProperty }}
-	                      <div>
-	                          <a href="#" {{action "showAddPropertyWindow" this target="view" }} >{{t installer.step7.config.addProperty}}...</a>
-	                      </div>
-	                  {{/if}}
-	                {{/if}}
+                  {{#if App.isAdmin}}
+                    {{#if view.canEdit}}
+                      {{#if category.canAddProperty }}
+                        <div>
+                          <a href="#" {{action "showAddPropertyWindow" this target="view" }} >{{t installer.step7.config.addProperty}}...</a>
+                        </div>
+                      {{/if}}
+                    {{/if}}
+                  {{/if}}
                 </form>
               </div>
             </div>

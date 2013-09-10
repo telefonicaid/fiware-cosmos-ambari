@@ -23,9 +23,10 @@ App.testModeDelayForActions = 10000;
 App.skipBootstrap = false;
 App.alwaysGoToInstaller = false;
 App.testEnableSecurity = true; // By default enable security is tested; turning it false tests disable security
+App.testNameNodeHA = true;
 App.apiPrefix = '/api/v1';
-App.defaultStackVersion = 'HDP-1.3.0';
-App.defaultLocalStackVersion = 'HDPLocal-1.3.0';
+App.defaultStackVersion = 'HDP-2.0.5';
+App.defaultLocalStackVersion = 'HDPLocal-2.0.5';
 App.defaultJavaHome = '/usr/jdk/jdk1.6.0_31';
 App.timeout = 180000; // default AJAX timeout
 App.maxRetries = 3; // max number of retries for certain AJAX calls
@@ -34,6 +35,8 @@ App.componentsUpdateInterval = 6000;
 App.contentUpdateInterval = 15000;
 App.maxRunsForAppBrowser = 500;
 App.pageReloadTime=3600000;
+App.singleNodeInstall = false;
+App.singleNodeAlias = document.location.hostname;
 
 // experimental features are automatically enabled if running on brunch server
 App.enableExperimental = false;
@@ -42,17 +45,20 @@ App.supports = {
   addServices: false,
   hostOverrides: false,
   mirroring: false,
-  secureCluster: false,
+  secureCluster: true,
+  secureClusterProceedPopup: false,
   reassignMaster: false,
   stackUpgrade: false,
   capacitySchedulerUi: false,
-  startStopAllServices: false,
-  hiveOozieExtraDatabases: false,
+  startStopAllServices: true,
+  hiveOozieExtraDatabases: true,
   multipleHBaseMasters: false,
   addMasters: false,
   customizeSmokeTestUser: true,
   hue: false,
-  ldapGroupMapping: false
+  ldapGroupMapping: false,
+  localRepositories: false,
+  highAvailability: true
 };
 
 if (App.enableExperimental) {

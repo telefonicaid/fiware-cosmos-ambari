@@ -31,6 +31,7 @@ App.MapReduceService = App.Service.extend({
   reduceSlots: DS.attr('number'),
   jobsSubmitted: DS.attr('number'),
   jobsCompleted: DS.attr('number'),
+  jobsRunning: DS.attr('number'),
   mapSlotsOccupied: DS.attr('number'),
   mapSlotsReserved: DS.attr('number'),
   reduceSlotsOccupied: DS.attr('number'),
@@ -39,7 +40,9 @@ App.MapReduceService = App.Service.extend({
   mapsWaiting: DS.attr('number'),
   reducesRunning: DS.attr('number'),
   reducesWaiting: DS.attr('number'),
-  trackersDecommissioned: DS.attr('number')
+  trackersDecommissioned: DS.attr('number'),
+  jobTrackerCpu: DS.attr('number'),
+  jobTrackerRpc: DS.attr('number')
 });
 
 App.MapReduceService.FIXTURES = [];

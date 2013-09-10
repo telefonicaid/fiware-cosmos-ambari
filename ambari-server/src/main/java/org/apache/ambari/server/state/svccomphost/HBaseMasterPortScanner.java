@@ -34,6 +34,7 @@ import org.apache.ambari.server.state.Cluster;
 import org.apache.ambari.server.state.Clusters;
 import org.apache.ambari.server.state.Host;
 import org.apache.ambari.server.state.ServiceComponentHost;
+import org.apache.ambari.server.state.State;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -54,13 +55,13 @@ public class HBaseMasterPortScanner implements Runnable {
   private final int port = 60010;
   private int maxAttempts = 3;
   private int attempts = 0;
-  private int countAttempts = 0;
+  protected int countAttempts = 0;
   private Map<ServiceComponentHost,Boolean> componentHostMap;
   private Cluster currentCluster;
   private Timer scheduleTimer;
   private RescanSchedulerTask rescanSchedulerTask;
   @Inject
-  private Clusters clusters;
+  protected Clusters clusters;
 
   /**
    * 
@@ -96,13 +97,6 @@ public class HBaseMasterPortScanner implements Runnable {
     return testScanTimeoutMsc;
   }
 
-  /**
-   * 
-   * @return count attempts (need unitests)
-   */
-  public int getCountAttempts() {
-    return countAttempts;
-  }
 
   /**
    * 
@@ -120,10 +114,8 @@ public class HBaseMasterPortScanner implements Runnable {
    */
   private boolean activeAwakeRequest = false;
 
-  public HBaseMasterPortScanner(int scanTimeoutMsc) {
-    this.defaultScanTimeoutMsc = scanTimeoutMsc;
-    this.scanTimeoutMsc = scanTimeoutMsc;
-    this.start();
+  public HBaseMasterPortScanner(Timer timer) {
+    scheduleTimer = timer;
   }
 
   public HBaseMasterPortScanner() {
@@ -139,9 +131,6 @@ public class HBaseMasterPortScanner implements Runnable {
     }
   }
 
-  public void stop() {
-    schedulerThread.interrupt();
-  }
 
   /**
    * Should be called from another thread when we want HBase Master scanner to
@@ -221,50 +210,7 @@ public class HBaseMasterPortScanner implements Runnable {
   @Override
   public void run() {
     while (true) {
-      if(rescanSchedulerTask != null){
-        rescanSchedulerTask.cancel();
-        scheduleTimer.purge();
-      }          
-      activeAwakeRequest = false;
-      if (componentHostMap != null) {
-        for (Map.Entry<ServiceComponentHost, Boolean> entry : componentHostMap.entrySet()) {
-          entry.setValue(scan(entry.getKey().getHostName()));
-          if (schedulerThread.isInterrupted()) {
-            scanTimeoutMsc = defaultScanTimeoutMsc;
-            return;
-          }
-          if (activeAwakeRequest) {
-            scanTimeoutMsc = defaultScanTimeoutMsc;
-            attempts = 0;
-            break;
-          }
-        }
-        attempts++;
-        countAttempts = attempts;
-        LOG.info("Attempt to scan of HBASE_MASTER port : "+ attempts);
-        if(validateScanResults(componentHostMap)){
-          //If results valid set it to ServiceComponentHost
-          setScanResults(componentHostMap);
-          scanTimeoutMsc = defaultScanTimeoutMsc;
-          attempts = 0;
-        } else {
-          if(attempts <= maxAttempts){
-            //Increase timeout
-            scanTimeoutMsc += defaultScanTimeoutMsc;
-            testScanTimeoutMsc = scanTimeoutMsc;
-            LOG.info("Increase timeout for scan HBASE_MASTER port to : "+ scanTimeoutMsc);
-            activeAwakeRequest = true;
-          } else {
-            LOG.info("No valid data about HBASE_MASTER, ports will rescanned after "+rescanTimeoutMsc/1000 + " seconds");
-            scanTimeoutMsc = defaultScanTimeoutMsc;
-            attempts = 0;
-            //Create task for latter scan
-            rescanSchedulerTask = new RescanSchedulerTask(currentCluster);
-            scheduleTimer.schedule(rescanSchedulerTask, rescanTimeoutMsc);
-          }
-        }        
-        
-      }
+      execute();
       if (activeAwakeRequest) {
         activeAwakeRequest = false;
         continue;
@@ -279,6 +225,50 @@ public class HBaseMasterPortScanner implements Runnable {
     }
   }
 
+  protected void execute() {
+    if (rescanSchedulerTask != null) {
+      rescanSchedulerTask.cancel();
+      scheduleTimer.purge();
+    }
+    activeAwakeRequest = false;
+    if (componentHostMap != null) {
+      for (Map.Entry<ServiceComponentHost, Boolean> entry : componentHostMap.entrySet()) {
+        entry.setValue(scan(entry.getKey().getHostName()));
+        if (activeAwakeRequest) {
+          scanTimeoutMsc = defaultScanTimeoutMsc;
+          attempts = 0;
+          break;
+        }
+      }
+      attempts++;
+      countAttempts = attempts;
+      LOG.info("Attempt to scan of HBASE_MASTER port : " + attempts);
+      if (validateScanResults(componentHostMap)) {
+        //If results valid set it to ServiceComponentHost
+        setScanResults(componentHostMap);
+        scanTimeoutMsc = defaultScanTimeoutMsc;
+        attempts = 0;
+      } else {
+        if (attempts <= maxAttempts) {
+          //Increase timeout
+          scanTimeoutMsc += defaultScanTimeoutMsc;
+          testScanTimeoutMsc = scanTimeoutMsc;
+          LOG.info("Increase timeout for scan HBASE_MASTER port to : " + scanTimeoutMsc);
+          activeAwakeRequest = true;
+        } else {
+          LOG.info("No valid data about HBASE_MASTER, ports will rescanned after " + rescanTimeoutMsc / 1000 + " seconds");
+          scanTimeoutMsc = defaultScanTimeoutMsc;
+          attempts = 0;
+          //Create task for latter scan
+          rescanSchedulerTask = new RescanSchedulerTask(currentCluster);
+          scheduleTimer.schedule(rescanSchedulerTask, rescanTimeoutMsc);
+        }
+      }
+
+    }
+
+  }
+
   private void setScanResults(Map<ServiceComponentHost, Boolean> scanResuls){
     for (Map.Entry<ServiceComponentHost, Boolean> entry : scanResuls.entrySet()) {
       entry.getKey().setHAState((entry.getValue()) ? "active" : "passive");
@@ -286,23 +276,32 @@ public class HBaseMasterPortScanner implements Runnable {
     LOG.info("Set result of HBASE_MASTER scan");
   }
   
-  private boolean validateScanResults(Map<ServiceComponentHost, Boolean> scanResuls){
+  private boolean validateScanResults(Map<ServiceComponentHost, Boolean> scanResuls) {
     boolean res = false;
     int activeMasters = 0;
+    int startedComponents = 0;
     for (Map.Entry<ServiceComponentHost, Boolean> entry : scanResuls.entrySet()) {
-      activeMasters += (entry.getValue()) ? 1 : 0;
+      activeMasters += (entry.getValue() && entry.getKey().getState() == State.STARTED) ? 1 : 0;
+      startedComponents += (entry.getKey().getState() == State.STARTED) ? 1 : 0;
     }
-    if(activeMasters == 0 || activeMasters > 1) {
-      res = false;
+    if (startedComponents > 0) {
+      if (activeMasters == 0 || activeMasters > 1) {
+        res = false;
+      } else {
+        res = true;
+      }
+    } else {
+      if (activeMasters > 0) {
+        res = false;
+      } else {
+        res = true;
+      }
     }
-    else {
-      res = true;
-    } 
-    LOG.info("Results of HBASE_MASTER scan are "+ ((res) ? "valid" : "invalid"));
-    return res;  
+    LOG.info("Results of HBASE_MASTER scan are " + ((res) ? "valid" : "invalid"));
+    return res;
   }
   
-  private boolean scan(String hostname) {
+  protected boolean scan(String hostname) {
     try {
       Socket socket = new Socket();
       socket.connect(new InetSocketAddress(hostname, port), scanTimeoutMsc);
@@ -334,5 +333,5 @@ public class HBaseMasterPortScanner implements Runnable {
     }
     
   }
-   
+
 }

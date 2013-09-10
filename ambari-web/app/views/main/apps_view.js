@@ -29,16 +29,15 @@ App.MainAppsView = Em.View.extend({
     tagName: 'a',
     template: Ember.Handlebars.compile('<i class="icon-arrow-left"></i>'),
     classNameBindings: ['class'],
-    class: "",
-    calculateClass: function () {
+    class: function () {
       if (parseInt(this.get("controller.paginationObject.startIndex")) > 1) {
-        this.set("class", "paginate_previous");
+        return "paginate_previous";
       } else {
-        this.set("class", "paginate_disabled_previous");
+        return "paginate_disabled_previous";
       }
-    }.observes("controller.paginationObject"),
+    }.property("controller.paginationObject.startIndex"),
     click: function (event) {
-      if (this.class == "paginate_previous") {
+      if (this.get('class') == "paginate_previous") {
         var startIndex = parseInt(this.get("controller.paginationObject.startIndex")) - 1;
         var showRows = parseInt(this.get("controller.filterObject.iDisplayLength"));
         var startDisplayValue = Math.max(0, startIndex - showRows);
@@ -50,16 +49,15 @@ App.MainAppsView = Em.View.extend({
     tagName: 'a',
     template: Ember.Handlebars.compile('<i class="icon-arrow-right"></i>'),
     classNameBindings: ['class'],
-    class: "",
-    calculateClass: function () {
-      if ((parseInt(this.get("controller.paginationObject.endIndex")) + 1) < parseInt(this.get("controller.paginationObject.iTotalDisplayRecords"))) {
-        this.set("class", "paginate_next");
+    class: function () {
+      if ((parseInt(this.get("controller.paginationObject.endIndex"))) < parseInt(this.get("controller.paginationObject.iTotalDisplayRecords"))) {
+        return "paginate_next";
       } else {
-        this.set("class", "paginate_disabled_next");
+        return "paginate_disabled_next";
       }
-    }.observes("controller.paginationObject"),
+    }.property("controller.paginationObject.endIndex"),
     click: function (event) {
-      if (this.class == "paginate_next") {
+      if (this.get('class') == "paginate_next") {
         var startDisplayValue = parseInt(this.get("controller.paginationObject.endIndex"));
         this.set("controller.filterObject.iDisplayStart", startDisplayValue);
       }
@@ -75,7 +73,6 @@ App.MainAppsView = Em.View.extend({
    If no runs to display set emptyData to true and reset Avg table data, else to set emptyData to false.
    */
   emptyDataObserver:function(){
-    //debugger;
     if(this.get("controller.paginationObject.iTotalRecords") != null && this.get("controller.paginationObject.iTotalDisplayRecords")>0){
       this.set("emptyData",false);
     }else{
@@ -103,26 +100,26 @@ App.MainAppsView = Em.View.extend({
     class: "sorting",
     widthClass: "",
     content: null,
-    defaultColumn: 8,
+    defaultColumn: 9,
 
     didInsertElement: function () {
-      this.set("widthClass", "col" + this.content.index);
-      if (this.content.index == this.defaultColumn) {
+      this.set("widthClass", "col" + this.get('content.index'));
+      if (this.get('content.index') == this.get('defaultColumn')) {
         this.setControllerObj(this.content.index, "DESC");
         this.set("class", "sorting_desc");
       }
     },
     click: function (event) {
-      console.log(this.class);
-      if (this.class == "sorting") {
+      console.log(this.get('class'));
+      if (this.get('class') == "sorting") {
         this.resetSortClass();
-        this.setControllerObj(this.content.index, "ASC");
+        this.setControllerObj(this.get('content.index'), "ASC");
         this.set("class", "sorting_asc");
-      } else if (this.class == "sorting_asc") {
-        this.setControllerObj(this.content.index, "DESC");
+      } else if (this.get('class') == "sorting_asc") {
+        this.setControllerObj(this.get('content.index'), "DESC");
         this.set("class", "sorting_desc");
-      } else if (this.class == "sorting_desc") {
-        this.setControllerObj(this.content.index, "ASC");
+      } else if (this.get('class') == "sorting_desc") {
+        this.setControllerObj(this.get('content.index'), "ASC");
         this.set("class", "sorting_asc");
       }
     },
@@ -161,13 +158,21 @@ App.MainAppsView = Em.View.extend({
     fieldType: 'input-small'
   }),
   /**
+   * Filter-field for tags.
+   * Based on <code>filters</code> library
+   */
+  tagFilterView: filters.createTextView({
+    valueBinding: "controller.filterObject.tagSearch",
+    fieldType: 'input-super-mini'
+  }),
+  /**
    * Filter-field for type.
    * Based on <code>filters</code> library
    */
   typeFilterView: filters.createSelectView({
     fieldType: 'input-small',
     valueBinding: "controller.filterObject.runType",
-    content: ['Any', 'Pig', 'Hive', 'MapReduce']
+    content: ['Any', 'Pig', 'Hive', 'MapReduce', 'Yarn']
   }),
 
   /**
@@ -217,22 +222,6 @@ App.MainAppsView = Em.View.extend({
     valueBinding: "controller.filterObject.jobs"
   }),
   /**
-   * Filter-field for Input.
-   * Based on <code>filters</code> library
-   */
-  inputFilterView: filters.createTextView({
-    fieldType: 'input-super-mini',
-    valueBinding: "controller.filterObject.input"
-  }),
-  /**
-   * Filter-field for Output.
-   * Based on <code>filters</code> library
-   */
-  outputFilterView: filters.createTextView({
-    fieldType: 'input-super-mini',
-    valueBinding: "controller.filterObject.output"
-  }),
-  /**
    * Filter-field for Duration.
    * Based on <code>filters</code> library
    */
@@ -268,7 +257,16 @@ App.MainAppsView = Em.View.extend({
    * data, and subsequently the popup dialog.
    */
   didInsertElement: function(){
-    App.router.get('mainAppsItemController').set('lastJobId', null);
+    var self = this;
+    Em.run.next(function() {
+      self.get('_childViews').forEach(function(childView) {
+        if(childView['showClearFilter']) {
+          childView.showClearFilter();
+        }
+      });
+    });
+    this.get('controller').set('lastJobId', null);
+    this.onChangeViewType();
   },
   /**
    *
@@ -326,7 +324,7 @@ App.MainAppsView = Em.View.extend({
     onLoad: function() {
       var run = this.get('parentView.run');
       if (run.index) {
-        var strip = (run.index % 2) ? 'odd' : 'even';
+        var strip = (run.index % 2) ? 'even' : 'odd';
         this.$().addClass(strip);
       }
     }.observes('parentView.run'),

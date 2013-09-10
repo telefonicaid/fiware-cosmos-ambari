@@ -34,9 +34,11 @@ import org.apache.commons.logging.LogFactory;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import org.apache.ambari.server.controller.AmbariServer;
 
 @Singleton
 public class BootStrapImpl {
+  public static final String DEV_VERSION = "${ambariVersion}";
   private File bootStrapDir;
   private String bootstrapActionScript;
   private String bootSetupAgentScript;
@@ -53,6 +55,7 @@ public class BootStrapImpl {
   private Set<String> hostsInProcess;
   private final String clusterOsType;
   private String projectVersion;
+  private int serverPort;
 
   @Inject
   public BootStrapImpl(Configuration conf, AmbariMetaInfo ambariMetaInfo) throws IOException {
@@ -67,6 +70,8 @@ public class BootStrapImpl {
         InetAddress.getLocalHost().getCanonicalHostName());
     this.clusterOsType = conf.getServerOsType();
     this.projectVersion = ambariMetaInfo.getServerVersion();
+    this.projectVersion = (this.projectVersion.equals(DEV_VERSION)) ? DEV_VERSION.replace("$", "") : this.projectVersion;
+    this.serverPort = (conf.getApiSSLAuthentication())? conf.getClientSSLApiPort() : conf.getClientApiPort();
   }
 
   /**
@@ -147,8 +152,8 @@ public class BootStrapImpl {
 
     bsActionRunner = new BSActionRunner(this, info, bootStrapDir.toString(),
         bootstrapActionScript, actionScript, bootSetupAgentPassword, requestId,
-        this.masterHostname, info.isVerbose(), this.clusterOsType,
-        this.projectVersion);
+        0L, this.masterHostname, info.isVerbose(), this.clusterOsType,
+        this.projectVersion, this.serverPort);
     bsActionRunner.start();
     response.setStatus(BSRunStat.OK);
     response.setRequestId(requestId);

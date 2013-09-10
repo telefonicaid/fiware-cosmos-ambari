@@ -18,30 +18,44 @@
 # under the License.
 #
 #
-class hdp-yarn::smoketest(
+define hdp-yarn::smoketest(
   $component_name = undef
 )
 {
-  $rm_webui_port = $hdp-yarn::params::rm_webui_port
-  $nm_webui_port = $hdp-yarn::params::nm_webui_port
-  $hs_webui_port = $hdp-yarn::params::hs_webui_port
+  $rm_webui_address = $hdp-yarn::params::rm_webui_address
+  $nm_webui_address = $hdp-yarn::params::nm_webui_address
+  $hs_webui_address = $hdp-yarn::params::hs_webui_address
 
   if ($component_name == 'resourcemanager') {
     $component_type = 'rm'
-    $component_port = $rm_webui_port
+    $component_address = $rm_webui_address
+  } elsif ($component_name == 'nodemanager') {
+    $component_type = 'nm'
+    $component_address = $nm_webui_address
   } elsif ($component_name == 'historyserver') {
-    $component_type = 'hs' 
-    $component_port = $hs_webui_port
+    $component_type = 'hs'
+    $component_address = $hs_webui_address
   } else {
     hdp_fail("Unsupported component name: $component_name")
   }
 
+  $security_enabled = $hdp::params::security_enabled
+  $smoke_user_keytab = $hdp::params::smokeuser_keytab
   $smoke_test_user = $hdp::params::smokeuser
-  
+  $kinit_cmd = "${hdp::params::kinit_path_local} -kt ${smoke_user_keytab} ${smoke_test_user};"
+
+
   $validateStatusFileName = "validateYarnComponentStatus.py"
   $validateStatusFilePath = "/tmp/$validateStatusFileName"
 
-  $validateStatusCmd = "su - ${smoke_test_user} -c 'python $validateStatusFilePath $component_type -p $component_port'"
+  $validateStatusCmd = "$validateStatusFilePath $component_type -p $component_address"
+
+    if ($security_enabled == true) {
+         $smoke_cmd = "${kinit_cmd}  $validateStatusCmd"
+        } else {
+          $smoke_cmd = $validateStatusCmd
+        }
+
 
   file { $validateStatusFilePath:
     ensure => present,
@@ -50,11 +64,12 @@ class hdp-yarn::smoketest(
   }
 
   exec { $validateStatusFilePath:
-    command   => $validateStatusCmd,
+    command   => $smoke_cmd,
     tries     => 3,
     try_sleep => 5,
     path      => '/usr/sbin:/sbin:/usr/local/bin:/bin:/usr/bin',
-    logoutput => "true"
-  }
-  File[$validateStatusFilePath] -> Exec[$validateStatusFilePath]
+    logoutput => "true",
+    user     =>  $smoke_test_user
+}
+  anchor{"hdp-yarn::smoketest::begin":} -> File[$validateStatusFilePath] -> Exec[$validateStatusFilePath] -> anchor{"hdp-yarn::smoketest::end":}
 }

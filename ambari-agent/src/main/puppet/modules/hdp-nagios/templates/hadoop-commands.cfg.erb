@@ -36,7 +36,7 @@ define command {
 
 define command{
         command_name    check_hdfs_blocks
-        command_line    php $USER1$/check_hdfs_blocks.php -h $HOSTADDRESS$ -p $ARG1$ -w $ARG2$ -c $ARG3$
+        command_line    php $USER1$/check_hdfs_blocks.php -h $HOSTADDRESS$ -p $ARG1$ -w $ARG2$ -c $ARG3$ -s $ARG4$
        }
 
 define command{
@@ -71,17 +71,17 @@ define command{
 
 define command{
         command_name    check_oozie_status
-        command_line    $USER1$/check_oozie_status.sh $HOSTADDRESS$ $ARG1$ $ARG2$ $ARG3$ $ARG4$ $ARG5$
+        command_line    $USER1$/check_oozie_status.sh $HOSTADDRESS$ $ARG1$ $ARG2$ $ARG3$ $ARG4$ $ARG5$ $ARG6$ $ARG7$
        }
 
 define command{
         command_name    check_templeton_status
-        command_line    $USER1$/check_templeton_status.sh $HOSTADDRESS$ $ARG1$ $ARG2$ $ARG3$ $ARG4$ $ARG5$
+        command_line    $USER1$/check_templeton_status.sh $HOSTADDRESS$ $ARG1$ $ARG2$ $ARG3$ $ARG4$ $ARG5$ $ARG6$ $ARG7$
        }
 
 define command{
         command_name    check_hive_metastore_status
-        command_line    $USER1$/check_hive_metastore_status.sh $HOSTADDRESS$ $ARG1$ $ARG2$ $ARG3$ $ARG4$ $ARG5$
+        command_line    $USER1$/check_hive_metastore_status.sh $HOSTADDRESS$ $ARG1$ $ARG2$ $ARG3$ $ARG4$ $ARG5$ $ARG6$ $ARG7$
        }
 define command{
         command_name    check_ambari_agent_status
@@ -91,3 +91,28 @@ define command{
         command_name    check_hue_status
         command_line    $USER1$/check_hue_status.sh
        }
+
+define command{
+       command_name    check_mapred_local_dir_used_space
+       command_line    $USER1$/check_mapred_local_dir_used.sh $ARG1$ $ARG2$
+       }
+
+define command{
+       command_name    check_namenodes_ha
+       command_line    $USER1$/check_namenodes_ha.sh $ARG1$ $ARG2$
+       }
+
+define command{
+        command_name    check_nodemanager_health
+        command_line    $USER1$/check_nodemanager_health.sh $HOSTADDRESS$ $ARG1$
+       }
+
+define command{
+        command_name    check_resourcemanager_nodes_percentage
+        command_line    $USER1$/check_resourcemanager_nodes_percentage.sh $HOSTADDRESS$ $ARG1$ $ARG2$ $ARG3$ $ARG4$
+       }
+
+define command{
+	command_name	check_tcp_on_host
+	command_line	$USER1$/check_tcp -H $ARG1$ -p $ARG2$ $ARG3$
+	}

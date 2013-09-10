@@ -27,13 +27,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Default cluster controller implementation.
@@ -41,7 +46,7 @@ import java.util.Set;
 public class ClusterControllerImpl implements ClusterController {
   private final static Logger LOG =
       LoggerFactory.getLogger(ClusterControllerImpl.class);
-  
+
   /**
    * Module of providers for this controller.
    */
@@ -65,6 +70,11 @@ public class ClusterControllerImpl implements ClusterController {
   private final Map<Resource.Type, Schema> schemas =
       new HashMap<Resource.Type, Schema>();
 
+  /**
+   * Resource comparator.
+   */
+  private final ResourceComparator comparator = new ResourceComparator();
+
 
   // ----- Constructors ------------------------------------------------------
 
@@ -81,7 +91,16 @@ public class ClusterControllerImpl implements ClusterController {
              SystemException,
              NoSuchParentResourceException,
              NoSuchResourceException {
+    PageResponse response = getResources(type, request, predicate, null);
+    return response.getIterable();
+  }
 
+  @Override
+  public PageResponse getResources(Resource.Type type, Request request, Predicate predicate, PageRequest pageRequest)
+      throws UnsupportedPropertyException,
+             SystemException,
+             NoSuchResourceException,
+             NoSuchParentResourceException {
     ResourceProvider provider = ensureResourceProvider(type);
     ensurePropertyProviders(type);
     Set<Resource> resources;
@@ -90,19 +109,41 @@ public class ClusterControllerImpl implements ClusterController {
       resources = Collections.emptySet();
     } else {
 
-
       if (LOG.isDebugEnabled()) {
         LOG.debug("Using resource provider "
-          + provider.getClass().getName()
-          + " for request type " + type.toString());
+            + provider.getClass().getName()
+            + " for request type " + type.toString());
       }
       checkProperties(type, request, predicate);
 
-      resources = provider.getResources(request, predicate);
-      resources = populateResources(type, resources, request, predicate);
+      Set<Resource> providerResources = provider.getResources(request, predicate);
+      providerResources               = populateResources(type, providerResources, request, predicate);
+
+      Comparator<Resource> resourceComparator = pageRequest == null || pageRequest.getComparator() == null ?
+          comparator : pageRequest.getComparator();
+
+      TreeSet<Resource> sortedResources = new TreeSet<Resource>(resourceComparator);
+      sortedResources.addAll(providerResources);
+
+      if (pageRequest != null) {
+        switch (pageRequest.getStartingPoint()) {
+          case Beginning:
+            return getPageFromOffset(pageRequest.getPageSize(), 0, sortedResources, predicate);
+          case End:
+            return getPageToOffset(pageRequest.getPageSize(), -1, sortedResources, predicate);
+          case OffsetStart:
+            return getPageFromOffset(pageRequest.getPageSize(), pageRequest.getOffset(), sortedResources, predicate);
+          case OffsetEnd:
+            return getPageToOffset(pageRequest.getPageSize(), pageRequest.getOffset(), sortedResources, predicate);
+          // TODO : need to support the following cases for pagination
+//          case PredicateStart:
+//          case PredicateEnd:
+        }
+      }
+      resources = sortedResources;
     }
-    
-    return new ResourceIterable(resources, predicate);
+
+    return new PageResponseImpl(new ResourceIterable(resources, predicate), 0, null, null);
   }
 
   @Override
@@ -366,8 +407,87 @@ public class ClusterControllerImpl implements ClusterController {
     return propertyProviders.get(type);
   }
 
+  /**
+   * Get one page of resources from the given set of resources starting at the given offset.
+   *
+   * @param pageSize   the page size
+   * @param offset     the offset
+   * @param resources  the set of resources
+   * @param predicate  the predicate
+   *
+   * @return a page response containing a page of resources
+   */
+  private PageResponse getPageFromOffset(int pageSize, int offset, NavigableSet<Resource> resources, Predicate predicate) {
 
-  // ----- ResourceIterable inner class --------------------------------------
+    int                currentOffset = 0;
+    Resource           previous      = null;
+    Set<Resource>      pageResources = new LinkedHashSet<Resource>();
+    Iterator<Resource> iterator      = resources.iterator();
+
+    // skip till offset
+    while (currentOffset < offset && iterator.hasNext()) {
+      previous = iterator.next();
+      ++currentOffset;
+    }
+
+    // get a page worth of resources
+    for (int i = 0; i < pageSize && iterator.hasNext(); ++i) {
+      pageResources.add(iterator.next());
+    }
+
+    return new PageResponseImpl(new ResourceIterable(pageResources, predicate),
+        currentOffset,
+        previous,
+        iterator.hasNext() ? iterator.next() : null);
+  }
+
+  /**
+   * Get one page of resources from the given set of resources ending at the given offset.
+   *
+   * @param pageSize   the page size
+   * @param offset     the offset; -1 indicates the end of the resource set
+   * @param resources  the set of resources
+   * @param predicate  the predicate
+   *
+   * @return a page response containing a page of resources
+   */
+  private PageResponse getPageToOffset(int pageSize, int offset, NavigableSet<Resource> resources, Predicate predicate) {
+
+    int                currentOffset = resources.size() - 1;
+    Resource           next          = null;
+    List<Resource>     pageResources = new LinkedList<Resource>();
+    Iterator<Resource> iterator      = resources.descendingIterator();
+
+    if (offset != -1) {
+      // skip till offset
+      while (currentOffset > offset && iterator.hasNext()) {
+        next = iterator.next();
+        --currentOffset;
+      }
+    }
+
+    // get a page worth of resources
+    for (int i = 0; i < pageSize && iterator.hasNext(); ++i) {
+      pageResources.add(0, iterator.next());
+      --currentOffset;
+    }
+
+    return new PageResponseImpl(new ResourceIterable(new LinkedHashSet<Resource>(pageResources), predicate),
+        currentOffset + 1,
+        iterator.hasNext() ? iterator.next() : null,
+        next);
+  }
+
+  /**
+   * Get the associated resource comparator.
+   *
+   * @return the resource comparator
+   */
+  protected Comparator<Resource> getComparator() {
+    return comparator;
+  }
+
+// ----- ResourceIterable inner class --------------------------------------
 
   private static class ResourceIterable implements Iterable<Resource> {
 
@@ -477,6 +597,55 @@ public class ClusterControllerImpl implements ClusterController {
         }
       }
       return null;
+    }
+  }
+
+  // ----- ResourceComparator inner class ------------------------------------
+
+  protected class ResourceComparator implements Comparator<Resource> {
+
+    @Override
+    public int compare(Resource resource1, Resource resource2) {
+      Resource.Type resourceType = resource1.getType();
+
+      // compare based on resource type
+      int compVal = resourceType.compareTo(resource2.getType());
+
+      if (compVal == 0) {
+        Schema schema = getSchema(resourceType);
+
+        // compare based on resource key properties
+        for (Resource.Type type : Resource.Type.values()) {
+          String keyPropertyId = schema.getKeyPropertyId(type);
+          if (keyPropertyId != null) {
+            compVal = compareValues(resource1.getPropertyValue(keyPropertyId),
+                                    resource2.getPropertyValue(keyPropertyId));
+            if (compVal != 0 ) {
+              return compVal;
+            }
+          }
+        }
+      }
+
+      // compare based on the resource strings
+      return resource1.toString().compareTo(resource2.toString());
+    }
+
+    // compare two values and account for null
+    private int compareValues(Object val1, Object val2) {
+
+      if (val1 == null || val2 == null) {
+        return val1 == null && val2 == null ? 0 : val1 == null ? -1 : 1;
+      }
+
+      if (val1 instanceof Comparable) {
+        try {
+          return ((Comparable)val1).compareTo(val2);
+        } catch (ClassCastException e) {
+          return 0;
+        }
+      }
+      return 0;
     }
   }
 }

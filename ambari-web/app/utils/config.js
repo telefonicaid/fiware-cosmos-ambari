@@ -17,27 +17,97 @@
  */
 
 var App = require('app');
+var stringUtils = require('utils/string_utils');
 
 var serviceComponents = {};
 var configGroupsByTag = [];
 var globalPropertyToServicesMap = null;
 
 App.config = Em.Object.create({
-
-  preDefinedServiceConfigs: require('data/service_configs'),
-  configMapping: require('data/config_mapping'),
-  preDefinedConfigProperties: require('data/config_properties').configProperties,
-  preDefinedCustomConfigs: require('data/custom_configs'),
+  /**
+   * XML characters which should be escaped in values
+   * http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Predefined_entities_in_XML
+   */
+  xmlEscapeMap: {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': '&quot;',
+    "'": '&apos;'
+  },
+  xmlUnEscapeMap: {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&apos;": "'"
+  },
+  
+  /**
+   * Since values end up in XML files (core-sit.xml, etc.), certain
+   * XML sensitive characters should be escaped. If not we will have
+   * an invalid XML document, and services will fail to start. 
+   * 
+   * Special characters in XML are defined at
+   * http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Predefined_entities_in_XML
+   */
+  escapeXMLCharacters: function(value) {
+    var self = this;
+    // To prevent double/triple replacing '&gt;' to '&gt;gt;' to '&gt;gt;gt', we need
+    // to first unescape all XML chars, and then escape them again.
+    var newValue = String(value).replace(/(&amp;|&lt;|&gt;|&quot;|&apos;)/g, function (s) {
+      return self.xmlUnEscapeMap[s];
+    });
+    return String(newValue).replace(/[&<>"']/g, function (s) {
+      return self.xmlEscapeMap[s];
+    });
+  },
+  preDefinedServiceConfigs: function(){
+    var configs = this.get('preDefinedGlobalProperties');
+    var services = [];
+    require('data/service_configs').forEach(function(service){
+      service.configs = configs.filterProperty('serviceName', service.serviceName);
+      services.push(service);
+    });
+    return services;
+  }.property('preDefinedGlobalProperties'),
+  configMapping: function() {
+      if (App.get('isHadoop2Stack')) {
+        return require('data/HDP2/config_mapping');
+      }
+    return require('data/config_mapping');
+  }.property('App.isHadoop2Stack'),
+  preDefinedGlobalProperties: function() {
+    if (App.get('isHadoop2Stack')) {
+      return require('data/HDP2/global_properties').configProperties;
+    }
+    return require('data/global_properties').configProperties;
+  }.property('App.isHadoop2Stack'),
+  preDefinedSiteProperties: function() {
+    if (App.get('isHadoop2Stack')) {
+      return require('data/HDP2/site_properties').configProperties;
+    }
+    return require('data/site_properties').configProperties;
+  }.property('App.isHadoop2Stack'),
+  preDefinedCustomConfigs: function () {
+    if (App.get('isHadoop2Stack')) {
+      return require('data/HDP2/custom_configs');
+    }
+    return require('data/custom_configs');
+  }.property('App.isHadoop2Stack'),
   //categories which contain custom configs
   categoriesWithCustom: ['CapacityScheduler'],
   //configs with these filenames go to appropriate category not in Advanced
   customFileNames: function() {
     if (App.supports.capacitySchedulerUi) {
+      if(App.get('isHadoop2Stack')){
+        return ['capacity-scheduler.xml'];
+      }
       return ['capacity-scheduler.xml', 'mapred-queue-acls.xml'];
     } else {
       return [];
     }
-  }.property(''),
+  }.property('App.isHadoop2Stack'),
   /**
    * Cache of loaded configurations. This is useful in not loading
    * same configuration multiple times. It is populated in multiple
@@ -101,11 +171,26 @@ App.config = Em.Object.create({
         if(!isAdvanced) config.isUserProperty = true;
       }
     } else {
-      config.category = 'Advanced';
+      config.category = config.category ? config.category : 'Advanced';
+      config.description = isAdvanced && advancedConfigs.findProperty('name', config.name).description;
       config.filename = isAdvanced && advancedConfigs.findProperty('name', config.name).filename;
       config.isRequired = true;
     }
   },
+  capacitySchedulerFilter: function () {
+    var yarnRegex = /^yarn\.scheduler\.capacity\.root\.(?!unfunded)([a-z]([\_\-a-z0-9]{0,50}))\.(acl_administer_jobs|acl_submit_jobs|state|user-limit-factor|maximum-capacity|capacity)$/i;
+    var self = this;
+    if(App.get('isHadoop2Stack')){
+      return function (_config) {
+        return (yarnRegex.test(_config.name));
+      }
+    } else {
+      return function (_config) {
+        return (_config.name.indexOf('mapred.capacity-scheduler.queue.') !== -1) ||
+          (/^mapred\.queue\.[a-z]([\_\-a-z0-9]{0,50})\.(acl-administer-jobs|acl-submit-job)$/i.test(_config.name));
+      }
+    }
+  }.property('App.isHadoop2Stack'),
   /**
    * return:
    *   configs,
@@ -121,7 +206,7 @@ App.config = Em.Object.create({
   mergePreDefinedWithLoaded: function (configGroups, advancedConfigs, tags, serviceName) {
     var configs = [];
     var globalConfigs = [];
-    var preDefinedConfigs = this.get('preDefinedConfigProperties');
+    var preDefinedConfigs = this.get('preDefinedGlobalProperties').concat(this.get('preDefinedSiteProperties'));
     var mappingConfigs = [];
 
     tags.forEach(function (_tag) {
@@ -133,15 +218,16 @@ App.config = Em.Object.create({
       properties = (properties.length) ? properties.objectAt(0).properties : {};
       for (var index in properties) {
         var configsPropertyDef = preDefinedConfigs.findProperty('name', index) || null;
-        var serviceConfigObj = {
+        var serviceConfigObj = App.ServiceConfig.create({
           name: index,
           value: properties[index],
           defaultValue: properties[index],
           filename: _tag.siteName + ".xml",
           isUserProperty: false,
           isOverridable: true,
-          serviceName: serviceName
-        };
+          serviceName: serviceName,
+          belongsToService: []
+        });
 
         if (configsPropertyDef) {
           serviceConfigObj.displayType = configsPropertyDef.displayType;
@@ -153,24 +239,24 @@ App.config = Em.Object.create({
           serviceConfigObj.isOverridable = configsPropertyDef.isOverridable === undefined ? true : configsPropertyDef.isOverridable;
           serviceConfigObj.serviceName = configsPropertyDef ? configsPropertyDef.serviceName : null;
           serviceConfigObj.index = configsPropertyDef.index;
-        }
-        // MAPREDUCE contains core-site properties but doesn't show them
-        if(serviceConfigObj.serviceName === 'MAPREDUCE' && serviceConfigObj.filename === 'core-site.xml'){
-          serviceConfigObj.isVisible = false;
+          serviceConfigObj.isSecureConfig = configsPropertyDef.isSecureConfig === undefined ? false : configsPropertyDef.isSecureConfig;
+          serviceConfigObj.belongsToService = configsPropertyDef.belongsToService;
+          serviceConfigObj.category = configsPropertyDef.category;
         }
         if (_tag.siteName === 'global') {
           if (configsPropertyDef) {
             this.handleSpecialProperties(serviceConfigObj);
+          } else {
+            serviceConfigObj.isVisible = false;  // if the global property is not defined on ui metadata global_properties.js then it shouldn't be a part of errorCount
           }
           serviceConfigObj.id = 'puppet var';
           serviceConfigObj.displayName = configsPropertyDef ? configsPropertyDef.displayName : null;
-          serviceConfigObj.category = configsPropertyDef ? configsPropertyDef.category : null;
           serviceConfigObj.options = configsPropertyDef ? configsPropertyDef.options : null;
           globalConfigs.push(serviceConfigObj);
         } else if (!this.get('configMapping').computed().someProperty('name', index)) {
           isAdvanced = advancedConfigs.someProperty('name', index);
           serviceConfigObj.id = 'site property';
-          serviceConfigObj.displayType = 'advanced';
+          serviceConfigObj.displayType = stringUtils.isSingleLine(serviceConfigObj.value) ? 'advanced' : 'multiLine';
           serviceConfigObj.displayName = configsPropertyDef ? configsPropertyDef.displayName : index;
           this.calculateConfigProperties(serviceConfigObj, isAdvanced, advancedConfigs);
           configs.push(serviceConfigObj);
@@ -185,6 +271,46 @@ App.config = Em.Object.create({
       mappingConfigs: mappingConfigs
     }
   },
+  /**
+   * synchronize order of config properties with order, that on UI side
+   * @param configSet
+   * @return {Object}
+   */
+  syncOrderWithPredefined: function(configSet){
+    var globalConfigs = configSet.globalConfigs,
+        siteConfigs = configSet.configs,
+        globalStart = [],
+        siteStart = [];
+
+    this.get('preDefinedGlobalProperties').mapProperty('name').forEach(function(name){
+      var _global = globalConfigs.findProperty('name', name);
+      if(_global){
+        globalStart.push(_global);
+        globalConfigs = globalConfigs.without(_global);
+      }
+    }, this);
+
+    this.get('preDefinedSiteProperties').mapProperty('name').forEach(function(name){
+      var _site = siteConfigs.findProperty('name', name);
+      if(_site){
+        siteStart.push(_site);
+        siteConfigs = siteConfigs.without(_site);
+      }
+    }, this);
+
+    var alphabeticalSort = function(a, b){
+      if (a.name < b.name) return -1;
+      if (a.name > b.name) return 1;
+      return 0;
+    }
+
+
+    return {
+      globalConfigs: globalStart.concat(globalConfigs.sort(alphabeticalSort)),
+      configs: siteStart.concat(siteConfigs.sort(alphabeticalSort)),
+      mappingConfigs: configSet.mappingConfigs
+    }
+  },
 
   /**
    * merge stored configs with pre-defined
@@ -194,14 +320,14 @@ App.config = Em.Object.create({
    */
   mergePreDefinedWithStored: function (storedConfigs, advancedConfigs) {
     var mergedConfigs = [];
-    var preDefinedConfigs = $.extend(true, [], this.get('preDefinedConfigProperties'));
+    var preDefinedConfigs = $.extend(true, [], this.get('preDefinedGlobalProperties').concat(this.get('preDefinedSiteProperties')));
     var preDefinedNames = [];
     var storedNames = [];
     var names = [];
     var categoryMetaData = null;
     storedConfigs = (storedConfigs) ? storedConfigs : [];
 
-    preDefinedNames = this.get('preDefinedConfigProperties').mapProperty('name');
+    preDefinedNames = preDefinedConfigs.mapProperty('name');
     storedNames = storedConfigs.mapProperty('name');
     names = preDefinedNames.concat(storedNames).uniq();
     names.forEach(function (name) {
@@ -212,6 +338,7 @@ App.config = Em.Object.create({
       if (preDefined && stored) {
         configData = preDefined;
         configData.value = stored.value;
+        configData.defaultValue = stored.defaultValue;
         configData.overrides = stored.overrides;
       } else if (!preDefined && stored) {
         configData = {
@@ -221,7 +348,7 @@ App.config = Em.Object.create({
           serviceName: stored.serviceName,
           value: stored.value,
           defaultValue: stored.defaultValue,
-          displayType: "advanced",
+          displayType: stringUtils.isSingleLine(stored.value) ? 'advanced' : 'multiLine',
           filename: stored.filename,
           category: 'Advanced',
           isUserProperty: stored.isUserProperty === true,
@@ -233,7 +360,10 @@ App.config = Em.Object.create({
       } else if (preDefined && !stored) {
         configData = preDefined;
         if (isAdvanced) {
-          configData.filename = advancedConfigs.findProperty('name', configData.name).filename;
+          var advanced = advancedConfigs.findProperty('name', configData.name);
+          configData.value = advanced.value;
+          configData.defaultValue = advanced.value;
+          configData.filename = advanced.filename;
         }
       }
       mergedConfigs.push(configData);
@@ -248,13 +378,13 @@ App.config = Em.Object.create({
    * @param serviceName
    */
   addAdvancedConfigs: function (serviceConfigs, advancedConfigs, serviceName) {
-    serviceConfigs = (serviceName) ? serviceConfigs.filterProperty('serviceName', serviceName) : serviceConfigs;
+    var configsToVerifying = (serviceName) ? serviceConfigs.filterProperty('serviceName', serviceName) : serviceConfigs;
     advancedConfigs.forEach(function (_config) {
       var configCategory = 'Advanced';
       var categoryMetaData = null;
       if (_config) {
         if (this.get('configMapping').computed().someProperty('name', _config.name)) {
-        } else if (!(serviceConfigs.someProperty('name', _config.name))) {
+        } else if (!(configsToVerifying.someProperty('name', _config.name))) {
           if(this.get('customFileNames').contains(_config.filename)){
             categoryMetaData = this.identifyCategory(_config);
             if (categoryMetaData != null) {
@@ -273,8 +403,7 @@ App.config = Em.Object.create({
            * (/^\s+$/.test(_config.value)) { _config.isRequired = false; }
            */
           _config.isRequired = true;
-          _config.isVisible = true;
-          _config.displayType = 'advanced';
+          _config.displayType = stringUtils.isSingleLine(_config.value) ? 'advanced' : 'multiLine';
           serviceConfigs.push(_config);
         }
       }
@@ -286,66 +415,23 @@ App.config = Em.Object.create({
   addCustomConfigs: function (configs) {
     var preDefinedCustomConfigs = $.extend(true, [], this.get('preDefinedCustomConfigs'));
     var stored = configs.filter(function (_config) {
-      if (this.get('categoriesWithCustom').contains(_config.category)) return true;
+      return this.get('categoriesWithCustom').contains(_config.category);
     }, this);
-    var queueProperties = stored.filter(function (_config) {
-      if ((_config.name.indexOf('mapred.capacity-scheduler.queue.') !== -1) ||
-        (/mapred.queue.[a-z]([\_\-a-z0-9]{0,50}).acl-administer-jobs/i.test(_config.name)) ||
-        (/mapred.queue.[a-z]([\_\-a-z0-9]{0,50}).acl-submit-job/i.test(_config.name))) {
-        return true;
+    if(App.supports.capacitySchedulerUi){
+      var queueProperties = stored.filter(this.get('capacitySchedulerFilter'));
+      if (queueProperties.length) {
+        queueProperties.setEach('isQueue', true);
       }
+    }
+  },
+
+  miscConfigVisibleProperty: function (configs, serviceToShow) {
+    configs.forEach(function(item) {
+      item.set("isVisible", item.belongsToService.some(function(cur){return serviceToShow.contains(cur)}));
     });
-    if (queueProperties.length) {
-      queueProperties.setEach('isQueue', true);
-    } else {
-      queueProperties = preDefinedCustomConfigs.filterProperty('isQueue');
-      queueProperties.forEach(function (customConfig) {
-        this.setDefaultQueue(customConfig, 'default');
-        configs.push(customConfig);
-      }, this);
-    }
+    return configs;
   },
-  /**
-   * set values to properties of queue
-   * @param customConfig
-   * @param queueName
-   */
-  setDefaultQueue: function (customConfig, queueName) {
-    customConfig.name = customConfig.name.replace(/<queue-name>/, queueName);
-    //default values of queue
-    switch (customConfig.name) {
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.capacity':
-        customConfig.value = '100';
-        break;
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.maximum-capacity':
-        customConfig.value = '100';
-        break;
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.minimum-user-limit-percent':
-        customConfig.value = '100';
-        break;
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.user-limit-factor':
-        customConfig.value = '1';
-        break;
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.maximum-initialized-active-tasks':
-        customConfig.value = '200000';
-        break;
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.maximum-initialized-active-tasks-per-user':
-        customConfig.value = '100000';
-        break;
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.init-accept-jobs-factor':
-        customConfig.value = '10';
-        break;
-      case 'mapred.capacity-scheduler.queue.' + queueName + '.supports-priority':
-        customConfig.value = 'false';
-        break;
-      case 'mapred.queue.' + queueName + '.acl-submit-job':
-        customConfig.value = '*';
-        break;
-      case 'mapred.queue.' + queueName + '.acl-administer-jobs':
-        customConfig.value = '*';
-        break;
-    }
-  },
+
   /**
    * render configs, distribute them by service
    * and wrap each in ServiceConfigProperty object
@@ -354,7 +440,7 @@ App.config = Em.Object.create({
    * @param selectedServiceNames
    * @return {Array}
    */
-  renderConfigs: function (configs, allInstalledServiceNames, selectedServiceNames) {
+  renderConfigs: function (configs, storedConfigs, allInstalledServiceNames, selectedServiceNames) {
     var renderedServiceConfigs = [];
     var localDB = {
       hosts: App.db.getHosts(),
@@ -381,7 +467,10 @@ App.config = Em.Object.create({
         _config.isOverridable = (_config.isOverridable === undefined) ? true : _config.isOverridable;
         serviceConfigProperty = App.ServiceConfigProperty.create(_config);
         this.updateHostOverrides(serviceConfigProperty, _config);
-        serviceConfigProperty.initialValue(localDB);
+        if (!storedConfigs) {
+          serviceConfigProperty.initialValue(localDB);
+        }
+        this.tweakDynamicDefaults(localDB, serviceConfigProperty, _config);
         serviceConfigProperty.validate();
         configsByService.pushObject(serviceConfigProperty);
       }, this);
@@ -391,6 +480,26 @@ App.config = Em.Object.create({
       renderedServiceConfigs.push(serviceConfig);
     }, this);
     return renderedServiceConfigs;
+  },
+  /**
+  Takes care of the "dynamic defaults" for the HCFS configs.  Sets
+  some of the config defaults to previously user-entered data.
+  **/
+  tweakDynamicDefaults: function (localDB, serviceConfigProperty, config) {
+    console.log("Step7: Tweaking Dynamic defaults");
+    var firstHost = null;
+    for(var host in localDB.hosts) {
+      firstHost = host;
+      break;
+    }
+    try {
+      if (typeof(config == "string") && config.defaultValue.indexOf("{firstHost}") >= 0) {
+        serviceConfigProperty.set('value', serviceConfigProperty.value.replace(new RegExp("{firstHost}"), firstHost));
+        serviceConfigProperty.set('defaultValue', serviceConfigProperty.defaultValue.replace(new RegExp("{firstHost}"), firstHost));
+      }
+    } catch (err) {
+      // Nothing to worry about here, most likely trying indexOf on a non-string
+    }
   },
   /**
    * create new child configs from overrides, attach them to parent config
@@ -422,7 +531,7 @@ App.config = Em.Object.create({
    * @param serviceName
    */
   createServiceConfig: function (serviceName) {
-    var preDefinedServiceConfig = App.config.preDefinedServiceConfigs.findProperty('serviceName', serviceName);
+    var preDefinedServiceConfig = App.config.get('preDefinedServiceConfigs').findProperty('serviceName', serviceName);
     var serviceConfig = App.ServiceConfig.create({
       filename: preDefinedServiceConfig.filename,
       serviceName: preDefinedServiceConfig.serviceName,
@@ -433,7 +542,11 @@ App.config = Em.Object.create({
     serviceConfig.configCategories.filterProperty('isCustomView', true).forEach(function (category) {
       switch (category.name) {
         case 'CapacityScheduler':
-          category.set('customView', App.ServiceConfigCapacityScheduler);
+          if(App.supports.capacitySchedulerUi){
+            category.set('customView', App.ServiceConfigCapacityScheduler);
+          } else {
+            category.set('isCustomView', false);
+          }
           break;
       }
     }, this);
@@ -451,7 +564,7 @@ App.config = Em.Object.create({
     });
     var params = urlParams.join('|');
     App.ajax.send({
-      name: 'config.on-site',
+      name: 'config.on_site',
       sender: this,
       data: {
         params: params
@@ -483,7 +596,8 @@ App.config = Em.Object.create({
       sender: this,
       data: {
         serviceName: serviceName,
-        stack2VersionUrl: App.get('stack2VersionURL')
+        stack2VersionUrl: App.get('stack2VersionURL'),
+        stackVersion: App.get('currentStackVersionNumber')
       },
       success: 'loadAdvancedConfigSuccess'
     });
@@ -497,11 +611,13 @@ App.config = Em.Object.create({
     if (data.items.length) {
       data.items.forEach(function (item) {
         item = item.StackConfigurations;
+        item.isVisible = item.type !== 'global.xml';
         properties.push({
           serviceName: item.service_name,
           name: item.property_name,
           value: item.property_value,
           description: item.property_description,
+          isVisible: item.isVisible,
           filename: item.filename || item.type
         });
       }, this);
@@ -678,6 +794,180 @@ App.config = Em.Object.create({
       }
     });
     console.log("loadServiceConfigHostsOverrides(): Finished loading.");
+  },
+
+  /**
+   * Set all site property that are derived from other site-properties
+   */
+  setConfigValue: function (mappedConfigs, allConfigs, config, globalConfigs) {
+    var globalValue;
+    if (config.value == null) {
+      return;
+    }
+    var fkValue = config.value.match(/<(foreignKey.*?)>/g);
+    var fkName = config.name.match(/<(foreignKey.*?)>/g);
+    var templateValue = config.value.match(/<(templateName.*?)>/g);
+    if (fkValue) {
+      fkValue.forEach(function (_fkValue) {
+        var index = parseInt(_fkValue.match(/\[([\d]*)(?=\])/)[1]);
+        if (mappedConfigs.someProperty('name', config.foreignKey[index])) {
+          globalValue = mappedConfigs.findProperty('name', config.foreignKey[index]).value;
+          config.value = config.value.replace(_fkValue, globalValue);
+        } else if (allConfigs.someProperty('name', config.foreignKey[index])) {
+          if (allConfigs.findProperty('name', config.foreignKey[index]).value === '') {
+            globalValue = allConfigs.findProperty('name', config.foreignKey[index]).defaultValue;
+          } else {
+            globalValue = allConfigs.findProperty('name', config.foreignKey[index]).value;
+          }
+          config.value = config.value.replace(_fkValue, globalValue);
+        }
+      }, this);
+    }
+
+    // config._name - formatted name from original config name
+    if (fkName) {
+      fkName.forEach(function (_fkName) {
+        var index = parseInt(_fkName.match(/\[([\d]*)(?=\])/)[1]);
+        if (mappedConfigs.someProperty('name', config.foreignKey[index])) {
+          globalValue = mappedConfigs.findProperty('name', config.foreignKey[index]).value;
+          config._name = config.name.replace(_fkName, globalValue);
+        } else if (allConfigs.someProperty('name', config.foreignKey[index])) {
+          if (allConfigs.findProperty('name', config.foreignKey[index]).value === '') {
+            globalValue = allConfigs.findProperty('name', config.foreignKey[index]).defaultValue;
+          } else {
+            globalValue = allConfigs.findProperty('name', config.foreignKey[index]).value;
+          }
+          config._name = config.name.replace(_fkName, globalValue);
+        }
+      }, this);
+    }
+
+    //For properties in the configMapping file having foreignKey and templateName properties.
+    if (templateValue) {
+      templateValue.forEach(function (_value) {
+        var index = parseInt(_value.match(/\[([\d]*)(?=\])/)[1]);
+        if (globalConfigs.someProperty('name', config.templateName[index])) {
+          var globalValue = globalConfigs.findProperty('name', config.templateName[index]).value;
+          config.value = config.value.replace(_value, globalValue);
+        } else {
+          config.value = null;
+        }
+      }, this);
+    }
+  },
+  complexConfigs: [
+    {
+      "id": "site property",
+      "name": "capacity-scheduler",
+      "displayName": "Capacity Scheduler",
+      "value": "",
+      "defaultValue": "",
+      "description": "Capacity Scheduler properties",
+      "displayType": "custom",
+      "isOverridable": true,
+      "isRequired": true,
+      "isVisible": true,
+      "serviceName": "YARN",
+      "filename": "capacity-scheduler.xml",
+      "category": "ResourceManager"
+    }
+  ],
+
+  /**
+   * transform set of configs from file
+   * into one config with textarea content:
+   * name=value
+   * @param configs
+   * @param filename
+   * @return {*}
+   */
+  fileConfigsIntoTextarea: function(configs, filename){
+    var fileConfigs = configs.filterProperty('filename', filename);
+    var value = '';
+    var defaultValue = '';
+    var complexConfig = this.get('complexConfigs').findProperty('filename', filename);
+    if(complexConfig){
+      fileConfigs.forEach(function(_config){
+        value += _config.name + '=' + _config.value + '\n';
+        defaultValue += _config.name + '=' + _config.defaultValue + '\n';
+      }, this);
+      complexConfig.value = value;
+      complexConfig.defaultValue = defaultValue;
+      configs = configs.filter(function(_config){
+        return _config.filename !== filename;
+      });
+      configs.push(complexConfig);
+    }
+    return configs;
+  },
+
+  /**
+   * transform one config with textarea content
+   * into set of configs of file
+   * @param configs
+   * @param filename
+   * @return {*}
+   */
+  textareaIntoFileConfigs: function(configs, filename){
+    var complexConfigName = this.get('complexConfigs').findProperty('filename', filename).name;
+    var configsTextarea = configs.findProperty('name', complexConfigName);
+    if (configsTextarea) {
+      var properties = configsTextarea.get('value').replace(/( |\n)+/g, '\n').split('\n');
+
+      properties.forEach(function (_property) {
+        var name, value;
+        if (_property) {
+          _property = _property.split('=');
+          name = _property[0];
+          value = (_property[1]) ? _property[1] : "";
+          configs.push(Em.Object.create({
+            id: configsTextarea.get('id'),
+            name: name,
+            value: value,
+            defaultValue: value,
+            serviceName: configsTextarea.get('serviceName'),
+            filename: filename
+          }));
+        }
+      });
+      return configs.without(configsTextarea);
+    }
+    console.log('ERROR: textarea config - ' + complexConfigName + ' is missing');
+    return configs;
+  },
+
+  /**
+   * trim trailing spaces for all properties.
+   * trim both trailing and leading spaces for host displayType and hive/oozie datebases url.
+   * for directory or directories displayType format string for further using.
+   * for password and values with spaces only do nothing.
+   * @param property
+   * @returns {*}
+   */
+  trimProperty: function(property, isEmberObject){
+    var displayType = (isEmberObject) ? property.get('displayType') : property.displayType;
+    var value = (isEmberObject) ? property.get('value') : property.value;
+    var name = (isEmberObject) ? property.get('name') : property.name;
+    var rez;
+    switch (displayType){
+      case 'directories':
+      case 'directory':
+        rez = value.trim().split(/\s+/g).join(',');
+        break;
+      case 'host':
+        rez = value.trim();
+        break;
+      case 'advanced':
+        if(name == 'hive_jdbc_connection_url' || name == 'oozie_jdbc_connection_url') {
+          rez = value.trim();
+        }
+        break;
+      case 'password':
+        break;
+      default:
+        rez = (value instanceof String) ? value.replace(/(\s+$)/g, '') : value;
+    }
+    return ((rez == '') || (rez == undefined)) ? value : rez;
   }
 
 });
