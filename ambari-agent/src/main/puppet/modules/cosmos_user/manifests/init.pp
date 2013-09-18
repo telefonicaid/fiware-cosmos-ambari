@@ -32,14 +32,15 @@ class cosmos_user($service_state) {
     # We employ variable scoping to enforce wipeoff only for this resource, not globally.
     $wipeoff_data = true
     # .ssh directory
-    hdp::directory { $params_for_user['user_ssh_dir']:
-      ensure => directory,
+    $ensure = $service_state ? {
+      'uninstalled' => absent,
+      default => directory,
+    }
+    file { $params_for_user['user_ssh_dir']:
+      ensure => $ensure,
       mode => 700,
-      service_state => $service_state,
-      force => true,
       owner => $params_for_user['username'],
       group => $cosmos_user::params::group,
-      override_owner => true,
     }
   }
 

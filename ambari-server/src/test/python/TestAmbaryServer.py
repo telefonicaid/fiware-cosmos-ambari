@@ -955,7 +955,7 @@ class TestAmbariServer(TestCase):
     download_jdk_mock.return_value = 0
     configure_os_settings_mock.return_value = 0
     result = ambari_server.setup(args)
-    self.assertEqual(None, result)
+    self.assertEqual(0, result)
 
     sys.stdout = sys.__stdout__
 
@@ -1047,7 +1047,7 @@ class TestAmbariServer(TestCase):
     pexistsMock.return_value = True
     rcode = ambari_server.start(args)
     self.assertTrue(killMock.called)
-    self.assertEqual(None, rcode)
+    self.assertEqual(0, rcode)
 
     pexistsMock.return_value = False
     find_jdk_mock.return_value = None
@@ -1060,7 +1060,7 @@ class TestAmbariServer(TestCase):
     p = MagicMock()
     popenMock.return_value = p
     rcode = ambari_server.start(args)
-    self.assertEqual(None, rcode)
+    self.assertEqual(0, rcode)
     self.assertTrue(f.write.called)
 
     sys.stdout = sys.__stdout__

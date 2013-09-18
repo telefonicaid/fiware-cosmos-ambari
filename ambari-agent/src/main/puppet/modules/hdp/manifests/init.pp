@@ -248,7 +248,7 @@ define hdp::directory(
   } elsif ($service_state != 'uninstalled') {
     if $override_owner == true {
       file { $name :
-      ensure => $ensure,
+      ensure => present,
       owner  => $owner,
       group  => $group,
       mode   => $mode,
@@ -256,7 +256,7 @@ define hdp::directory(
      }
     } else {
       file { $name :
-      ensure => $ensure,
+      ensure => present,
       mode   => $mode,
       force  => $force
      }

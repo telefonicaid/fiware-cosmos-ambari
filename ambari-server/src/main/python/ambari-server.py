@@ -859,13 +859,13 @@ def setup(args):
   retcode = check_selinux()
   if not retcode == 0:
     print_error_msg ('Failed to disable SELinux. Exiting.')
-    sys.exit(retcode)
+    return retcode
    
   print 'Checking iptables...'
   retcode, out = check_iptables()
   if not retcode == 0 and out == IP_TBLS_ENABLED:
     print_error_msg ('Failed to stop iptables. Exiting.')
-    sys.exit(retcode)
+    return retcode
 
   if not REMOTE_DATABASE:
 
@@ -873,41 +873,42 @@ def setup(args):
     retcode = check_postgre_up()
     if not retcode == 0:
       print_error_msg ('Unable to start PostgreSQL server. Exiting')
-      sys.exit(retcode)
+      return retcode
 
     print 'Configuring database...'
     retcode = setup_db(args)
     if not retcode == 0:
       print_error_msg  ('Running database init script was failed. Exiting.')
-      sys.exit(retcode)
+      return retcode
 
     print 'Configuring PostgreSQL...'
     retcode = configure_postgres()
     if not retcode == 0:
       print_error_msg ('Unable to configure PostgreSQL server. Exiting')
-      sys.exit(retcode)
+      return retcode
 
   else:
     print 'Configuring remote database connection properties'
     retcode = setup_remote_db(args)
     if not retcode == 0:
       print_error_msg ('Error while configuring connection properties. Exiting')
-      sys.exit(retcode)
+      return retcode
   
   print 'Checking JDK...'
   retcode = download_jdk(args)
   if not retcode == 0:
     print_error_msg ('Downloading or installing JDK failed. Exiting.')
-    sys.exit(retcode)
+    return retcode
 
   print 'Completing setup...'
   retcode = configure_os_settings()
   if not retcode == 0:
     print_error_msg ('Configure of OS settings in '
                    'ambari.properties failed. Exiting.')
-    sys.exit(retcode)
+    return retcode
 
   print "Ambari Server 'setup' finished successfully"
+  return 0
 
 
 
@@ -969,7 +970,7 @@ def start(args):
     try:
       os.kill(pid, 0)
       print("Server is already running.")
-      return
+      return 0
     except OSError, e:
       print_info_msg("Server is not running, continue.")
 
@@ -983,13 +984,13 @@ def start(args):
   retcode = check_postgre_up()
   if not retcode == 0:
     print_error_msg("Unable to start PostgreSQL server. Exiting")
-    sys.exit(retcode)
+    return retcode
 
   print 'Checking iptables...'
   retcode, out = check_iptables()
   if not retcode == 0 and out == IP_TBLS_ENABLED:
     print_error_msg ("Failed to stop iptables. Exiting")
-    sys.exit(retcode)
+    return retcode
 
   command = SERVER_START_CMD.format(jdk_path, conf_dir, get_ambari_classpath())
   print "Running server: " + command
@@ -997,6 +998,7 @@ def start(args):
   f = open(PID_DIR + os.sep + PID_NAME, "w")
   f.write(str(server_process.pid))
   f.close()
+  return 0
 
 
 
@@ -1011,12 +1013,14 @@ def stop(args):
       os.killpg(os.getpgid(pid), signal.SIGKILL)
     except OSError, e:
       print_info_msg( "Unable to stop Ambari Server - " + str(e) )
-      return
+      return -1
     f.close()
     os.remove(f.name)
     print "Ambari Server stopped"
+    return 0
   else:
     print "Ambari Server not running"
+    return StatusCodes.NOT_RUNNING
 
 
 
@@ -1028,14 +1032,14 @@ def upgrade(args):
   retcode = check_postgre_up()
   if not retcode == 0:
     printErrorMsg('PostgreSQL server not running. Exiting')
-    sys.exit(retcode)
+    return retcode
 
   file = args.upgrade_script_file
   print 'Upgrading database...'
   retcode = execute_db_script(args, file)
   if not retcode == 0:
     printErrorMsg('Database upgrade script has failed. Exiting.')
-    sys.exit(retcode)
+    return retcode
 
   print 'Checking database integrity...'
   check_file = file[:-3] + "Check" + file[-4:]
@@ -1048,10 +1052,11 @@ def upgrade(args):
 
     if not retcode == 0:
       printErrorMsg('Database cannot be fixed. Exiting.')
-      sys.exit(retcode)
+      return retcode
   else:
     print 'Database is consistent.'
   print "Ambari Server 'upgrade' finished successfully"
+  return 0
 
 
 #
@@ -1067,10 +1072,13 @@ def status(args):
     if retcode == 0:
       print "Ambari Server running"
       print "Ambari Server PID at: " + PID_DIR + os.sep + PID_NAME
+      return StatusCodes.RUNNING
     else:
       print "Ambari Server not running. Stale PID File at: " + PID_DIR + os.sep + PID_NAME
+      return StatusCodes.DEAD_AND_PID_FILE_EXISTS
   else:
     print "Ambari Server not running"
+    return StatusCodes.NOT_RUNNING
 
 
 
@@ -1228,7 +1236,25 @@ def configure_postgres_username_password(args):
   args.postgres_username=username
   args.postgres_password=password
 
-
+def performAction(action, options, parser, args):
+  if action == SETUP_ACTION:
+    return setup(options)
+  elif action == START_ACTION:
+    return start(options)
+  elif action == STOP_ACTION:
+    return stop(options)
+  elif action == RESET_ACTION:
+    return reset(options)
+  elif action == STATUS_ACTION:
+    return status(options)
+  elif action == UPGRADE_ACTION:
+    return upgrade(options)
+  elif action == UPGRADE_STACK_ACTION:
+    stack_id = args[1]
+    return upgrade_stack(options, stack_id)
+  else:
+    parser.error("Invalid action")
+    return -1
 
 #
 # Main.
@@ -1283,7 +1309,7 @@ def main():
 
 
 
-  
+
   if len(args) == 0:
     print parser.print_help()
     parser.error("No action entered")
@@ -1298,27 +1324,18 @@ def main():
   if len(args) < args_number_required:
     print parser.print_help()
     parser.error("Invalid number of arguments. Entered: " + str(len(args)) + ", required: " + str(args_number_required))
- 
-  if action == SETUP_ACTION:
-    setup(options)
-  elif action == START_ACTION:
-    start(options)
-  elif action == STOP_ACTION:
-    stop(options)
-  elif action == RESET_ACTION:
-    reset(options)
-  elif action == STATUS_ACTION:
-    status(options)
-  elif action == UPGRADE_ACTION:
-    upgrade(options)
-  elif action == UPGRADE_STACK_ACTION:
-    stack_id = args[1]
-    upgrade_stack(options, stack_id)
-  else:
-    parser.error("Invalid action")
+
+  actionStatusCode = performAction(action, options, parser, args)
+  return actionStatusCode
 
 
-
+class StatusCodes:
+  """
+  Service Status codes according to Linux Specification.
+  """
+  RUNNING=0
+  DEAD_AND_PID_FILE_EXISTS=1
+  NOT_RUNNING=3
 
 # A Python replacement for java.util.Properties
 # Based on http://code.activestate.com/recipes
@@ -1433,4 +1450,4 @@ class Properties(object):
 
 
 if __name__ == "__main__":
-  main()
+  sys.exit(main())

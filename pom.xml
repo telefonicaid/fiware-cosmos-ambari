@@ -21,7 +21,7 @@
   <artifactId>ambari</artifactId>
   <packaging>pom</packaging>
   <name>Ambari Main</name>
-  <version>0.10.0</version>
+  <version>0.12.0</version>
   <description>Ambari</description>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -51,6 +51,7 @@
     <module>ambari-project</module>
     <module>ambari-server</module>
     <module>ambari-agent</module>
+    <module>contrib/ambari-log4j</module>
   </modules>
   <build>
     <pluginManagement>
@@ -157,6 +158,18 @@
       </plugin>
     </plugins>
   </build>
+  <distributionManagement>
+        <repository>
+            <id>${repoMavenId}</id>
+            <name>${repoMavenName}</name>
+            <url>${repoMavenUrl}</url>
+        </repository>
+        <snapshotRepository>
+            <id>${repoMavenSnapshotId}</id>
+            <name>${repoMavenSnapshotName}</name>
+            <url>${repoMavenSnapshotUrl}</url>
+        </snapshotRepository>
+    </distributionManagement>
   <profiles>
     <profile>
       <id>clover</id>
