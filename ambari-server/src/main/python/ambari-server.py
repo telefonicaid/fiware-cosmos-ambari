@@ -2152,7 +2152,7 @@ def start(args):
     try:
       os.kill(pid, 0)
       err = "Ambari Server is already running."
-      raise FatalException(1, err)
+      raise FatalException(0, err)
     except OSError as e:
       print_info_msg("Ambari Server is not running...")
 

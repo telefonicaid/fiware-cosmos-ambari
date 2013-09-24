@@ -32,8 +32,8 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-class BSActionRunner extends Thread {
-  private static Log LOG = LogFactory.getLog(BSActionRunner.class);
+class BSRunner extends Thread {
+  private static Log LOG = LogFactory.getLog(BSRunner.class);
   private static final String DEFAULT_USER = "root";
 
   private boolean finished = false;
@@ -52,10 +52,10 @@ class BSActionRunner extends Thread {
   private String projectVersion;
   private int serverPort;
 
-  public BSActionRunner(BootStrapImpl impl, SshHostInfo sshHostInfo, String bootDir,
-      String bsScript, String agentSetupScript, String agentSetupPassword,
-      int requestId, long timeout, String hostName, boolean isVerbose, String clusterOsType,
-      String projectVersion, int serverPort)
+  public BSRunner(BootStrapImpl impl, SshHostInfo sshHostInfo, String bootDir,
+                  String bsScript, String agentSetupScript, String agentSetupPassword,
+                  int requestId, long timeout, String hostName, boolean isVerbose, String clusterOsType,
+                  String projectVersion, int serverPort)
   {
     this.requestId = requestId;
     this.sshHostInfo = sshHostInfo;
@@ -106,6 +106,7 @@ class BSActionRunner extends Thread {
     command.add(this.ambariHostname);
     command.add(this.clusterOsType);
     command.add(this.projectVersion);
+    command.add(Integer.toString(this.serverPort));
     if (passwordFile != null) {
       command.add(passwordFile.toString());
     } else {

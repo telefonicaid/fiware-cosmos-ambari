@@ -29,6 +29,7 @@ import threading
 import traceback
 from pprint import pformat
 
+DEBUG=False
 
 class SSH(threading.Thread):
 

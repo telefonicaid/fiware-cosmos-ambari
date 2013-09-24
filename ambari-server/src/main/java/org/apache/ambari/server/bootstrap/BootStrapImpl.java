@@ -34,7 +34,6 @@ import org.apache.commons.logging.LogFactory;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.ambari.server.controller.AmbariServer;
 
 @Singleton
 public class BootStrapImpl {
@@ -44,7 +43,7 @@ public class BootStrapImpl {
   private String bootSetupAgentScript;
   private String teardownAgentScript;
   private String bootSetupAgentPassword;
-  private BSActionRunner bsActionRunner;
+  private BSRunner bsRunner;
   private String masterHostname;
 
   private static Log LOG = LogFactory.getLog(BootStrapImpl.class);
@@ -132,7 +131,7 @@ public class BootStrapImpl {
       SshHostInfo info, String actionScript) {
     BSResponse response = new BSResponse();
     /* Run some checks for ssh host */
-    if (bsActionRunner != null) {
+    if (bsRunner != null) {
       response.setLog("BootStrap action in Progress: Cannot Run more than one " +
           "bootstrap action at the same time.");
       response.setStatus(BSRunStat.ERROR);
@@ -150,11 +149,11 @@ public class BootStrapImpl {
 
     requestId++;
 
-    bsActionRunner = new BSActionRunner(this, info, bootStrapDir.toString(),
+    bsRunner = new BSRunner(this, info, bootStrapDir.toString(),
         bootstrapActionScript, actionScript, bootSetupAgentPassword, requestId,
         0L, this.masterHostname, info.isVerbose(), this.clusterOsType,
         this.projectVersion, this.serverPort);
-    bsActionRunner.start();
+    bsRunner.start();
     response.setStatus(BSRunStat.OK);
     response.setRequestId(requestId);
     return response;
@@ -204,7 +203,7 @@ public class BootStrapImpl {
    *
    */
   public synchronized void resetBootstrapRunner() {
-    bsActionRunner = null;
+    bsRunner = null;
   }
 
 }

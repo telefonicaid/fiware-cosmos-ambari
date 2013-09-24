@@ -228,18 +228,6 @@ class CertificateManager():
                    '\nExiting..')
       raise ssl.SSLError
 
-  def reqCrtRevoke(self):
-    revoke_crt_req_url = self.secure_server_url + '/certs/' + hostname.hostname()
-    req = urllib2.Request(revoke_crt_req_url, headers = {'Content-Type': 'application/json'})
-    req.get_method = lambda: 'DELETE'
-    if not self.cachedconnect:
-      self.cachedconnect = CachedHTTPSConnection(self.config)
-    response = self.cachedconnect.request(req)
-    revoke_succeeded = json.loads(response)['result'] == 'OK'
-    if not revoke_succeeded:
-      logger.error("Certificate revoke failed")
-    return revoke_succeeded
-
   def genAgentCrtReq(self):
     generate_script = GEN_AGENT_KEY % {'hostname': hostname.hostname(),
                                      'keysdir' : self.config.get('security', 'keysdir')}

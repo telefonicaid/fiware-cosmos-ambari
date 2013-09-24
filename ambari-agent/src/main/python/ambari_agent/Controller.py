@@ -67,7 +67,6 @@ class Controller(threading.Thread):
     self.register = Register(self.config)
     self.unregister = Unregister(self.config)
     self.heartbeat = Heartbeat(self.actionQueue, self.config)
-    pass
   
   def __del__(self):
     logger.info("Server connection disconnected.")

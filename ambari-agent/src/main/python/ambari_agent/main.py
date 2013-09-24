@@ -228,8 +228,6 @@ def main():
   controller = Controller(config)
   if (len(sys.argv) >1) and sys.argv[1]=='unregister':
     controller.unregisterWithServer()
-    if not certMan.reqCrtRevoke():
-      logger.error("Could not revoke host's cert")
     os._exit(0)
 
   # Daemonize current instance of Ambari Agent

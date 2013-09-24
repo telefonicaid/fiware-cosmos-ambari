@@ -26,6 +26,7 @@ import logging
 import pprint
 import os
 import subprocess
+import threading
 import traceback
 from SSH import SSH
 from SCP import SCP
@@ -491,10 +492,10 @@ def main(argv=None):
         stat = subprocess.Popen(["chmod", "600", password_file], stdout=subprocess.PIPE)
 
     logging.info("BootStrapping hosts " + pprint.pformat(hostList) +
-               " using " + scriptDir + " cluster primary OS: " + cluster_os_type +
-               " with user '" + user + "' sshKey File " + sshkey_file + " password File " + passwordFile +\
-               " using tmp dir " + bootdir + " ambari: " + ambariServer +"; server_port: " + server_port +\
-               "; ambari version: " + ambariVersion)
+               " using " + script_dir + " cluster primary OS: " + cluster_os_type +
+               " with user '" + user + "' sshKey File " + ssh_key_file + " password File " + password_file +\
+               " using tmp dir " + bootdir + " ambari: " + ambari_server +"; server_port: " + server_port +\
+               "; ambari version: " + ambari_version)
     sharedState = SharedState(user, ssh_key_file, script_dir, bootdir, agent_action_path,
                        ambari_server, cluster_os_type, ambari_version,
                        server_port, password_file)
