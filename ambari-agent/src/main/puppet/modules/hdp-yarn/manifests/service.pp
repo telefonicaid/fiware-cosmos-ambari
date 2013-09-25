@@ -45,11 +45,6 @@ define hdp-yarn::service(
    
   $cmd = "export HADOOP_LIBEXEC_DIR=${hadoop_libexec_dir} && ${daemon} --config ${hdp-yarn::params::conf_dir}"
   
-  
-
-  
-  
-  
   if ($ensure == 'running') {
     if ($run_as_root == true) {
       $daemon_cmd = "${cmd} start ${name}"
@@ -59,9 +54,9 @@ define hdp-yarn::service(
     $service_is_up = "ls ${pid_file} >/dev/null 2>&1 && ps `cat ${pid_file}` >/dev/null 2>&1"
   } elsif ($ensure == 'stopped') {
     if ($run_as_root == true) {
-      $daemon_cmd = "${cmd} stop ${name}"
+      $daemon_cmd = "${cmd} stop ${name} && rm -f ${pid_file}"
     } else {
-      $daemon_cmd = "su - ${user} -c  '${cmd} stop ${name}'"
+      $daemon_cmd = "su - ${user} -c  '${cmd} stop ${name}' && rm -f ${pid_file}"
     }
     $service_is_up = undef
   } else {
@@ -98,7 +93,7 @@ define hdp-yarn::service(
   anchor{"hdp-yarn::service::${name}::begin":}
   anchor{"hdp-yarn::service::${name}::end":}
   if ($daemon_cmd != undef) {
-    Anchor["hdp-yarn::service::${name}::begin"] -> Hdp::Exec[$daemon_cmd] -> Anchor["hdp-yarn::service::${name}::end"]
+    Anchor["hdp-yarn::service::${name}::begin"] -> Hdp::Directory_recursive_create<|title == $pid_dir or title == $log_dir|> -> Hdp::Exec[$daemon_cmd] -> Anchor["hdp-yarn::service::${name}::end"]
 
   }
   if ($ensure == 'running') {

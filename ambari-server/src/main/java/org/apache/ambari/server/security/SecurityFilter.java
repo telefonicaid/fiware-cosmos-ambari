@@ -30,14 +30,16 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 
-import org.apache.ambari.server.controller.AmbariServer;
+import org.apache.ambari.server.configuration.Configuration;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 public class SecurityFilter implements Filter {
-	
+  
   //Allowed pathes for one way auth https
   private static String CA = "/ca";
+
+  private static Configuration config;
   private final static Log LOG = LogFactory.getLog(SecurityFilter.class);
 
   @Override
@@ -51,19 +53,17 @@ public class SecurityFilter implements Filter {
     HttpServletRequest req = (HttpServletRequest) serReq;
     String reqUrl = req.getRequestURL().toString();
 
-    LOG.info("Filtering " + reqUrl + " for security purposes");
-    if (serReq.getLocalPort() != AmbariServer.AGENT_TWO_WAY_AUTH) {
+    LOG.debug("Filtering " + reqUrl + " for security purposes");
+    if (serReq.getLocalPort() != config.getTwoWayAuthPort()) {
       if (isRequestAllowed(reqUrl, req.getMethod())) {
-        LOG.info("OK, request can go on");
         filtCh.doFilter(serReq, serResp);
       }
       else {
-        LOG.warn("This request is not allowed on this port");
+        LOG.warn("This request is not allowed on this port: " + reqUrl);
       }
-
     }
 	  else {
-      LOG.info("OK, request can go on because it is using the safe port");
+      LOG.debug("Request can continue on secure port " + serReq.getLocalPort());
       filtCh.doFilter(serReq, serResp);
     }
   }
@@ -99,5 +99,9 @@ public class SecurityFilter implements Filter {
     }
     LOG.warn("Request " + reqUrl + " doesn't match any pattern.");
     return false;
+  }
+
+  public static void init(Configuration instance) {
+    config = instance;
   }
 }

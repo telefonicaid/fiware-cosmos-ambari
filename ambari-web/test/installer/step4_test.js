@@ -23,13 +23,13 @@ require('controllers/wizard/step4_controller');
 describe('App.WizardStep4Controller', function () {
 
   var services = [
-    'HDFS', 'MAPREDUCE', 'NAGIOS', 'GANGLIA', 'OOZIE', 'HIVE', 'HBASE', 'PIG', 'SCOOP', 'ZOOKEEPER', 'HCATALOG', 'WEBHCAT'
+    'HDFS', 'MAPREDUCE', 'NAGIOS', 'GANGLIA', 'OOZIE', 'HIVE', 'HBASE', 'PIG', 'SCOOP', 'ZOOKEEPER', 'HCATALOG', 'WEBHCAT', 'YARN', 'MAPREDUCE2'
   ]
 
   var controller = App.WizardStep4Controller.create();
   services.forEach(function(serviceName, index){
     controller.pushObject(Ember.Object.create({
-      'serviceName':serviceName, 'isSelected': true, 'isInstalled': false, 'isDisabled': index == 0
+      'serviceName':serviceName, 'isSelected': true, 'canBeSelected': true, 'isInstalled': false, 'isDisabled': index == 0
     }));
   });
 
@@ -79,9 +79,18 @@ describe('App.WizardStep4Controller', function () {
       controller.setEach('isSelected', false);
       controller.findProperty('serviceName', 'HIVE').set('isSelected', true);
       controller.checkDependencies();
-      expect(controller.findProperty('serviceName', 'ZOOKEEPER').get('isSelected')).to.equal(true);
       expect(controller.findProperty('serviceName', 'HCATALOG').get('isSelected')).to.equal(true);
       expect(controller.findProperty('serviceName', 'WEBHCAT').get('isSelected')).to.equal(true);
+    })
+    it('should set MapReduce2 isSelected property like in Yarn', function () {
+      App.set('currentStackVersion', 'HDP-2.0.1');
+      App.set('defaultStackVersion', 'HDP-2.0.1');
+      controller.setEach('isSelected', false);
+      controller.findProperty('serviceName', 'YARN').set('isSelected', true);
+      controller.checkDependencies();
+      expect(controller.findProperty('serviceName', 'MAPREDUCE2').get('isSelected')).to.equal(true);
+      App.set('currentStackVersion', 'HDP-1.2.2');
+      App.set('defaultStackVersion', 'HDP-1.2.2');
     })
   })
 
@@ -89,7 +98,7 @@ describe('App.WizardStep4Controller', function () {
     it('should select all services', function () {
       controller.setEach('isSelected', false);
       controller.selectAll();
-      expect(controller.everyProperty('isSelected', true)).to.equal(true);
+      expect(controller.filterProperty('canBeSelected', true).everyProperty('isSelected', true)).to.equal(true);
     })
   })
 

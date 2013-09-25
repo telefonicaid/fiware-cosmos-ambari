@@ -26,7 +26,18 @@ App.MainDashboardServiceHealthView = Em.View.extend({
   //template: Em.Handlebars.compile(""),
   blink: false,
   tagName: 'span',
-  
+  attributeBindings:['rel', 'title','data-original-title'],
+  rel: 'HealthTooltip',
+  'data-original-title': '',
+
+  getHostComponentStatus: function(){
+    var popupText = "";
+    this.get("service").get("hostComponents").filterProperty('isMaster', true).forEach(function(item){
+      popupText += item.get("displayName") + " " + item.get("componentTextStatus") + "<br/>";
+    });
+    this.set('data-original-title',popupText);
+  }.observes('service.hostComponents.@each.workStatus'),
+
   /**
    * When set to true, extending classes should
    * show only tabular rows as they will be 
@@ -79,8 +90,22 @@ App.MainDashboardServiceHealthView = Em.View.extend({
   }.property('service.healthStatus'),
 
   didInsertElement: function () {
+    this.getHostComponentStatus();
+    $("[rel='HealthTooltip']").tooltip();
     this.doBlink(); // check for blink availability
   }
+});
+
+App.ComponentLiveTextView =  Em.View.extend({
+  classNameBindings: ['color:service-summary-component-red-dead:service-summary-component-green-live'],
+  service: function() { return this.get("parentView").get("service")}.property("parentView.service"),
+  liveComponents: function() {
+  }.property(),
+  totalComponents: function() {
+  }.property(),
+  color: function() {
+    return this.get("liveComponents") == 0;
+  }.property("liveComponents")
 });
 
 App.MainDashboardServiceView = Em.View.extend({
@@ -89,6 +114,13 @@ App.MainDashboardServiceView = Em.View.extend({
   data: function () {
     return this.get('controller.data.' + this.get('serviceName'));
   }.property('controller.data'),
+
+  dashboardMasterComponentView : Em.View.extend({
+    templateName: require('templates/main/service/info/summary/master_components'),
+    mastersComp : function(){
+     return this.get('parentView.service.hostComponents').filterProperty('isMaster', true);
+    }.property("service")
+  }),
 
   formatUnavailable: function(value){
     return (value || value == 0) ? value : this.t('services.service.summary.notAvailable');

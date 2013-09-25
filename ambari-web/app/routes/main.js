@@ -17,10 +17,12 @@
  */
 
 var App = require('app');
+var stringUtils = require('utils/string_utils');
 
 module.exports = Em.Route.extend({
   route: '/main',
   enter: function (router) {
+    App.db.updateStorage();
     console.log('in /main:enter');
     if (router.getAuthenticated()) {
       App.router.get('clusterController').loadClusterName(false);
@@ -94,14 +96,19 @@ module.exports = Em.Route.extend({
       router.transitionTo(event.context);
     }
   }),
-  apps: Em.Route.extend({
-    route: '/apps',
-    connectOutlets: function (router) {
-      //router.get('clusterController').loadRuns();
-      router.get('mainAppsController').loadRuns();
-      router.get('mainController').connectOutlet('mainApps');
-    }
-  }),
+    apps: Em.Route.extend({
+      route: '/apps',
+      connectOutlets: function (router) {
+        if (App.get('isHadoop2Stack')) {
+          Em.run.next(function () {
+            router.transitionTo('main.dashboard');
+          });
+        } else {
+          router.get('mainAppsController').loadRuns();
+          router.get('mainController').connectOutlet('mainApps');
+        }
+      }
+    }),
 
   mirroring: Em.Route.extend({
     route: '/mirroring',
@@ -121,7 +128,7 @@ module.exports = Em.Route.extend({
       }
     }),
 
-    gotoMirroringHome : function(router){
+    gotoMirroringHome: function (router) {
       router.transitionTo('mirroring/index');
     },
     addNewDataset: function (router) {
@@ -640,19 +647,100 @@ module.exports = Em.Route.extend({
       }
     }),
 
+    adminHighAvailability: Em.Route.extend({
+      route: '/highAvailability',
+      connectOutlets: function (router) {
+        router.set('mainAdminController.category', "highAvailability");
+        router.get('mainAdminController').connectOutlet('mainAdminHighAvailability');
+      },
+
+      rollback: Ember.Route.extend({
+        route: '/rollback',
+        enter: function (router) {
+          //after refresh check if the wizard is open then restore it
+          Ember.run.next(function () {
+            App.router.get('updateController').set('isWorking', false);
+
+            var highAvailabilityWizardController = router.get('highAvailabilityWizardController');
+            if(highAvailabilityWizardController.get('popup')){
+              highAvailabilityWizardController.finish();
+              highAvailabilityWizardController.get('popup').hide();
+            }
+            var popup = App.ModalPopup.show({
+              classNames: ['full-width-modal'],
+              header: Em.I18n.t('admin.highAvailability.rollback.header'),
+              bodyClass: App.HighAvailabilityRollbackView.extend({
+                controllerBinding: 'App.router.highAvailabilityRollbackController'
+              }),
+              showCloseButton: false,
+              primary: Em.I18n.t('form.cancel'),
+              secondary: null,
+              showFooter: false,
+
+              onClose: function () {
+                var self = this;
+                var controller = router.get('highAvailabilityRollbackController');
+//                if (!controller.get('isSubmitDisabled')) {
+                  self.proceedOnClose();
+//                }
+              },
+              proceedOnClose: function () {
+                App.router.get('updateController').set('isWorking', true);
+                /*App.clusterStatus.setClusterStatus({
+                  clusterName: router.get('content.cluster.name'),
+                  clusterState: 'HIGH_AVAILABILITY_DISABLED',
+                  wizardControllerName: router.get('highAvailabilityRollbackController.name'),
+                  localdb: App.db.data
+                });*/
+                this.hide();
+                router.transitionTo('main.admin.adminHighAvailability');
+              },
+              didInsertElement: function () {
+                this.fitHeight();
+              }
+            });
+            router.set('highAvailabilityRollbackController.popup', popup);
+          });
+
+        },
+
+        unroutePath: function () {
+          return false;
+        }
+      })
+    }),
+
+    enableHighAvailability: require('routes/high_availability_routes'),
 
     adminSecurity: Em.Route.extend({
       route: '/security',
       enter: function (router) {
         router.set('mainAdminController.category', "security");
         var controller = router.get('mainAdminSecurityController');
-        if (!(controller.getAddSecurityWizardStatus() === 'RUNNING')) {
+        if (!App.testMode) {
+          App.clusterStatus.updateFromServer();
+          var currentClusterStatus = App.clusterStatus.get('value');
+          App.db.data.AddSecurity = currentClusterStatus.localdb;
+          if (currentClusterStatus.localdb) {
+            App.db.setSecurityDeployStages(currentClusterStatus.localdb.securityDeployStages);
+            controller.setAddSecurityWizardStatus(currentClusterStatus.localdb.status);
+            App.db.setSecureConfigProperties(currentClusterStatus.localdb.secureConfigProperties);
+            App.db.setWizardCurrentStep('AddSecurity', currentClusterStatus.localdb.currentStep);
+            App.db.setIsNameNodeHa(currentClusterStatus.localdb.haStatus);
+            App.db.setDisableSecurityStatus(currentClusterStatus.localdb.disableSecurityStatus);
+          }
+        }
+        if (!(controller.getAddSecurityWizardStatus() === 'RUNNING') && !(controller.getDisableSecurityStatus() === 'RUNNING')) {
           Em.run.next(function () {
             router.transitionTo('adminSecurity.index');
           });
-        } else {
+        } else if (controller.getAddSecurityWizardStatus() === 'RUNNING') {
           Em.run.next(function () {
             router.transitionTo('adminAddSecurity');
+          });
+        } else if (controller.getDisableSecurityStatus() === 'RUNNING') {
+          Em.run.next(function () {
+            router.transitionTo('disableSecurity');
           });
         }
       },
@@ -667,40 +755,69 @@ module.exports = Em.Route.extend({
       }),
 
       addSecurity: function (router, object) {
+        router.get('mainAdminSecurityController').setAddSecurityWizardStatus('RUNNING');
         router.transitionTo('adminAddSecurity');
       },
 
       disableSecurity: Ember.Route.extend({
-        route: '/',
+        route: '/disableSecurity',
         enter: function (router) {
-          Ember.run.next(function () {
-            App.router.get('updateController').set('isWorking', false);
-            App.ModalPopup.show({
-              classNames: ['full-width-modal'],
-              header: Em.I18n.t('admin.removeSecurity.header'),
-              bodyClass: App.MainAdminSecurityDisableView.extend({
-                controllerBinding: 'App.router.mainAdminSecurityDisableController'
-              }),
-              primary: Em.I18n.t('form.cancel'),
-              secondary: null,
-              showFooter: false,
+          //after refresh check if the wizard is open then restore it
+          if (router.get('mainAdminSecurityController').getDisableSecurityStatus() === 'RUNNING') {
+            Ember.run.next(function () {
+              App.router.get('updateController').set('isWorking', false);
+              App.ModalPopup.show({
+                classNames: ['full-width-modal'],
+                header: Em.I18n.t('admin.removeSecurity.header'),
+                bodyClass: App.MainAdminSecurityDisableView.extend({
+                  controllerBinding: 'App.router.mainAdminSecurityDisableController'
+                }),
+                primary: Em.I18n.t('form.cancel'),
+                secondary: null,
+                showFooter: false,
 
-              onPrimary: function () {
-                this.hide();
-                App.router.get('updateController').set('isWorking', true);
-              },
-              onClose: function () {
-                if (router.get('mainAdminSecurityDisableController.isSubmitDisabled') === false) {
-                  this.hide();
+                onClose: function () {
+                  var self = this;
+                  var controller = router.get('mainAdminSecurityDisableController');
+                  if (!controller.get('isSubmitDisabled')) {
+                    self.proceedOnClose();
+                    return;
+                  }
+                  var applyingConfigStage = controller.get('stages').findProperty('stage', 'stage3');
+                  if (applyingConfigStage && !applyingConfigStage.get('isCompleted')) {
+                    if (applyingConfigStage.get('isStarted')) {
+                      App.showAlertPopup(Em.I18n.t('admin.security.applying.config.header'), Em.I18n.t('admin.security.applying.config.body'));
+                    } else {
+                      App.showConfirmationPopup(function () {
+                        self.proceedOnClose();
+                      }, Em.I18n.t('admin.addSecurity.disable.onClose'));
+                    }
+                  } else {
+                    self.proceedOnClose();
+                  }
+                },
+                proceedOnClose: function () {
+                  router.get('mainAdminSecurityDisableController').clearStep();
+                  App.db.setSecurityDeployStages(undefined);
                   App.router.get('updateController').set('isWorking', true);
+                  router.get('mainAdminSecurityController').setDisableSecurityStatus(undefined);
+                  App.clusterStatus.setClusterStatus({
+                    clusterName: router.get('content.cluster.name'),
+                    clusterState: 'SECURITY_COMPLETED',
+                    wizardControllerName: router.get('mainAdminSecurityDisableController.name'),
+                    localdb: App.db.data.AddSecurity
+                  });
+                  this.hide();
                   router.transitionTo('adminSecurity.index');
+                },
+                didInsertElement: function () {
+                  this.fitHeight();
                 }
-              },
-              didInsertElement: function () {
-                this.fitHeight();
-              }
+              });
             });
-          });
+          } else {
+            router.transitionTo('adminSecurity.index');
+          }
         },
 
         unroutePath: function () {
@@ -708,7 +825,10 @@ module.exports = Em.Route.extend({
         },
 
         done: function (router, context) {
-          $(context.currentTarget).parents("#modal").find(".close").trigger('click');
+          var controller = router.get('mainAdminSecurityDisableController');
+          if (!controller.get('isSubmitDisabled')) {
+            $(context.currentTarget).parents("#modal").find(".close").trigger('click');
+          }
         }
       }),
 
@@ -756,7 +876,7 @@ module.exports = Em.Route.extend({
       router.transitionTo('admin' + object.context.capitalize());
     },
 
-    //events
+//events
     goToAdmin: function (router, event) {
       router.transitionTo(event.context);
     }
@@ -780,16 +900,16 @@ module.exports = Em.Route.extend({
     index: Ember.Route.extend({
       route: '/',
       enter: function (router) {
-        Ember.run.next(function(){
-        var controller = router.get('mainController');
-        controller.dataLoading().done(function () {
-          var service = router.get('mainServiceItemController.content');
-          if (!service) {
-            service = App.Service.find().objectAt(0); // getting the first service to display
-          }
-          router.transitionTo('service.summary', service);
+        Ember.run.next(function () {
+          var controller = router.get('mainController');
+          controller.dataLoading().done(function () {
+            var service = router.get('mainServiceItemController.content');
+            if (!service) {
+              service = App.Service.find().objectAt(0); // getting the first service to display
+            }
+            router.transitionTo('service.summary', service);
+          });
         });
-      });
       }
     }),
     connectOutlets: function (router, context) {

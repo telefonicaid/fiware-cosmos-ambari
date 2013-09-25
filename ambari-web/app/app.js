@@ -18,6 +18,8 @@
 
 // Application bootstrapper
 
+var stringUtils = require('utils/string_utils');
+
 module.exports = Em.Application.create({
   name: 'Ambari Web',
   rootElement: '#wrapper',
@@ -51,7 +53,14 @@ module.exports = Em.Application.create({
     return '/stacks2/HDP/versions/' + stackVersion.replace(/HDP-/g, '');
   }.property('currentStackVersion'),
   clusterName: null,
-  currentStackVersion: null
+  currentStackVersion: '',
+  currentStackVersionNumber: function(){
+    return this.get('currentStackVersion').replace(/HDP(Local)?-/, '');
+  }.property('currentStackVersion'),
+  isHadoop2Stack: function(){
+    return (stringUtils.compareVersions(this.get('currentStackVersionNumber'), "2.0") === 1 ||
+      stringUtils.compareVersions(this.get('currentStackVersionNumber'), "2.0") === 0)
+  }.property('currentStackVersionNumber')
 });
 
 /**
@@ -95,5 +104,15 @@ DS.attr.transforms.date = {
     }
   }
 }
+
+DS.attr.transforms.object = {
+  from: function(serialized) {
+    return Ember.none(serialized) ? null : Object(serialized);
+  },
+
+  to: function(deserialized) {
+    return Ember.none(deserialized) ? null : Object(deserialized);
+  }
+};
 
 

@@ -17,6 +17,7 @@
 
 var App = require('app');
 var date = require('utils/date');
+var numberUtils = require('utils/number_utils');
 
 App.MainDashboardServiceHdfsView = App.MainDashboardServiceView.extend({
   templateName: require('templates/main/dashboard/service/hdfs'),
@@ -34,6 +35,60 @@ App.MainDashboardServiceHdfsView = App.MainDashboardServiceView.extend({
       var used = total - remaining;
       return [ used, remaining ];
     }.property('service.capacityUsed', 'service.capacityTotal')
+  }),
+
+  dashboardMasterComponentView: Em.View.extend({
+    templateName: require('templates/main/service/info/summary/master_components'),
+    mastersComp : function() {
+      return this.get('parentView.service.hostComponents').filter(function(comp){
+        return comp.get('isMaster') && comp.get('componentName') !== 'JOURNALNODE';
+      });
+    }.property("service")
+  }),
+
+  dataNodesLive: function(){
+    return App.HostComponent.find().filterProperty('componentName', 'DATANODE').filterProperty("workStatus","STARTED");
+  }.property('service.hostComponents.@each'),
+  dataNodesDead: function(){
+    return App.HostComponent.find().filterProperty('componentName', 'DATANODE').filterProperty("workStatus","INSTALLED");
+  }.property('service.hostComponents.@each'),
+
+  dataNodeHostText: function () {
+    if(this.get("service.dataNodes").content.length > 1){
+      return Em.I18n.t('services.service.summary.viewHosts');
+    }else{
+      return Em.I18n.t('services.service.summary.viewHost');
+    }
+  }.property("service"),
+
+  showJournalNodes: function () {
+    return App.HostComponent.find().filterProperty('componentName', 'JOURNALNODE').get('length') > 0;
+  }.property('service.hostComponents.@each'),
+
+  journalNodeHostText: function () {
+    if(this.get("service.journalNodes").content.length > 1){
+      return Em.I18n.t('services.service.summary.viewHosts');
+    }else{
+      return Em.I18n.t('services.service.summary.viewHost');
+    }
+  }.property("service"),
+
+  dataNodesLiveTextView: App.ComponentLiveTextView.extend({
+    liveComponents: function() {
+      return App.HostComponent.find().filterProperty('componentName', 'DATANODE').filterProperty("workStatus","STARTED").get("length");
+    }.property("service.hostComponents.@each"),
+    totalComponents: function() {
+      return this.get("service.dataNodes.length");
+    }.property("service.dataNodes.length")
+  }),
+
+  journalNodesLiveTextView: App.ComponentLiveTextView.extend({
+    liveComponents: function() {
+      return App.HostComponent.find().filterProperty('componentName', 'JOURNALNODE').filterProperty("workStatus","STARTED").get("length");
+    }.property("service.hostComponents.@each"),
+    totalComponents: function() {
+      return this.get("service.journalNodes.length");
+    }.property("service.journalNodes.length")
   }),
 
   dfsTotalBlocks: function(){
@@ -70,15 +125,17 @@ App.MainDashboardServiceHdfsView = App.MainDashboardServiceView.extend({
   }.property("service.nameNodeStartTime"),
 
   nodeWebUrl: function () {
-    return "http://" + this.get('service').get('nameNode').get('publicHostName') + ":50070";
+    return "http://" + (App.singleNodeInstall ? App.singleNodeAlias :  this.get('service').get('nameNode').get('publicHostName')) + ":50070";
   }.property('service.nameNode'),
 
   nodeHeap: function () {
-    var memUsed = this.get('service').get('jvmMemoryHeapUsed') * 1000000;
-    var memCommitted = this.get('service').get('jvmMemoryHeapCommitted') * 1000000;
+    var memUsed = this.get('service').get('jvmMemoryHeapUsed');
+    var memCommitted = this.get('service').get('jvmMemoryHeapCommitted');
     var percent = memCommitted > 0 ? ((100 * memUsed) / memCommitted) : 0;
-    return this.t('dashboard.services.hdfs.nodes.heapUsed').format(memUsed.bytesToSize(1, 'parseFloat'), memCommitted.bytesToSize(1, 'parseFloat'), percent.toFixed(1));
-
+    return this.t('dashboard.services.hdfs.nodes.heapUsed').format(
+        numberUtils.bytesToSize(memUsed, 1, 'parseFloat', 1024 * 1024), 
+        numberUtils.bytesToSize(memCommitted, 1, 'parseFloat', 1024 * 1024), 
+        percent.toFixed(1));
   }.property('service.jvmMemoryHeapUsed', 'service.jvmMemoryHeapCommitted'),
 
   summaryHeader: function () {
@@ -98,24 +155,22 @@ App.MainDashboardServiceHdfsView = App.MainDashboardServiceView.extend({
 
   capacity: function () {
     var text = this.t("dashboard.services.hdfs.capacityUsed");
-    var total = this.get('service.capacityTotal') + 0;
-    var remaining = this.get('service.capacityRemaining') + 0;
-    var used = total - remaining;
+    var total = this.get('service.capacityTotal');
+    var remaining = this.get('service.capacityRemaining');
+    var used = total !== null && remaining !== null ? total - remaining : null;
     var percent = total > 0 ? ((used * 100) / total).toFixed(1) : 0;
     if (percent == "NaN" || percent < 0) {
       percent = Em.I18n.t('services.service.summary.notAvailable') + " ";
     }
-    if (used < 0) {
-      used = 0;
-    }
-    if (total < 0) {
-      total = 0;
-    }
-    return text.format(used.bytesToSize(1, 'parseFloat'), total.bytesToSize(1, 'parseFloat'), percent);
+    return text.format(numberUtils.bytesToSize(used, 1, 'parseFloat'), numberUtils.bytesToSize(total, 1, 'parseFloat'), percent);
   }.property('service.capacityUsed', 'service.capacityTotal'),
 
   dataNodeComponent: function () {
     return App.HostComponent.find().findProperty('componentName', 'DATANODE');
+  }.property(),
+
+  journalNodeComponent: function () {
+    return App.HostComponent.find().findProperty('componentName', 'JOURNALNODE');
   }.property(),
 
   isSafeMode: function () {

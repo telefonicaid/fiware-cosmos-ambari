@@ -30,7 +30,9 @@ logger = logging.getLogger()
 
 class StatusCheck:
     
-    
+  USER_PATTERN='{USER}'
+  firstInit = True
+
   def listFiles(self, dir):
     basedir = dir
     logger.debug("Files in " + os.path.abspath(dir) + ": ")
@@ -62,15 +64,16 @@ class StatusCheck:
     except Exception as e:
         logger.error("Error while filling directories values " + str(e))
         
-  def __init__(self, serviceToPidDict, pidPathesVars, globalConfig, linuxUserPattern):
-
+  def __init__(self, serviceToPidDict, pidPathesVars, globalConfig,
+    servicesToLinuxUser):
+    
     self.serToPidDict = serviceToPidDict
     self.pidPathesVars = pidPathesVars
     self.pidPathes = []
     self.sh = shellRunner()
     self.pidFilesDict = {}
     self.globalConfig = globalConfig
-    self.linuxUserPattern = linuxUserPattern
+    self.servicesToLinuxUser = servicesToLinuxUser
     
     self.fillDirValues()
     
@@ -78,7 +81,20 @@ class StatusCheck:
       self.listFiles(pidPath)
 
     for service, pid in self.serToPidDict.items():
-      self.serToPidDict[service] = string.replace(pid, '{USER}', self.linuxUserPattern)
+      if self.servicesToLinuxUser.has_key(service):
+        linuxUserKey = self.servicesToLinuxUser[service]
+        if self.globalConfig.has_key(linuxUserKey):
+          self.serToPidDict[service] = string.replace(pid, self.USER_PATTERN,
+            self.globalConfig[linuxUserKey])
+      else:
+        if self.USER_PATTERN in pid:
+          logger.error('There is no linux user mapping for component: ' + service)
+
+    if StatusCheck.firstInit:
+      logger.info('Service to pid dictionary: ' + str(self.serToPidDict))
+      StatusCheck.firstInit = False
+    else:
+      logger.debug('Service to pid dictionary: ' + str(self.serToPidDict))
 
   def getIsLive(self, pidPath):
 

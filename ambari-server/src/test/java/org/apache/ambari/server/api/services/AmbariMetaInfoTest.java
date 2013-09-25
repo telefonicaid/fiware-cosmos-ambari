@@ -82,7 +82,7 @@ public class AmbariMetaInfoTest {
   public void before() throws Exception {
     File stackRoot = new File("src/test/resources/stacks");
    LOG.info("Stacks file " + stackRoot.getAbsolutePath());
-    metaInfo = new AmbariMetaInfo(stackRoot, new File("../version"));
+    metaInfo = new AmbariMetaInfo(stackRoot, new File("target/version"));
     try {
       metaInfo.init();
     } catch(Exception e) {
@@ -134,7 +134,7 @@ public class AmbariMetaInfoTest {
         SERVICE_NAME_HDFS);
     assertTrue(valid);
 
-    boolean invalid = metaInfo.isValidService(STACK_NAME_HDP, NON_EXT_VALUE, NON_EXT_VALUE);
+    boolean invalid = metaInfo.isValidService(STACK_NAME_HDP, STACK_VERSION_HDP, NON_EXT_VALUE);
     assertFalse(invalid);
   }
 
@@ -240,7 +240,7 @@ public class AmbariMetaInfoTest {
     assertEquals(3, redhat6cnt.size());
     assertEquals(3, centos6Cnt.size());
   }
-
+  
   
   @Test
   /**
@@ -280,7 +280,7 @@ public class AmbariMetaInfoTest {
     File stackRoot = new File("src/test/resources/stacks");
     File stackRootTmp = new File(buildDir + "/ambari-metaInfo"); stackRootTmp.mkdir();
     FileUtils.copyDirectory(stackRoot, stackRootTmp);
-    AmbariMetaInfo ambariMetaInfo = new AmbariMetaInfo(stackRootTmp, new File("../version"));
+    AmbariMetaInfo ambariMetaInfo = new AmbariMetaInfo(stackRootTmp, new File("target/version"));
     File f1, f2, f3;
     f1 = new File(stackRootTmp.getAbsolutePath() + "/001.svn"); f1.createNewFile();
     f2 = new File(stackRootTmp.getAbsolutePath() + "/abcd.svn/001.svn"); f2.mkdirs(); f2.createNewFile();
@@ -428,4 +428,5 @@ public class AmbariMetaInfoTest {
     Assert.assertTrue(metaInfo.isOsSupported("sles11"));
     Assert.assertFalse(metaInfo.isOsSupported("windows"));
   }
+  
 }

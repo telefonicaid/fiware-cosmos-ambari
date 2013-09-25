@@ -23,8 +23,14 @@ App.WizardStep3Controller = Em.Controller.extend({
   hosts: [],
   content: [],
   bootHosts: [],
+  registeredHosts: [],
   registrationStartedAt: null,
-  registrationTimeoutSecs: 120,
+  registrationTimeoutSecs: function(){
+    if(this.get('content.installOptions.manualInstall')){
+      return 15;
+    }
+    return 120;
+  }.property('content.installOptions.manualInstall'),
   stopBootstrap: false,
   isSubmitDisabled: true,
 
@@ -93,9 +99,6 @@ App.WizardStep3Controller = Em.Controller.extend({
   }.property('hosts.@each.isChecked'),
 
   isRetryDisabled: true,
-
-  mockData: require('data/mock/step3_hosts'),
-  mockRetryData: require('data/mock/step3_pollData'),
 
   navigateStep: function () {
     this.loadStep();
@@ -280,8 +283,9 @@ App.WizardStep3Controller = Em.Controller.extend({
       App.router.get('installerController').setLowerStepsDisable(3);
       this.set('isSubmitDisabled', true);
     } else {
-      App.router.get('installerController.isStepDisabled').findProperty('step', 1).set('value', false);
-      App.router.get('installerController.isStepDisabled').findProperty('step', 2).set('value', false);
+      App.router.get('installerController.isStepDisabled').filter(function(step){
+        if(step.step >= 0 && step.step <= 2) return true;
+      }).setEach('value', false);
     }
   }.observes('isInstallInProgress'),
 
@@ -354,15 +358,6 @@ App.WizardStep3Controller = Em.Controller.extend({
       }
     }
   },
-
-  /*
-   stopBootstrap: function () {
-   console.log('stopBootstrap() called');
-   Ember.run.later(this, function () {
-   this.startRegistration();
-   }, 1000);
-   },
-   */
 
   startRegistration: function () {
     if (this.get('registrationStartedAt') == null) {
@@ -466,6 +461,42 @@ App.WizardStep3Controller = Em.Controller.extend({
     }
   },
 
+  hasMoreRegisteredHosts: false,
+
+  getAllRegisteredHosts: function() {
+    App.ajax.send({
+      name: 'wizard.step3.is_hosts_registered',
+      sender: this,
+      success: 'getAllRegisteredHostsCallback'
+    });
+  }.observes('bootHosts.@each.name'),
+
+  getAllRegisteredHostsCallback: function(hosts) {
+    var registeredHosts = [];
+    var addedHosts = this.get('bootHosts').getEach('name');
+    hosts.items.forEach(function(host){
+      (addedHosts.contains(host.Hosts.host_name)) ? null : registeredHosts.push(host.Hosts.host_name);
+    });
+    if(registeredHosts.length) {
+      this.set('hasMoreRegisteredHosts',true);
+      this.set('registeredHosts',registeredHosts);
+    } else {
+      this.set('hasMoreRegisteredHosts',false);
+      this.set('registeredHosts','');
+    }
+  },
+
+  allHostsComplete: function() {
+    var result = true;
+    this.get('bootHosts').forEach(function(host) {
+      var status = host.get('bootStatus');
+      if (status != 'REGISTERED' && status != 'FAILED') {
+        result = false;
+      }
+    });
+    return result;
+  }.property('bootHosts.@each.bootStatus'),
+
   registerErrPopup: function (header, message) {
     App.ModalPopup.show({
       header: header,
@@ -530,8 +561,19 @@ App.WizardStep3Controller = Em.Controller.extend({
 
   submit: function () {
     if (!this.get('isSubmitDisabled')) {
-      this.set('content.hosts', this.get('bootHosts'));
-      App.router.send('next');
+        if(this.get('isHostHaveWarnings')) {
+            var self = this;
+            App.showConfirmationPopup(
+                function(){
+                    self.set('content.hosts', self.get('bootHosts'));
+                    App.router.send('next');
+                },
+                Em.I18n.t('installer.step3.hostWarningsPopup.hostHasWarnings'));
+        }
+        else {
+              this.set('content.hosts', this.get('bootHosts'));
+              App.router.send('next');
+        }
     }
   },
 
@@ -593,23 +635,23 @@ App.WizardStep3Controller = Em.Controller.extend({
   /**
    * check warnings from server and put it in parsing
     */
-  rerunChecks: function(){
+  rerunChecks: function () {
     var self = this;
-    var url = App.testMode ? '/data/wizard/bootstrap/two_hosts_information.json' : App.apiPrefix + '/hosts?fields=Hosts/last_agent_env';
     var currentProgress = 0;
-    var interval = setInterval(function(){
-      self.set('checksUpdateProgress', Math.ceil((++currentProgress/60)*100))
+    var interval = setInterval(function () {
+      currentProgress += 100000 / self.get('warningsTimeInterval');
+      if (currentProgress < 100) {
+        self.set('checksUpdateProgress', currentProgress);
+      } else {
+        clearInterval(interval);
+        App.ajax.send({
+          name: 'wizard.step3.rerun_checks',
+          sender: self,
+          success: 'rerunChecksSuccessCallback',
+          error: 'rerunChecksErrorCallback'
+        });
+      }
     }, 1000);
-    setTimeout(function(){
-      clearInterval(interval);
-      App.ajax.send({
-        name: 'wizard.step3.rerun_checks',
-        sender: self,
-        success: 'rerunChecksSuccessCallback',
-        error: 'rerunChecksErrorCallback'
-      });
-    }, this.get('warningsTimeInterval'));
-
   },
 
   rerunChecksSuccessCallback: function (data) {
@@ -625,24 +667,19 @@ App.WizardStep3Controller = Em.Controller.extend({
   },
 
   warnings: [],
+  warningsByHost: [],
   warningsTimeInterval: 60000,
   /**
    * check are hosts have any warnings
    */
   isHostHaveWarnings: function(){
-    var isWarning = false;
-    this.get('warnings').forEach(function(warning){
-      if(!isWarning && (warning.directoriesFiles.someProperty('isWarn', true) ||
-      warning.packages.someProperty('isWarn', true) ||
-      warning.processes.someProperty('isWarn', true))){
-        isWarning = true;
-      }
-    }, this);
-    return isWarning;
+    return this.get('warnings.length') > 0;
   }.property('warnings'),
+
   isWarningsBoxVisible: function(){
-    return (App.testMode) ? true : !this.get('isSubmitDisabled');
-  }.property('isSubmitDisabled'),
+    return (App.testMode) ? true : this.get('allHostsComplete');
+  }.property('allHostsComplete'),
+
   checksUpdateProgress:0,
   checksUpdateStatus: null,
   /**
@@ -651,149 +688,201 @@ App.WizardStep3Controller = Em.Controller.extend({
    * @param data
    * @return {Object}
    */
-  filterBootHosts: function(data){
-    var bootHosts = this.get('bootHosts');
+  filterBootHosts: function (data) {
+    var bootHostNames = this.get('bootHosts').mapProperty('name');
     var filteredData = {
       href: data.href,
       items: []
     };
-    bootHosts.forEach(function(bootHost){
-      data.items.forEach(function(host){
-        if(host.Hosts.host_name == bootHost.get('name')){
-          filteredData.items.push(host);
-        }
-      })
-    })
+    data.items.forEach(function (host) {
+      if (bootHostNames.contains(host.Hosts.host_name)) {
+        filteredData.items.push(host);
+      }
+    });
     return filteredData;
   },
   /**
    * parse warnings data for each host and total
    * @param data
    */
-  parseWarnings: function(data){
-    data = this.filterBootHosts(data);
+  parseWarnings: function (data) {
+    data = App.testMode ? data : this.filterBootHosts(data);
     var warnings = [];
-    var totalWarnings = {
-      hostName: 'All Hosts',
-      directoriesFiles: [],
-      packages: [],
-      processes: []
-    }
-    //alphabetical sorting
-    var sortingFunc = function(a, b){
-      var a1= a.name, b1= b.name;
-      if(a1== b1) return 0;
-      return a1> b1? 1: -1;
-    }
-    data.items.forEach(function(host){
-      var warningsByHost = {
-        hostName: host.Hosts.host_name,
-        directoriesFiles: [],
-        packages: [],
-        processes: []
-      };
-
-      //render all directories and files for each host
-      if (!host.Hosts.last_agent_env) {
-        // in some unusual circumstances when last_agent_env is not available from the host,
-        // skip the host and proceed to process the rest of the hosts.
-        console.log("last_agent_env is missing for " + host.Hosts.host_name + ".  Skipping host check.");
+    var warning;
+    var hosts = [];
+    data.items.sort(function (a, b) {
+      if (a.Hosts.host_name > b.Hosts.host_name) {
+        return 1;
+      }
+      if (a.Hosts.host_name < b.Hosts.host_name) {
+        return -1;
+      }
+      return 0;
+    });
+    data.items.forEach(function (_host) {
+      var host = {
+        name: _host.Hosts.host_name,
+        warnings: []
+      }
+      if (!_host.Hosts.last_agent_env) {
+        // in some unusual circumstances when last_agent_env is not available from the _host,
+        // skip the _host and proceed to process the rest of the hosts.
+        console.log("last_agent_env is missing for " + _host.Hosts.host_name + ".  Skipping _host check.");
         return;
       }
-      host.Hosts.last_agent_env.paths.forEach(function(path){
-        var parsedPath = {
-          name: path.name,
-          isWarn: (path.type == 'not_exist') ? false : true,
-          message: (path.type == 'not_exist') ? Em.I18n.t('ok') : Em.I18n.t('installer.step3.hostWarningsPopup.existOnHost')
+
+      //parse all directories and files warnings for host
+
+      //todo: to be removed after check in new API
+      var stackFoldersAndFiles = _host.Hosts.last_agent_env.stackFoldersAndFiles || _host.Hosts.last_agent_env.paths;
+
+      stackFoldersAndFiles.forEach(function (path) {
+        warning = warnings.filterProperty('category', 'fileFolders').findProperty('name', path.name);
+        if (warning) {
+          warning.hosts.push(_host.Hosts.host_name);
+          warning.onSingleHost = false;
+        } else {
+          warning = {
+            name: path.name,
+            hosts: [_host.Hosts.host_name],
+            category: 'fileFolders',
+            onSingleHost: true
+          }
+          warnings.push(warning);
         }
-        warningsByHost.directoriesFiles.push(parsedPath);
-        // parsing total warnings
-        if(!totalWarnings.directoriesFiles.someProperty('name', parsedPath.name)){
-          totalWarnings.directoriesFiles.push({
-            name:parsedPath.name,
-            isWarn: parsedPath.isWarn,
-            message: (parsedPath.isWarn) ? Em.I18n.t('installer.step3.hostWarningsPopup.existOnOneHost') : Em.I18n.t('ok'),
-            warnCount: (parsedPath.isWarn) ? 1 : 0
-          })
-        } else if(parsedPath.isWarn){
-            totalWarnings.directoriesFiles.forEach(function(item, index){
-              if(item.name == parsedPath.name){
-                totalWarnings.directoriesFiles[index].isWarn = true;
-                totalWarnings.directoriesFiles[index].warnCount++;
-                totalWarnings.directoriesFiles[index].message = Em.I18n.t('installer.step3.hostWarningsPopup.existOnManyHost').format(totalWarnings.directoriesFiles[index].warnCount);
-              }
-            });
-        }
+        host.warnings.push(warning);
       }, this);
 
-      //render all packages for each host
-      host.Hosts.last_agent_env.rpms.forEach(function(_package){
-        var parsedPackage = {
-          name: _package.name,
-          isWarn: _package.installed,
-          message: (_package.installed) ? Em.I18n.t('installer.step3.hostWarningsPopup.installedOnHost') : Em.I18n.t('ok')
-        }
-        warningsByHost.packages.push(parsedPackage);
-        // parsing total warnings
-        if(!totalWarnings.packages.someProperty('name', parsedPackage.name)){
-          totalWarnings.packages.push({
-            name:parsedPackage.name,
-            isWarn: parsedPackage.isWarn,
-            message: (parsedPackage.isWarn) ? Em.I18n.t('installer.step3.hostWarningsPopup.installedOnOneHost') : Em.I18n.t('ok'),
-            warnCount: (parsedPackage.isWarn) ? 1 : 0
-          })
-        } else if(parsedPackage.isWarn){
-          totalWarnings.packages.forEach(function(item, index){
-            if(item.name == parsedPackage.name){
-              totalWarnings.packages[index].isWarn = true;
-              totalWarnings.packages[index].warnCount++;
-              totalWarnings.packages[index].message = Em.I18n.t('installer.step3.hostWarningsPopup.installedOnManyHost').format(totalWarnings.packages[index].warnCount);
+      //parse all package warnings for host
+      _host.Hosts.last_agent_env.installedPackages.forEach(function (_package) {
+          warning = warnings.filterProperty('category', 'packages').findProperty('name', _package.name);
+          if (warning) {
+            warning.hosts.push(_host.Hosts.host_name);
+            warning.version = _package.version,
+            warning.onSingleHost = false;
+          } else {
+            warning = {
+              name: _package.name,
+              version: _package.version,
+              hosts: [_host.Hosts.host_name],
+              category: 'packages',
+              onSingleHost: true
             }
-          });
-        }
+            warnings.push(warning);
+          }
+          host.warnings.push(warning);
       }, this);
 
-      // render all process for each host
-      host.Hosts.last_agent_env.javaProcs.forEach(function(process){
-          var parsedProcess = {
+      //parse all process warnings for host
+
+      //todo: to be removed after check in new API
+      var javaProcs = _host.Hosts.last_agent_env.hostHealth ? _host.Hosts.last_agent_env.hostHealth.activeJavaProcs : _host.Hosts.last_agent_env.javaProcs;
+
+      javaProcs.forEach(function (process) {
+        warning = warnings.filterProperty('category', 'processes').findProperty('pid', process.pid);
+        if (warning) {
+          warning.hosts.push(_host.Hosts.host_name);
+          warning.onSingleHost = false;
+        } else {
+          warning = {
+            name: (process.command.substr(0, 35) + '...'),
+            hosts: [_host.Hosts.host_name],
+            category: 'processes',
             user: process.user,
-            isWarn: process.hadoop,
             pid: process.pid,
-            command: process.command,
-            shortCommand: (process.command.substr(0, 15)+'...'),
-            message: (process.hadoop) ? Em.I18n.t('installer.step3.hostWarningsPopup.runningOnHost') : Em.I18n.t('ok')
+            command: '<table><tr><td style="word-break: break-all;">' +
+                ((process.command.length < 500) ? process.command : process.command.substr(0, 230) + '...' +
+                    '<p style="text-align: center">................</p>' +
+                    '...' + process.command.substr(-230)) + '</td></tr></table>',
+            onSingleHost: true
           }
-          warningsByHost.processes.push(parsedProcess);
-          // parsing total warnings
-          if(!totalWarnings.processes.someProperty('pid', parsedProcess.name)){
-            totalWarnings.processes.push({
-              user: process.user,
-              pid: process.pid,
-              command: process.command,
-              shortCommand: (process.command.substr(0, 15)+'...'),
-              isWarn: parsedProcess.isWarn,
-              message: (parsedProcess.isWarn) ? Em.I18n.t('installer.step3.hostWarningsPopup.runningOnOneHost') : Em.I18n.t('ok'),
-              warnCount: (parsedProcess.isWarn) ? 1 : 0
-            })
-          } else if(parsedProcess.isWarn){
-            totalWarnings.processes.forEach(function(item, index){
-              if(item.pid == parsedProcess.pid){
-                totalWarnings.processes[index].isWarn = true;
-                totalWarnings.processes[index].warnCount++;
-                totalWarnings.processes[index].message = Em.I18n.t('installer.step3.hostWarningsPopup.runningOnManyHost').format(totalWarnings.processes[index].warnCount);
-              }
-            });
-          }
+          warnings.push(warning);
+        }
+        host.warnings.push(warning);
       }, this);
-      warningsByHost.directoriesFiles.sort(sortingFunc);
-      warningsByHost.packages.sort(sortingFunc);
-      warnings.push(warningsByHost);
-    }, this);
 
-    totalWarnings.directoriesFiles.sort(sortingFunc);
-    totalWarnings.packages.sort(sortingFunc);
-    warnings.unshift(totalWarnings);
+      //parse all service warnings for host
+
+      //todo: to be removed after check in new API
+      if (_host.Hosts.last_agent_env.hostHealth && _host.Hosts.last_agent_env.hostHealth.liveServices) {
+
+        _host.Hosts.last_agent_env.hostHealth.liveServices.forEach(function (service) {
+          if (service.status === 'Unhealthy') {
+            warning = warnings.filterProperty('category', 'services').findProperty('name', service.name);
+            if (warning) {
+              warning.hosts.push(_host.Hosts.host_name);
+              warning.onSingleHost = false;
+            } else {
+              warning = {
+                name: service.name,
+                hosts: [_host.Hosts.host_name],
+                category: 'services',
+                onSingleHost: true
+              }
+              warnings.push(warning);
+            }
+            host.warnings.push(warning);
+          }
+        }, this);
+      }
+      //parse all user warnings for host
+
+      //todo: to be removed after check in new API
+      if (_host.Hosts.last_agent_env.existingUsers) {
+
+        _host.Hosts.last_agent_env.existingUsers.forEach(function (user) {
+          warning = warnings.filterProperty('category', 'users').findProperty('name', user.userName);
+          if (warning) {
+            warning.hosts.push(_host.Hosts.host_name);
+            warning.onSingleHost = false;
+          } else {
+            warning = {
+              name: user.userName,
+              hosts: [_host.Hosts.host_name],
+              category: 'users',
+              onSingleHost: true
+            }
+            warnings.push(warning);
+          }
+          host.warnings.push(warning);
+        }, this);
+      }
+
+      //parse misc warnings for host
+
+      var umask = _host.Hosts.last_agent_env.umask;
+      if (umask && umask !== 18) {
+        warning = warnings.filterProperty('category', 'misc').findProperty('name', umask);
+        if (warning) {
+          warning.hosts.push(_host.Hosts.host_name);
+          warning.onSingleHost = false;
+        } else {
+          warning = {
+            name: umask,
+            hosts: [_host.Hosts.host_name],
+            category: 'misc',
+            onSingleHost: true
+          }
+          warnings.push(warning);
+        }
+        host.warnings.push(warning);
+      }
+
+      hosts.push(host);
+    }, this);
+    warnings.forEach(function (warn) {
+      if (warn.hosts.length < 11) {
+        warn.hostsList = warn.hosts.join('<br>')
+      } else {
+        warn.hostsList = warn.hosts.slice(0,10).join('<br>') + '<br> ' + Em.I18n.t('installer.step3.hostWarningsPopup.moreHosts').format(warn.hosts.length - 10);
+      }
+    });
+    hosts.unshift({
+      name: 'All Hosts',
+      warnings: warnings
+    });
     this.set('warnings', warnings);
+    this.set('warningsByHost', hosts);
   },
   /**
    * open popup that contain hosts' warnings
@@ -816,6 +905,9 @@ App.WizardStep3Controller = Em.Controller.extend({
       },
       onSecondary: function() {
         self.rerunChecks();
+      },
+      didInsertElement: function () {
+        this.fitHeight();
       },
 
       footerClass: Ember.View.extend({
@@ -863,57 +955,159 @@ App.WizardStep3Controller = Em.Controller.extend({
 
       bodyClass: Ember.View.extend({
         templateName: require('templates/wizard/step3_host_warnings_popup'),
-        warnings: function(){
+        classNames: ['host-check'],
+        didInsertElement: function () {
+          Ember.run.next(this, function () {
+            this.$("[rel='HostsListTooltip']").tooltip({html: true, placement: "right"});
+            this.$('#process .warning-name').tooltip({html: true, placement: "top"});
+          })
+        }.observes('content'),
+        warningsByHost: function () {
+          return App.router.get('wizardStep3Controller.warningsByHost');
+        }.property('App.router.wizardStep3Controller.warningsByHost'),
+        warnings: function () {
           return App.router.get('wizardStep3Controller.warnings');
         }.property('App.router.wizardStep3Controller.warnings'),
-        categories: function(){
-          var categories = this.get('warnings').getEach('hostName');
-          return categories;
-        }.property('warnings'),
+        categories: function () {
+          return this.get('warningsByHost').mapProperty('name');
+        }.property('warningsByHost'),
         category: 'All Hosts',
-        content: function(){
-          return this.get('warnings').findProperty('hostName', this.get('category'));
-        }.property('category', 'warnings'),
+        categoryWarnings: function () {
+          return this.get('warningsByHost').findProperty('name', this.get('category')).warnings
+        }.property('warningsByHost', 'category'),
+        content: function () {
+          var categoryWarnings = this.get('categoryWarnings');
+          return [
+            Ember.Object.create({
+              warnings: categoryWarnings.filterProperty('category', 'processes'),
+              title: Em.I18n.t('installer.step3.hostWarningsPopup.process'),
+              message: Em.I18n.t('installer.step3.hostWarningsPopup.processes.message'),
+              type: Em.I18n.t('common.process'),
+              emptyName: Em.I18n.t('installer.step3.hostWarningsPopup.empty.processes'),
+              action: Em.I18n.t('installer.step3.hostWarningsPopup.action.running'),
+              category: 'process'
+            }),
+             Ember.Object.create({
+              warnings: categoryWarnings.filterProperty('category', 'packages'),
+              title: Em.I18n.t('installer.step3.hostWarningsPopup.package'),
+              message: Em.I18n.t('installer.step3.hostWarningsPopup.packages.message'),
+              type: Em.I18n.t('common.package'),
+              emptyName: Em.I18n.t('installer.step3.hostWarningsPopup.empty.packages'),
+              action: Em.I18n.t('installer.step3.hostWarningsPopup.action.installed'),
+              category: 'package'
+            }),
+             Ember.Object.create({
+              warnings: categoryWarnings.filterProperty('category', 'fileFolders'),
+              title: Em.I18n.t('installer.step3.hostWarningsPopup.fileAndFolder'),
+              message: Em.I18n.t('installer.step3.hostWarningsPopup.fileFolders.message'),
+              type: Em.I18n.t('common.path'),
+              emptyName: Em.I18n.t('installer.step3.hostWarningsPopup.empty.filesAndFolders'),
+              action: Em.I18n.t('installer.step3.hostWarningsPopup.action.exists'),
+              category: 'fileFolders'
+            }),
+             Ember.Object.create({
+              warnings: categoryWarnings.filterProperty('category', 'services'),
+              title: Em.I18n.t('installer.step3.hostWarningsPopup.service'),
+              message: Em.I18n.t('installer.step3.hostWarningsPopup.services.message'),
+              type: Em.I18n.t('common.service'),
+              emptyName: Em.I18n.t('installer.step3.hostWarningsPopup.empty.services'),
+              action: Em.I18n.t('installer.step3.hostWarningsPopup.action.notRunning'),
+              category: 'service'
+            }),
+             Ember.Object.create({
+              warnings: categoryWarnings.filterProperty('category', 'users'),
+              title: Em.I18n.t('installer.step3.hostWarningsPopup.user'),
+              message: Em.I18n.t('installer.step3.hostWarningsPopup.users.message'),
+              type: Em.I18n.t('common.user'),
+              emptyName: Em.I18n.t('installer.step3.hostWarningsPopup.empty.users'),
+              action: Em.I18n.t('installer.step3.hostWarningsPopup.action.exists'),
+              category: 'user'
+            }),
+            Ember.Object.create({
+              warnings: categoryWarnings.filterProperty('category', 'misc'),
+              title: Em.I18n.t('installer.step3.hostWarningsPopup.misc'),
+              message: Em.I18n.t('installer.step3.hostWarningsPopup.misc.message'),
+              type: Em.I18n.t('installer.step3.hostWarningsPopup.misc.umask'),
+              emptyName: Em.I18n.t('installer.step3.hostWarningsPopup.empty.misc'),
+              action: Em.I18n.t('installer.step3.hostWarningsPopup.action.exists'),
+              category: 'misc'
+            })
+          ]
+        }.property('category', 'warningsByHost'),
+
+        showHostsPopup: function (hosts) {
+          $('.tooltip').hide();
+          App.ModalPopup.show({
+            header: Em.I18n.t('installer.step3.hostWarningsPopup.allHosts'),
+            bodyClass: Ember.View.extend({
+              hosts: hosts.context,
+              template: Ember.Handlebars.compile('<ul>{{#each host in view.hosts}}<li>{{host}}</li>{{/each}}</ul>')
+            }),
+            onPrimary: function () {
+              this.hide();
+            },
+            secondary: null
+          });
+        },
+
+        onToggleBlock: function (category) {
+          this.$('#' + category.context.category).toggle('blind', 500);
+        },
+        warningsNotice: function () {
+          var warnings = this.get('warnings');
+          var warningsByHost = self.get('warningsByHost').slice();
+          warningsByHost.shift();
+          var issues = warnings.length + ' ' + (warnings.length === 1 ? Em.I18n.t('installer.step3.hostWarningsPopup.issue') : Em.I18n.t('installer.step3.hostWarningsPopup.issues'));
+          var hostsNumber = warningsByHost.length - warningsByHost.filterProperty('warnings.length', 0).length;
+          var hosts = hostsNumber + ' ' + (hostsNumber === 1 ? Em.I18n.t('installer.step3.hostWarningsPopup.host') : Em.I18n.t('installer.step3.hostWarningsPopup.hosts'));
+          return Em.I18n.t('installer.step3.hostWarningsPopup.summary').format(issues, hosts);
+        }.property('warnings', 'warningsByHost'),
         /**
          * generate detailed content to show it in new window
          */
-        contentInDetails: function(){
+        contentInDetails: function () {
           var content = this.get('content');
+          var warningsByHost = this.get('warningsByHost').slice();
+          warningsByHost.shift();
           var newContent = '';
-          if(content.hostName == 'All Hosts'){
-            newContent += '<h4>'+Em.I18n.t('installer.step3.warningsWindow.allHosts')+'</h4>';
-          } else {
-            newContent += '<h4>' + Em.I18n.t('installer.step3.warningsWindow.warningsOn') + content.hostName + '</h4>';
+          newContent += Em.I18n.t('installer.step3.hostWarningsPopup.report.header') + new Date;
+          newContent += Em.I18n.t('installer.step3.hostWarningsPopup.report.hosts');
+          newContent += warningsByHost.filterProperty('warnings.length').mapProperty('name').join(' ');
+          if (content.findProperty('category', 'fileFolders').warnings.length) {
+            newContent += Em.I18n.t('installer.step3.hostWarningsPopup.report.fileFolders');
+            newContent += content.findProperty('category', 'fileFolders').warnings.mapProperty('name').join(' ');
           }
-          newContent += '<div>' + Em.I18n.t('installer.step3.warningsWindow.directoriesAndFiles') + '</div><div>';
-          content.directoriesFiles.filterProperty('isWarn', true).forEach(function(path){
-              newContent += path.name + '&nbsp;'
-          });
-          if(content.directoriesFiles.filterProperty('isWarn', true).length == 0){
-            newContent += Em.I18n.t('installer.step3.warningsWindow.noWarnings');
+          if (content.findProperty('category', 'process').warnings.length) {
+            newContent += Em.I18n.t('installer.step3.hostWarningsPopup.report.process');
+            content.findProperty('category', 'process').warnings.forEach(function (process, i) {
+              process.hosts.forEach(function (host, j) {
+                if (!!i || !!j) {
+                  newContent += ',';
+                }
+                newContent += '(' + host + ',' + process.user + ',' + process.pid + ')';
+              });
+            });
           }
-          newContent += '</div><br/><div>PACKAGES</div><div>';
-          content.packages.filterProperty('isWarn', true).forEach(function(_package){
-              newContent += _package.name + '&nbsp;'
-          });
-          if(content.packages.filterProperty('isWarn', true).length == 0){
-            newContent += Em.I18n.t('installer.step3.warningsWindow.noWarnings');
+          if (content.findProperty('category', 'package').warnings.length) {
+            newContent += Em.I18n.t('installer.step3.hostWarningsPopup.report.package');
+            newContent += content.findProperty('category', 'package').warnings.mapProperty('name').join(' ');
           }
-          newContent += '</div><br/><div>PROCESSES</div><div>';
-          content.processes.filterProperty('isWarn', true).forEach(function(process, index){
-              newContent += '(' + content.hostName + ',' + process.pid + ',' + process.user + ')';
-              newContent += (index != (content.processes.filterProperty('isWarn', true).length-1)) ? ',' : '';
-          })
-          if(content.processes.filterProperty('isWarn', true).length == 0){
-            newContent += Em.I18n.t('installer.step3.warningsWindow.noWarnings');
+          if (content.findProperty('category', 'service').warnings.length) {
+            newContent += Em.I18n.t('installer.step3.hostWarningsPopup.report.service');
+            newContent += content.findProperty('category', 'service').warnings.mapProperty('name').join(' ');
           }
+          if (content.findProperty('category', 'user').warnings.length) {
+            newContent += Em.I18n.t('installer.step3.hostWarningsPopup.report.user');
+            newContent += content.findProperty('category', 'user').warnings.mapProperty('name').join(' ');
+          }
+          newContent += '</p>';
           return newContent;
-        }.property('content'),
+        }.property('content', 'warningsByHost'),
         /**
          * open new browser tab with detailed content
          */
         openWarningsInDialog: function(){
-          var newWindow = window.open('', this.get('category')+' warnings');
+          var newWindow = window.open('');
           var newDocument = newWindow.document;
           newDocument.write(this.get('contentInDetails'));
           newWindow.focus();
@@ -922,36 +1116,27 @@ App.WizardStep3Controller = Em.Controller.extend({
     })
   },
 
-  // TODO: dummy button. Remove this after the hook up with actual REST API.
-  mockBtn: function () {
-    this.set('isSubmitDisabled', false);
-    this.hosts.clear();
-    var hostInfo = this.mockData;
-    this.renderHosts(hostInfo);
-  },
-
-  pollBtn: function () {
-    if (this.get('isSubmitDisabled')) {
-      return;
-    }
-    var hosts = this.get('visibleHosts');
-    var selectedHosts = hosts.filterProperty('isChecked', true);
-    selectedHosts.forEach(function (_host) {
-      console.log('Retrying:  ' + _host.name);
-    });
-
-    var mockHosts = this.mockRetryData;
-    mockHosts.forEach(function (_host) {
-      console.log('Retrying:  ' + _host.name);
-    });
-    if (this.parseHostInfo(mockHosts, selectedHosts)) {
-      // this.saveHostInfoToDb();
-    }
+  registeredHostsPopup: function(){
+    var self = this;
+    App.ModalPopup.show({
+      header: Em.I18n.t('installer.step3.warning.registeredHosts').format(this.get('registeredHosts').length),
+      secondary: null,
+      bodyClass: Ember.View.extend({
+        template: Ember.Handlebars.compile([
+          '<p>{{view.message}}</p>',
+          '<ul>{{#each host in view.registeredHosts}}',
+              '<li>{{host}}</li>',
+          '{{/each}}</ul>'
+        ].join('')),
+        message: Em.I18n.t('installer.step3.registeredHostsPopup'),
+        registeredHosts: self.get('registeredHosts')
+      })
+    })
   },
 
   back: function () {
     if (this.get('isInstallInProgress')) {
-      return false;
+      return;
     }
     App.router.send('back');
   }

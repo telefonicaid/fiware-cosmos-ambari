@@ -37,12 +37,13 @@ import com.google.inject.Singleton;
 
 @Singleton
 public class BootStrapImpl {
+  public static final String DEV_VERSION = "${ambariVersion}";
   private File bootStrapDir;
   private String bootstrapActionScript;
   private String bootSetupAgentScript;
   private String teardownAgentScript;
   private String bootSetupAgentPassword;
-  private BSActionRunner bsActionRunner;
+  private BSRunner bsRunner;
   private String masterHostname;
 
   private static Log LOG = LogFactory.getLog(BootStrapImpl.class);
@@ -53,6 +54,7 @@ public class BootStrapImpl {
   private Set<String> hostsInProcess;
   private final String clusterOsType;
   private String projectVersion;
+  private int serverPort;
 
   @Inject
   public BootStrapImpl(Configuration conf, AmbariMetaInfo ambariMetaInfo) throws IOException {
@@ -67,6 +69,8 @@ public class BootStrapImpl {
         InetAddress.getLocalHost().getCanonicalHostName());
     this.clusterOsType = conf.getServerOsType();
     this.projectVersion = ambariMetaInfo.getServerVersion();
+    this.projectVersion = (this.projectVersion.equals(DEV_VERSION)) ? DEV_VERSION.replace("$", "") : this.projectVersion;
+    this.serverPort = (conf.getApiSSLAuthentication())? conf.getClientSSLApiPort() : conf.getClientApiPort();
   }
 
   /**
@@ -127,7 +131,7 @@ public class BootStrapImpl {
       SshHostInfo info, String actionScript) {
     BSResponse response = new BSResponse();
     /* Run some checks for ssh host */
-    if (bsActionRunner != null) {
+    if (bsRunner != null) {
       response.setLog("BootStrap action in Progress: Cannot Run more than one " +
           "bootstrap action at the same time.");
       response.setStatus(BSRunStat.ERROR);
@@ -145,11 +149,11 @@ public class BootStrapImpl {
 
     requestId++;
 
-    bsActionRunner = new BSActionRunner(this, info, bootStrapDir.toString(),
+    bsRunner = new BSRunner(this, info, bootStrapDir.toString(),
         bootstrapActionScript, actionScript, bootSetupAgentPassword, requestId,
-        this.masterHostname, info.isVerbose(), this.clusterOsType,
-        this.projectVersion);
-    bsActionRunner.start();
+        0L, this.masterHostname, info.isVerbose(), this.clusterOsType,
+        this.projectVersion, this.serverPort);
+    bsRunner.start();
     response.setStatus(BSRunStat.OK);
     response.setRequestId(requestId);
     return response;
@@ -199,7 +203,7 @@ public class BootStrapImpl {
    *
    */
   public synchronized void resetBootstrapRunner() {
-    bsActionRunner = null;
+    bsRunner = null;
   }
 
 }

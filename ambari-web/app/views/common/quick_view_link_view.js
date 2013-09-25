@@ -20,6 +20,9 @@ var App = require('app');
 
 App.QuickViewLinks = Em.View.extend({
 
+  ambariProperties: function() {
+    return App.router.get('clusterController.ambariProperties');
+  },
   /**
    * Updated quick links. Here we put correct hostname to url
    */
@@ -27,17 +30,42 @@ App.QuickViewLinks = Em.View.extend({
     var serviceName = this.get('content.serviceName');
     var components = this.get('content.hostComponents');
     var host;
+    var self = this;
 
-    if (serviceName === 'HDFS') {
-      host = components.findProperty('componentName', 'NAMENODE').get('host.publicHostName');
-    } else if (serviceName === 'MAPREDUCE') {
-      host = components.findProperty('componentName', 'JOBTRACKER').get('host.publicHostName');
-    } else if (serviceName === 'HBASE') {
-      var component = components.filterProperty('componentName', 'HBASE_MASTER').findProperty('haStatus', 'active');
-      if(component){
-        host = component.get('host.publicHostName');
-      }
+    switch (serviceName) {
+      case "HDFS":
+        host = App.singleNodeInstall ? App.singleNodeAlias : components.findProperty('componentName', 'NAMENODE').get('host.publicHostName');
+        break;
+      case "MAPREDUCE":
+      case "OOZIE":
+      case "GANGLIA":
+      case "NAGIOS":
+      case "HUE":
+        host = App.singleNodeInstall ? App.singleNodeAlias : components.findProperty('isMaster', true).get("host").get("publicHostName");
+        break;
+      case "HBASE":
+        var component;
+        if (App.supports.multipleHBaseMasters) {
+          component = components.filterProperty('componentName', 'HBASE_MASTER').findProperty('haStatus', 'active');
+        } else {
+          component = components.findProperty('componentName', 'HBASE_MASTER');
+        }
+        if (component) {
+          if (App.singleNodeInstall) {
+            host = App.singleNodeAlias;
+          } else {
+            host = component.get('host.publicHostName');
+          }
+        }
+        break;
+      case "YARN":
+        host = App.singleNodeInstall ? App.singleNodeAlias : components.findProperty('componentName', 'RESOURCEMANAGER').get('host.publicHostName');
+        break;
+      case "MAPREDUCE2":
+        host = App.singleNodeInstall ? App.singleNodeAlias : components.findProperty('componentName', 'HISTORYSERVER').get('host.publicHostName');
+        break;
     }
+
     if (!host) {
       return [
         {
@@ -47,18 +75,39 @@ App.QuickViewLinks = Em.View.extend({
       ];
     }
     return this.get('content.quickLinks').map(function (item) {
+      var protocol = self.setProtocol(item.get('service_id'));
       if (item.get('url')) {
-        item.set('url', item.get('url').fmt(host));
+        item.set('url', item.get('url').fmt(protocol,host));
       }
       return item;
     });
   }.property('content.quickLinks.@each.label'),
 
+  setProtocol: function(service_id){
+    var properties  = this.ambariProperties();
+    switch(service_id){
+      case "GANGLIA":
+        return (properties && properties.hasOwnProperty('ganglia.https') && properties['ganglia.https']) ? "https" : "http";
+        break;
+      case "NAGIOS":
+        return (properties && properties.hasOwnProperty('nagios.https') && properties['nagios.https']) ? "https" : "http";
+        break;
+      default:
+        return "http";
+    }
+  },
+
   linkTarget: function () {
     switch (this.get('content.serviceName').toLowerCase()) {
       case "hdfs":
+      case "yarn":
+      case "mapreduce2":
       case "mapreduce":
       case "hbase":
+      case "oozie":
+      case "ganglia":
+      case "nagios":
+      case "hue":
         return "_blank";
         break;
       default:

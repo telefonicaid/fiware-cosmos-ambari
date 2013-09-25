@@ -23,13 +23,11 @@ require('config');
 require('utils/updater');
 require('utils/ajax');
 
+require('models/host_component');
+
 require('controllers/global/background_operations_controller');
 require('views/common/modal_popup');
 require('utils/host_progress_popup');
-
-/*window.console.log = function(text){
-  console.log(text);
-}*/
 
 describe('App.BackgroundOperationsController', function () {
 
@@ -38,7 +36,6 @@ describe('App.BackgroundOperationsController', function () {
    *
    */
   App.set('clusterName', 'testName');
-  App.set('testMode', 'true');
   App.bgOperationsUpdateInterval = 100;
 
   /**
@@ -62,6 +59,7 @@ describe('App.BackgroundOperationsController', function () {
       this.timeout(App.bgOperationsUpdateInterval + 500);
 
       sinon.stub(controller, 'requestMostRecent', function(){
+        App.set('testMode', true);
         controller.set('isWorking', false);
         controller.requestMostRecent.restore();
         done();
@@ -82,36 +80,6 @@ describe('App.BackgroundOperationsController', function () {
       controller.set('isWorking', true);
     });
 
-    /*it('allOperations should be set  ', function(done){
-      this.timeout(App.bgOperationsUpdateInterval + 500);
+  });
 
-      sinon.stub(controller, 'updateBackgroundOperations', function(data){
-        controller.set('isWorking', false);
-        controller.updateBackgroundOperations.restore();
-        controller.updateBackgroundOperations(data);
-        expect(controller.get('executeTasks').length).to.be.equal(2);
-        expect(controller.get('allOperationsCount')).to.be.equal(1);
-
-        var bgOperation = controller.get('allOperations')[0];
-        expect(bgOperation).to.have.property('id');
-        expect(bgOperation).to.have.property('request_id');
-        expect(bgOperation).to.have.property('role');
-        expect(bgOperation).to.have.property('command');
-        expect(bgOperation).to.have.property('status');
-
-        done();
-      });
-
-      controller.set('isWorking', true);
-    });*/
-
-  })
-
-  /*describe('#showPopup', function () {
-    it('works without exceptions  ', function(){
-      var popup = controller.showPopup();
-      popup.onPrimary();
-    });
-  });*/
-
-})
+});

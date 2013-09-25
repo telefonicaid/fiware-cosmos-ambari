@@ -37,14 +37,14 @@ public class AbstractPropertyProviderTest {
 
   @Test
   public void testGetComponentMetrics() {
-    Map<String, Map<String, PropertyInfo>> componentMetrics = PropertyHelper.getGangliaPropertyIds(Resource.Type.HostComponent);
+    Map<String, Map<String, PropertyInfo>> componentMetrics = PropertyHelper.getGangliaPropertyIds(Resource.Type.HostComponent, PropertyHelper.MetricsVersion.HDP1);
     AbstractPropertyProvider provider = new TestPropertyProvider(componentMetrics);
     Assert.assertEquals(componentMetrics, provider.getComponentMetrics());
   }
 
   @Test
   public void testGetPropertyInfoMap() {
-    AbstractPropertyProvider provider = new TestPropertyProvider(PropertyHelper.getGangliaPropertyIds(Resource.Type.HostComponent));
+    AbstractPropertyProvider provider = new TestPropertyProvider(PropertyHelper.getGangliaPropertyIds(Resource.Type.HostComponent, PropertyHelper.MetricsVersion.HDP1));
 
     // specific property
     Map<String, PropertyInfo> propertyInfoMap = provider.getPropertyInfoMap("NAMENODE", "metrics/cpu/cpu_aidle");
@@ -57,6 +57,92 @@ public class AbstractPropertyProviderTest {
     Assert.assertTrue(propertyInfoMap.containsKey("metrics/disk/disk_free"));
     Assert.assertTrue(propertyInfoMap.containsKey("metrics/disk/disk_total"));
     Assert.assertTrue(propertyInfoMap.containsKey("metrics/disk/part_max_used"));
+  }
+
+  @Test
+  public void testSubstituteArguments() throws Exception
+  {
+    //simple substitute
+    String newPropertyId = AbstractPropertyProvider.substituteArgument("category/name1/$1/name2/$2", "$1", "foo");
+    Assert.assertEquals("category/name1/foo/name2/$2", newPropertyId);
+
+    newPropertyId = AbstractPropertyProvider.substituteArgument("category/name1/$1/name2/$2", "$2", "bar");
+    Assert.assertEquals("category/name1/$1/name2/bar", newPropertyId);
+
+    //substitute with method
+    newPropertyId = AbstractPropertyProvider.substituteArgument(
+        "category/name1/$1.toLowerCase()/name2/$2.toUpperCase()", "$1", "FOO");
+    Assert.assertEquals("category/name1/foo/name2/$2.toUpperCase()", newPropertyId);
+
+    newPropertyId = AbstractPropertyProvider.substituteArgument(
+        "category/name1/$1.toLowerCase()/name2/$2.toUpperCase()", "$2", "bar");
+    Assert.assertEquals("category/name1/$1.toLowerCase()/name2/BAR", newPropertyId);
+
+    //substitute with chained methods
+    newPropertyId = AbstractPropertyProvider.substituteArgument(
+        "category/name1/$1.toLowerCase().substring(1)/name2", "$1", "FOO");
+    Assert.assertEquals("category/name1/oo/name2", newPropertyId);
+
+    newPropertyId = AbstractPropertyProvider.substituteArgument(
+        "category/name1/$1.toLowerCase().substring(1).concat(\"_post\")/name2/$2.concat(\"_post\")", "$1", "FOO");
+    newPropertyId = AbstractPropertyProvider.substituteArgument(newPropertyId, "$2", "bar");
+    Assert.assertEquals("category/name1/oo_post/name2/bar_post", newPropertyId);
+  }
+
+  @Test
+  public void testUpdateComponentMetricMapHDP1() {
+    Map<String, Map<String, PropertyInfo>> componentMetrics =
+      PropertyHelper.getGangliaPropertyIds(Resource.Type.HostComponent,
+      PropertyHelper.MetricsVersion.HDP1);
+
+    AbstractPropertyProvider provider = new TestPropertyProvider(componentMetrics);
+
+    Map<String, PropertyInfo> flumeMetrics = provider.getComponentMetrics().get(
+      "FLUME_SERVER");
+
+    int metricsBefore = flumeMetrics.size();
+    String specificMetric = "metrics/flume/arg1/CHANNEL/arg2/ChannelCapacity";
+    String specificPropertyInfoId = "arg1.CHANNEL.arg2.ChannelCapacity";
+    Map<String, PropertyInfo> componentMetricMap =
+      provider.getComponentMetrics().get("FLUME_SERVER");
+
+    Assert.assertNull(flumeMetrics.get(specificMetric));
+
+    provider.updateComponentMetricMap(componentMetricMap, specificMetric);
+
+    Assert.assertEquals(metricsBefore + 1, flumeMetrics.size());
+    Assert.assertNotNull(flumeMetrics.get(specificMetric));
+    Assert.assertEquals(specificPropertyInfoId,
+      flumeMetrics.get(specificMetric).getPropertyId());
+  }
+
+  @Test
+  public void testUpdateComponentMetricMapHDP2() {
+    Map<String, Map<String, PropertyInfo>> componentMetrics =
+      PropertyHelper.getGangliaPropertyIds(Resource.Type.HostComponent,
+      PropertyHelper.MetricsVersion.HDP2);
+
+    AbstractPropertyProvider provider = new TestPropertyProvider(componentMetrics);
+
+    Map<String, PropertyInfo> resourceManagerMetrics = provider.getComponentMetrics().get(
+      "RESOURCEMANAGER");
+
+    int metricsBefore = resourceManagerMetrics.size();
+    String specificMetric =
+      "metrics/yarn/Queue/specificQueue1/specificQueue2/AvailableMB";
+    String specificPropertyInfoId =
+      "yarn.QueueMetrics.Queue=specificQueue1.specificQueue2.AvailableMB";
+    Map<String, PropertyInfo> componentMetricMap =
+      provider.getComponentMetrics().get("RESOURCEMANAGER");
+
+    Assert.assertNull(resourceManagerMetrics.get(specificMetric));
+
+    provider.updateComponentMetricMap(componentMetricMap, specificMetric);
+
+    Assert.assertEquals(metricsBefore + 1, resourceManagerMetrics.size());
+    Assert.assertNotNull(resourceManagerMetrics.get(specificMetric));
+    Assert.assertEquals(specificPropertyInfoId,
+      resourceManagerMetrics.get(specificMetric).getPropertyId());
   }
 
   static class TestPropertyProvider extends AbstractPropertyProvider {

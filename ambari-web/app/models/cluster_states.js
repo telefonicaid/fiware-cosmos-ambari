@@ -22,21 +22,30 @@ App.clusterStatus = Ember.Object.create({
   validStates: ['CLUSTER_NOT_CREATED_1', 'CLUSTER_DEPLOY_PREP_2', 'CLUSTER_INSTALLING_3', 'SERVICE_STARTING_3', 'CLUSTER_INSTALLED_4',  'CLUSTER_STARTED_5',
     'ADD_HOSTS_DEPLOY_PREP_2', 'ADD_HOSTS_INSTALLING_3', 'ADD_HOSTS_INSTALLED_4', 'ADD_HOSTS_COMPLETED_5',
     'ADD_SERVICES_DEPLOY_PREP_2', 'ADD_SERVICES_INSTALLING_3', 'ADD_SERVICES_INSTALLED_4', 'ADD_SERVICES_COMPLETED_5',
-    'STOPPING_SERVICES', 'STACK_UPGRADING', 'STACK_UPGRADE_FAILED', 'STACK_UPGRADED', 'STACK_UPGRADE_COMPLETED'],
+    'STOPPING_SERVICES', 'STACK_UPGRADING', 'STACK_UPGRADE_FAILED', 'STACK_UPGRADED', 'STACK_UPGRADE_COMPLETED', 'ADD_SECURITY_STEP_1',
+    'ADD_SECURITY_STEP_2', 'ADD_SECURITY_STEP_3', 'ADD_SECURITY_STEP_4', 'DISABLE_SECURITY', 'SECURITY_COMPLETED', 'HIGH_AVAILABILITY_DEPLOY'],
   clusterState: 'CLUSTER_NOT_CREATED_1',
   wizardControllerName: null,
   localdb: null,
   key: 'CLUSTER_CURRENT_STATUS',
+  isInstalled: function(){
+    var notInstalledStates = ['CLUSTER_NOT_CREATED_1', 'CLUSTER_DEPLOY_PREP_2', 'CLUSTER_INSTALLING_3', 'SERVICE_STARTING_3'];
+    return !notInstalledStates.contains(this.get('clusterState'));
+  }.property('clusterState'),
   /**
    * get cluster data from server and update cluster status
+   * @param isAsync: set this to true if the call is to be made asynchronously.  if unspecified, false is assumed
+   * @return promise object for the get call
    */
-  updateFromServer: function(){
+  updateFromServer: function(isAsync) {
+    // if isAsync is undefined, set it to false
+    isAsync = isAsync || false;
     var url = App.apiPrefix + '/persist/' + this.get('key');
-    jQuery.ajax(
+    return jQuery.ajax(
       {
         url: url,
         context: this,
-        async: false,
+        async: isAsync,
         success: function (response) {
           if (response) {
             var newValue = jQuery.parseJSON(response);
@@ -60,7 +69,18 @@ App.clusterStatus = Ember.Object.create({
           if (xhr.status == 404) {
             // default status already set
             console.log('Persist API did NOT find the key CLUSTER_CURRENT_STATUS');
+            return;
           }
+          App.ModalPopup.show({
+            header: Em.I18n.t('common.error'),
+            secondary: false,
+            onPrimary: function () {
+              this.hide();
+            },
+            bodyClass: Ember.View.extend({
+              template: Ember.Handlebars.compile('<p>{{t common.update.error}}</p>')
+            })
+          });
         },
         statusCode: require('data/statusCodes')
       }
@@ -72,6 +92,7 @@ App.clusterStatus = Ember.Object.create({
    * @return {*}
    */
   setClusterStatus: function(newValue){
+    if(App.testMode) return false;
     if (newValue) {
       //setter
       if (newValue.clusterState) {
@@ -87,7 +108,6 @@ App.clusterStatus = Ember.Object.create({
         this.set('localdb', newValue.localdb);
       }
 
-      var url = App.apiPrefix + '/persist/';
       var keyValuePair = {};
       var val = {
         clusterName: this.get('clusterName'),
@@ -97,20 +117,44 @@ App.clusterStatus = Ember.Object.create({
       };
       keyValuePair[this.get('key')] = JSON.stringify(val);
 
-
-      jQuery.ajax({
-        async: false,
-        context: this,
-        type: "POST",
-        url: url,
-        data: JSON.stringify(keyValuePair),
-        beforeSend: function () {
-          console.log('BeforeSend: persistKeyValues', keyValuePair);
-        }
+      App.ajax.send({
+        name: 'cluster.state',
+        sender: this,
+        data: {
+            key: keyValuePair,
+            newVal: newValue
+        },
+        beforeSend: 'clusterStatusBeforeSend',
+        error: 'clusterStatusErrorCallBack'
       });
       return newValue;
     }
   },
+  clusterStatusBeforeSend: function (keyValuePair) {
+    console.log('BeforeSend: persistKeyValues', keyValuePair);
+  },
+  clusterStatusErrorCallBack: function(request, ajaxOptions, error, opt) {
+    console.log("ERROR");
+    if(opt.newValue.errorCallBack) {
+      opt.newValue.errorCallBack();
+    } else {
+      var doc = $.parseXML(request.responseText);
+      var msg = 'Error ' + (request.status) + ' ';
+      msg += $(doc).find("body p").text();
+    }
+    App.ModalPopup.show({
+      header: Em.I18n.t('common.error'),
+      secondary: false,
+      response: msg,
+      onPrimary: function () {
+        this.hide();
+      },
+      bodyClass: Ember.View.extend({
+        template: Ember.Handlebars.compile('<p>{{t common.persist.error}} {{response}}</p>')
+      })
+    });
+  },
+
   /**
    * general info about cluster
    */

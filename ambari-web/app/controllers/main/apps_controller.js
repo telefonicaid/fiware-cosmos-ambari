@@ -48,7 +48,12 @@ App.MainAppsController = Em.ArrayController.extend({
     var self = this;
 
     //var runsUrl = App.testMode ? "/data/apps/runs.json" : App.apiPrefix + "/jobhistory/workflow?orderBy=startTime&sortDir=DESC&limit=" + App.maxRunsForAppBrowser;
-    var runsUrl = App.testMode ? "/data/apps/runs.json" : App.apiPrefix + this.get("runUrl");
+    var runsUrl;
+    if (App.testMode) {
+      runsUrl = App.get('isHadoop2Stack') ? "/data/apps/runs2.json" : "/data/apps/runs.json";
+    } else {
+      runsUrl = App.apiPrefix + this.get("runUrl");
+    }
 
     App.HttpClient.get(runsUrl, App.runsMapper, {
       complete:function (jqXHR, textStatus) {
@@ -88,10 +93,6 @@ App.MainAppsController = Em.ArrayController.extend({
     sSearch_3:"",
     minJobs:"",
     maxJobs:"",
-    minInputBytes:"",
-    maxInputBytes:"",
-    minOutputBytes:"",
-    maxOutputBytes:"",
     minDuration:"",
     maxDuration:"",
     minStartTime:"",
@@ -101,6 +102,7 @@ App.MainAppsController = Em.ArrayController.extend({
     iDisplayStart:"",
     iSortCol_0:"",
     sSortDir_0:"",
+    tagSearch:"",
 
     allFilterActivated:false,
     filteredDisplayRecords:null,
@@ -112,15 +114,21 @@ App.MainAppsController = Em.ArrayController.extend({
      * Direct binding to job filter field
      */
     runType:"",
-    onRunTypeChange:function(){
-      if(this.runType == "MapReduce"){
-        this.set("sSearch_2","mr");
-      }else if(this.runType == "Hive"){
-        this.set("sSearch_2","hive");
-      }else if(this.runType == "Pig"){
-        this.set("sSearch_2","pig");
-      }else{
-        this.set("sSearch_2","");
+    onRunTypeChange: function () {
+      if (this.runType == "MapReduce") {
+        if (!App.testMode && !App.get('isHadoop2Stack')) {
+          this.set("sSearch_2", "mr");
+        } else {
+          this.set("sSearch_2", "mapreduce");
+        }
+      } else if (this.runType == "Hive") {
+        this.set("sSearch_2", "hive");
+      } else if (this.runType == "Pig") {
+        this.set("sSearch_2", "pig");
+      } else if (this.runType == "Yarn") {
+        this.set("sSearch_2", "yarn");
+      } else {
+        this.set("sSearch_2", "");
       }
     }.observes("runType"),
 
@@ -133,26 +141,6 @@ App.MainAppsController = Em.ArrayController.extend({
       this.set("minJobs", minMaxTmp.min);
       this.set("maxJobs", minMaxTmp.max);
     }.observes("jobs"),
-
-    /**
-     * Direct binding to Input filter field
-     */
-    input:"",
-    onInputChange:function(){
-      var minMaxTmp = this.parseBandWidth(this.input);
-      this.set("minInputBytes", minMaxTmp.min);
-      this.set("maxInputBytes", minMaxTmp.max);
-    }.observes("input"),
-
-    /**
-     * Direct binding to Output filter field
-     */
-    output:"",
-    onOutputChange:function(){
-      var minMaxTmp = this.parseBandWidth(this.output);
-      this.set("minOutputBytes", minMaxTmp.min);
-      this.set("maxOutputBytes", minMaxTmp.max);
-    }.observes("output"),
 
     /**
      * Direct binding to Duration filter field
@@ -320,27 +308,28 @@ App.MainAppsController = Em.ArrayController.extend({
 
       var arr = [
         "sSearch_0", "sSearch_1", "sSearch_2", "sSearch_3", "minJobs",
-        "maxJobs", "minInputBytes", "maxInputBytes", "minOutputBytes",
-        "maxOutputBytes", "minDuration", "maxDuration", "minStartTime",
+        "maxJobs", "minDuration", "maxDuration", "minStartTime",
         "maxStartTime", "sSearch", "iDisplayLength", "iDisplayStart",
-        "iSortCol_0", "sSortDir_0"
+        "iSortCol_0", "sSortDir_0", "tagSearch"
       ];
+
+      var notFilterFields = ["iDisplayLength", "iDisplayStart", "iSortCol_0", "sSortDir_0"];
+
+      var filtersUsed = false;
 
       for (var n=0; n<arr.length;n++) {
         if(this.get(arr[n])){
           link += arr[n] + "=" + this.get(arr[n]) + "&";
+          if (!notFilterFields.contains(arr[n])) {
+            filtersUsed = true;
+          }
         }
       };
 
       link = link.slice(0,link.length-1);
 
-      var valueInString=link.match(/&/g);
-
-      if(!this.get("viewTypeClickEvent"))
-      if(valueInString != null){
-        this.set("viewType","filtered");
-      }else{
-        this.set("viewType","all");
+      if(!this.get("viewTypeClickEvent")) {
+        this.set('viewType', filtersUsed?'filtered':'all');
       }
 
       return link;
@@ -353,16 +342,16 @@ App.MainAppsController = Em.ArrayController.extend({
    */
   clearFilters: function () {
     var obj=this.get("filterObject");
+    obj.set("sSearch","");
     obj.set("sSearch_0","");
     obj.set("sSearch_1","");
     obj.set("sSearch_2","");
     obj.set("sSearch_3","");
     obj.set("runType","Any");
     obj.set("jobs","");
-    obj.set("input","");
-    obj.set("output","");
     obj.set("duration","");
     obj.set("runDate","Any");
+    obj.set("tagSearch","");
   },
 
 
@@ -370,12 +359,16 @@ App.MainAppsController = Em.ArrayController.extend({
   runTimeout : null,
 
   valueObserver: function(){
+    if(this.get('filterObject.iDisplayLength') > this.get('content.length')) {
+      this.set('filterObject.iDisplayStart', 0);
+    }
     var link = this.get('filterObject').createAppLink();
 
     if(this.get("filterObject.viewType") == "filtered"){
       this.set("runUrl", link);
     }else{
-      this.set("runUrl",  "/jobhistory/datatable?iDisplayLength="+this.get('filterObject.iDisplayLength'));
+      this.set("runUrl", "/jobhistory/datatable?iDisplayStart=" + this.get('filterObject.iDisplayStart') + "&iDisplayLength=" + this.get('filterObject.iDisplayLength') +
+         '&iSortCol_0=' + this.get('filterObject.iSortCol_0') + '&sSortDir_0=' + this.get('filterObject.sSortDir_0'));
     }
 
     var timeout = this.get('runTimeout');
@@ -396,10 +389,6 @@ App.MainAppsController = Em.ArrayController.extend({
       'filterObject.sSearch_3',
       'filterObject.minJobs',
       'filterObject.maxJobs',
-      'filterObject.minInputBytes',
-      'filterObject.maxInputBytes',
-      'filterObject.minOutputBytes',
-      'filterObject.maxOutputBytes',
       'filterObject.minDuration',
       'filterObject.maxDuration',
       'filterObject.minStartTime',
@@ -409,7 +398,8 @@ App.MainAppsController = Em.ArrayController.extend({
       'filterObject.iDisplayStart',
       'filterObject.iSortCol_0',
       'filterObject.sSortDir_0',
-      'filterObject.viewType'
+      'filterObject.viewType',
+      'filterObject.tagSearch'
   ),
 
   serverData: "",
@@ -424,16 +414,6 @@ App.MainAppsController = Em.ArrayController.extend({
     if(!summary){
       tmp = {
         'jobs': {
-          'avg': '-',
-          'min': '-',
-          'max': '-'
-        },
-        'input': {
-          'avg': '-',
-          'min': '-',
-          'max': '-'
-        },
-        'output': {
           'avg': '-',
           'min': '-',
           'max': '-'
@@ -454,16 +434,6 @@ App.MainAppsController = Em.ArrayController.extend({
           'avg': summary.jobs.avg.toFixed(2),
           'min': summary.jobs.min,
           'max': summary.jobs.max
-        },
-        'input': {
-          'avg': misc.formatBandwidth(summary.input.avg),
-          'min': misc.formatBandwidth(summary.input.min),
-          'max': misc.formatBandwidth(summary.input.max)
-        },
-        'output': {
-          'avg': misc.formatBandwidth(summary.output.avg),
-          'min': misc.formatBandwidth(summary.output.min),
-          'max': misc.formatBandwidth(summary.output.max)
         },
         'duration': {
           'avg': date.timingFormat(Math.round(summary.duration.avg)),
@@ -486,11 +456,10 @@ App.MainAppsController = Em.ArrayController.extend({
       { name: Em.I18n.t('common.name'), index: 1 },
       { name: Em.I18n.t('common.type'), index: 2 },
       { name: Em.I18n.t('common.user'), index: 3 },
-      { name: Em.I18n.t('apps.avgTable.jobs'), index: 4 },
-      { name: Em.I18n.t('apps.avgTable.input'), index: 5 },
-      { name: Em.I18n.t('apps.avgTable.output'), index: 6 },
-      { name: Em.I18n.t('apps.avgTable.duration'), index: 7 },
-      { name: Em.I18n.t('apps.table.column.runDate'), index: 8 }
+      { name: Em.I18n.t('common.tags'), index: 4 },
+      { name: Em.I18n.t('apps.avgTable.jobs'), index: 5 },
+      { name: Em.I18n.t('apps.avgTable.duration'), index: 6 },
+      { name: Em.I18n.t('apps.table.column.runDate'), index: 7 }
     ]
   })
 

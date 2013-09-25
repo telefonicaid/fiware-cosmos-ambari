@@ -63,7 +63,7 @@ class hdp-hadoop::namenode(
         group => $hdp::params::user_group
       }
     }
- 
+
     hdp-hadoop::namenode::create_name_dirs { $dfs_name_dir: 
       service_state => $service_state
     }
@@ -82,21 +82,27 @@ class hdp-hadoop::namenode(
     }
 
     hdp-hadoop::namenode::create_app_directories { 'create_app_directories' :
-       service_state => $service_state
+      service_state => $service_state
     }
 
     hdp-hadoop::namenode::create_user_directories { 'create_user_directories' :
-       service_state => $service_state
+      service_state => $service_state
     }
 
-    #top level does not need anchors
-    Class['hdp-hadoop'] ->  Hdp-hadoop::Service['namenode']
-    Hdp-hadoop::Namenode::Create_name_dirs<||> -> Hdp-hadoop::Service['namenode'] 
-    Hdp-hadoop::Service['namenode'] -> Hdp-hadoop::Namenode::Create_app_directories<||> -> Hdp-hadoop::Namenode::Create_user_directories<||>
+    Anchor['hdp-hadoop::begin'] ->
+    Hdp-hadoop::Namenode::Create_name_dirs<||> ->
+    Hdp-hadoop::Service['namenode'] ->
+    Hdp-hadoop::Namenode::Create_app_directories<||> ->
+    Hdp-hadoop::Namenode::Create_user_directories<||> ->
+    Anchor['hdp-hadoop::end']
+
     if ($service_state == 'running' and $format == true) {
-      Class['hdp-hadoop'] -> Class['hdp-hadoop::namenode::format'] -> Hdp-hadoop::Service['namenode']
-      Hdp-hadoop::Namenode::Create_name_dirs<||> -> Class['hdp-hadoop::namenode::format']
-    } 
+      Anchor['hdp-hadoop::begin'] ->
+      Hdp-hadoop::Namenode::Create_name_dirs<||> ->
+      Class['hdp-hadoop::namenode::format'] ->
+      Hdp-hadoop::Service['namenode'] ->
+      Anchor['hdp-hadoop::end']
+    }
   } else {
     hdp_fail("TODO not implemented yet: service_state = ${service_state}")
   }
@@ -128,10 +134,12 @@ define hdp-hadoop::namenode::create_app_directories($service_state)
       service_state => $service_state,
       owner         => $hdp-hadoop::params::mapred_user
     }
+
     hdp-hadoop::hdfs::directory{ '/mapred/system' :
       service_state => $service_state,
       owner         => $hdp-hadoop::params::mapred_user
     }
+
     Hdp-hadoop::Hdfs::Directory['/mapred'] -> Hdp-hadoop::Hdfs::Directory['/mapred/system']
 
     if ($hdp::params::hbase_master_hosts != "") {
@@ -139,6 +147,13 @@ define hdp-hadoop::namenode::create_app_directories($service_state)
       hdp-hadoop::hdfs::directory { $hdfs_root_dir:
         owner         => $hdp::params::hbase_user,
         service_state => $service_state
+      }
+
+      $hbase_staging_dir = $hdp::params::hbase_staging_dir
+      hdp-hadoop::hdfs::directory { $hbase_staging_dir:
+        owner         => $hdp::params::hbase_user,
+        service_state => $service_state,
+        mode             => '711'
       }
     }
 
@@ -166,7 +181,7 @@ define hdp-hadoop::namenode::create_app_directories($service_state)
       }
     }
 
-    if $stack_version in ("2.0.1") {
+    if (hdp_get_major_stack_version($hdp::params::stack_version) >= 2) {
       if ($hdp::params::nm_hosts != "") {
         if ($hdp::params::yarn_log_aggregation_enabled == "true") {
           $yarn_user = $hdp::params::yarn_user
@@ -175,7 +190,8 @@ define hdp-hadoop::namenode::create_app_directories($service_state)
           hdp-hadoop::hdfs::directory{ $yarn_nm_app_log_dir:
             service_state => $service_state,
             owner => $yarn_user,
-            mode  => '744',
+            group => $hdp::params::user_group,
+            mode  => '1777',
             recursive_chmod => true
           }
         }
@@ -185,20 +201,21 @@ define hdp-hadoop::namenode::create_app_directories($service_state)
       if ($hdp::params::hs_host != "") {
         $mapred_user = $hdp::params::mapred_user
         $mapreduce_jobhistory_intermediate_done_dir = $hdp::params::mapreduce_jobhistory_intermediate_done_dir
+        $group = $hdp::params::user_group
         $mapreduce_jobhistory_done_dir = $hdp::params::mapreduce_jobhistory_done_dir
 
         hdp-hadoop::hdfs::directory{ $mapreduce_jobhistory_intermediate_done_dir:
           service_state => $service_state,
           owner => $mapred_user,
-          mode  => '777',
-          recursive_chmod => true
+          group => $group,
+          mode  => '1777'
         }
 
         hdp-hadoop::hdfs::directory{ $mapreduce_jobhistory_done_dir:
           service_state => $service_state,
           owner => $mapred_user,
-          mode  => '750',
-          recursive_chmod => true
+          group => $group,
+          mode  => '1777'
         }
       }
     }
@@ -217,7 +234,7 @@ define hdp-hadoop::namenode::create_user_directories($service_state)
       $hive_hdfs_user_dir = $hdp::params::hive_hdfs_user_dir
       $hive_dir_item="$hive_hdfs_user_dir,"
     } else {
-    $hive_dir_item=""
+      $hive_dir_item=""
     }
 
     if ($hdp::params::oozie_server != "") {
@@ -245,8 +262,9 @@ define hdp-hadoop::namenode::create_user_directories($service_state)
     #Get unique users directories set
     $users_dirs_set = hdp_set_from_comma_list($users_dir_list_comm_sep)
 
-    hdp-hadoop::namenode::create_user_directory{$users_dirs_set:
-      service_state => $service_state}
+    hdp-hadoop::namenode::create_user_directory{ $users_dirs_set:
+      service_state => $service_state
+    }
   }
   
 }

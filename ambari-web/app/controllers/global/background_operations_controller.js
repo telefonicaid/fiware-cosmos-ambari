@@ -39,6 +39,7 @@ App.BackgroundOperationsController = Em.Controller.extend({
    */
   startPolling: function(){
     if(this.get('isWorking')){
+      this.requestMostRecent();
       App.updater.run(this, 'requestMostRecent', 'isWorking', App.bgOperationsUpdateInterval);
     }
   }.observes('isWorking'),
@@ -64,55 +65,58 @@ App.BackgroundOperationsController = Em.Controller.extend({
     this.get("services").clear();
     var runningServices = 0;
     var self = this;
-    data.items = data.items.sort(function(a,b){return b.Requests.id - a.Requests.id}).slice( 0, 10);
+    data.items = data.items.sort(function(a,b){return b.Requests.id - a.Requests.id});
     data.items.forEach(function(request){
+      var hostsMap = {};
+      var isRunningTasks = false;
+      request.tasks.forEach(function (task) {
+        if (!isRunningTasks && (['QUEUED', 'IN_PROGRESS', 'PENDING'].contains(task.Tasks.status))) {
+          isRunningTasks = true;
+        }
+        if (hostsMap[task.Tasks.host_name]) {
+          hostsMap[task.Tasks.host_name].logTasks.push(task);
+        } else {
+          hostsMap[task.Tasks.host_name] = {
+            name: task.Tasks.host_name,
+            publicName: task.Tasks.host_name,
+            logTasks: [task]
+          };
+        }
+      }, this);
+      var hosts = [];
+      for(var hostName in hostsMap){
+        hosts.push(hostsMap[hostName]);
+      }
       var rq = Em.Object.create({
-        id:request.Requests.id,
-        name: 'Request name not specified',
-        displayName: 'Request name not specified',
-        progress:10,
+        id: request.Requests.id,
+        name: request.Requests.request_context || 'Request name not specified',
+        displayName: request.Requests.request_context || 'Request name not specified',
+        progress: 10,
         status: "",
-        isRunning: false,
-        hosts: []
-      })
-      if(request.Requests.request_context != ""){
-        rq.name = request.Requests.request_context;
-        rq.displayName = request.Requests.request_context;
-      }
-
-      var runningTasks = 0;
-      runningTasks = request.tasks.filterProperty('Tasks.status', 'QUEUED').length;
-      runningTasks += request.tasks.filterProperty('Tasks.status', 'IN_PROGRESS').length;
-      runningTasks += request.tasks.filterProperty('Tasks.status', 'PENDING').length;
-      if(runningTasks > 0){
-        runningServices++;
-      }
-
-      var hostNames = request.tasks.mapProperty('Tasks.host_name').uniq();
-      hostNames.forEach(function (name) {
-        var tasks = request.tasks.filterProperty("Tasks.host_name",name);
-        rq.get("hosts").push({
-          name: name,
-          publicName: name,
-          logTasks: tasks
-        });
+        isRunning: isRunningTasks,
+        hosts: hosts
       });
+      runningServices += ~~isRunningTasks;
       self.get("services").push(rq);
     });
     self.set("allOperationsCount",runningServices);
     self.set('serviceTimestamp', new Date().getTime());
   },
 
+  popupView: null,
 
   /**
    * Onclick handler for background operations number located right to logo
    * @return PopupObject For testing purposes
    */
   showPopup: function(){
-    if(!App.testMode){
-      App.updater.immediateRun('requestMostRecent');
+    App.updater.immediateRun('requestMostRecent');
+    if(this.get('popupView') && App.HostPopup.get('showServices')){
+      this.set('popupView.isOpen', true);
+      $(this.get('popupView.element')).appendTo('#wrapper');
+    } else {
+      this.set('popupView', App.HostPopup.initPopup("", this, true));
     }
-    return App.HostPopup.initPopup("", this, true);
   }
 
 });

@@ -18,6 +18,7 @@
 
 package org.apache.ambari.server.controller.internal;
 
+import org.apache.ambari.server.configuration.ComponentSSLConfiguration;
 import org.apache.ambari.server.controller.AmbariServer;
 import org.apache.ambari.server.controller.ganglia.GangliaComponentPropertyProvider;
 import org.apache.ambari.server.controller.ganglia.GangliaHostComponentPropertyProvider;
@@ -31,6 +32,8 @@ import org.apache.ambari.server.controller.utilities.PredicateBuilder;
 import org.apache.ambari.server.controller.utilities.PropertyHelper;
 import org.apache.ambari.server.controller.AmbariManagementController;
 import com.google.inject.Inject;
+import org.apache.ambari.server.controller.utilities.StreamProvider;
+import org.apache.ambari.server.state.DesiredConfig;
 import org.apache.ambari.server.state.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +49,7 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
   private static final int PROPERTY_REQUEST_READ_TIMEOUT    = 10000;
 
   private static final String CLUSTER_NAME_PROPERTY_ID                  = PropertyHelper.getPropertyId("Clusters", "cluster_name");
+  private static final String CLUSTER_VERSION_PROPERTY_ID               = PropertyHelper.getPropertyId("Clusters", "version");
   private static final String HOST_COMPONENT_CLUSTER_NAME_PROPERTY_ID   = PropertyHelper.getPropertyId("HostRoles", "cluster_name");
   private static final String HOST_COMPONENT_HOST_NAME_PROPERTY_ID      = PropertyHelper.getPropertyId("HostRoles", "host_name");
   private static final String HOST_COMPONENT_COMPONENT_NAME_PROPERTY_ID = PropertyHelper.getPropertyId("HostRoles", "component_name");
@@ -95,6 +99,12 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
 
   @Inject
   private AmbariManagementController managementController;
+
+  /**
+   * Cluster versions.
+   */
+  private final Map<String, PropertyHelper.MetricsVersion> clusterVersionsMap =
+      new HashMap<String, PropertyHelper.MetricsVersion>();
 
   /**
    * The map of host components.
@@ -156,8 +166,11 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
   public void update(ResourceProviderEvent event) {
     Resource.Type type = event.getResourceType();
 
-    if (type == Resource.Type.Cluster ||
-        type == Resource.Type.Host ||
+    if (type == Resource.Type.Cluster) {
+      resetInit();
+      updateClusterVersion();
+    }
+    if (type == Resource.Type.Host ||
         type == Resource.Type.HostComponent) {
       resetInit();
     }
@@ -188,7 +201,7 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
     Service.Type service = componentServiceMap.get(componentName);
     if (service != null) {
       try {
-        String currVersion = getDesiredConfigVersion(clusterName, service.name(),
+        String currVersion = getDesiredConfigVersion(clusterName,
           serviceConfigTypes.get(service));
 
         String oldVersion = serviceConfigVersions.get(service);
@@ -235,7 +248,7 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
   }
 
   protected void putResourceProvider(Resource.Type type, ResourceProvider resourceProvider) {
-    resourceProviders.put( type , resourceProvider);
+    resourceProviders.put(type, resourceProvider);
   }
 
   protected void putPropertyProviders(Resource.Type type, List<PropertyProvider> providers) {
@@ -246,29 +259,33 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
 
     List<PropertyProvider> providers = new LinkedList<PropertyProvider>();
 
+    ComponentSSLConfiguration configuration = ComponentSSLConfiguration.instance();
     URLStreamProvider streamProvider = new URLStreamProvider(
-        PROPERTY_REQUEST_CONNECT_TIMEOUT, PROPERTY_REQUEST_READ_TIMEOUT);
+        PROPERTY_REQUEST_CONNECT_TIMEOUT, PROPERTY_REQUEST_READ_TIMEOUT,
+        configuration.getTruststorePath(), configuration.getTruststorePassword(), configuration.getTruststoreType());
 
     switch (type){
       case Cluster :
-        providers.add(new GangliaReportPropertyProvider(
-            PropertyHelper.getGangliaPropertyIds(type),
+        providers.add(createGangliaReportPropertyProvider(
+            type,
             streamProvider,
+            ComponentSSLConfiguration.instance(),
             this,
             PropertyHelper.getPropertyId("Clusters", "cluster_name")));
         break;
       case Host :
-        providers.add(new GangliaHostPropertyProvider(
-            PropertyHelper.getGangliaPropertyIds(type),
+        providers.add(createGangliaHostPropertyProvider(
+            type,
             streamProvider,
+            ComponentSSLConfiguration.instance(),
             this,
             PropertyHelper.getPropertyId("Hosts", "cluster_name"),
             PropertyHelper.getPropertyId("Hosts", "host_name")
         ));
         break;
       case Component :
-        providers.add(new JMXPropertyProvider(
-            PropertyHelper.getJMXPropertyIds(type),
+        providers.add(createJMXPropertyProvider(
+            type,
             streamProvider,
             this,
             PropertyHelper.getPropertyId("ServiceComponentInfo", "cluster_name"),
@@ -277,16 +294,17 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
             PropertyHelper.getPropertyId("ServiceComponentInfo", "state"),
             Collections.singleton("STARTED")));
 
-        providers.add(new GangliaComponentPropertyProvider(
-            PropertyHelper.getGangliaPropertyIds(type),
+        providers.add(createGangliaComponentPropertyProvider(
+            type,
             streamProvider,
+            ComponentSSLConfiguration.instance(),
             this,
             PropertyHelper.getPropertyId("ServiceComponentInfo", "cluster_name"),
             PropertyHelper.getPropertyId("ServiceComponentInfo", "component_name")));
         break;
       case HostComponent:
-        providers.add(new JMXPropertyProvider(
-            PropertyHelper.getJMXPropertyIds(type),
+        providers.add(createJMXPropertyProvider(
+            type,
             streamProvider,
             this,
             PropertyHelper.getPropertyId("HostRoles", "cluster_name"),
@@ -295,9 +313,10 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
             PropertyHelper.getPropertyId("HostRoles", "state"),
             Collections.singleton("STARTED")));
 
-        providers.add(new GangliaHostComponentPropertyProvider(
-            PropertyHelper.getGangliaPropertyIds(type),
+        providers.add(createGangliaHostComponentPropertyProvider(
+            type,
             streamProvider,
+            ComponentSSLConfiguration.instance(),
             this,
             PropertyHelper.getPropertyId("HostRoles", "cluster_name"),
             PropertyHelper.getPropertyId("HostRoles", "host_name"),
@@ -329,7 +348,39 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
     }
   }
 
-  private void initProviderMaps() throws SystemException{
+  /**
+   * Update a map of known cluster names to version of JMX metrics.  The JMX metrics version is based on the
+   * HDP version of the cluster.
+   */
+  private void updateClusterVersion() {
+    synchronized (clusterVersionsMap) {
+      clusterVersionsMap.clear();
+
+      ResourceProvider provider = getResourceProvider(Resource.Type.Cluster);
+      Request request = PropertyHelper.getReadRequest(CLUSTER_NAME_PROPERTY_ID, CLUSTER_VERSION_PROPERTY_ID);
+
+      try {
+        Set<Resource> clusters = provider.getResources(request, null);
+
+        for (Resource cluster : clusters) {
+          String clusterVersion = (String) cluster.getPropertyValue(CLUSTER_VERSION_PROPERTY_ID);
+
+          PropertyHelper.MetricsVersion version =  clusterVersion.startsWith("HDP-1") ?
+              PropertyHelper.MetricsVersion.HDP1 : PropertyHelper.MetricsVersion.HDP2;
+
+          clusterVersionsMap.put(
+              (String) cluster.getPropertyValue(CLUSTER_NAME_PROPERTY_ID),
+              version);
+        }
+      } catch (Exception e) {
+        if (LOG.isErrorEnabled()) {
+          LOG.error("Caught exception while trying to get the cluster versions.", e);
+        }
+      }
+    }
+  }
+
+  private void initProviderMaps() throws SystemException {
     ResourceProvider provider = getResourceProvider(Resource.Type.Cluster);
     Request          request  = PropertyHelper.getReadRequest(CLUSTER_NAME_PROPERTY_ID);
 
@@ -397,33 +448,37 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
   }
 
   private String getDesiredConfigVersion(String clusterName,
-      String serviceName, String configType) throws
+                                         String configType) throws
       NoSuchParentResourceException, UnsupportedPropertyException,
       SystemException {
 
     // Get config version tag
-    ResourceProvider serviceResourceProvider = getResourceProvider(Resource.Type.Service);
+    ResourceProvider clusterResourceProvider = getResourceProvider(Resource
+      .Type.Cluster);
     Predicate basePredicate = new PredicateBuilder().property
-      (ServiceResourceProvider.SERVICE_CLUSTER_NAME_PROPERTY_ID).equals(clusterName).and()
-      .property(ServiceResourceProvider.SERVICE_SERVICE_NAME_PROPERTY_ID).equals(serviceName).toPredicate();
+      (ClusterResourceProvider.CLUSTER_NAME_PROPERTY_ID).equals(clusterName)
+      .toPredicate();
 
-    Set<Resource> serviceResource = null;
+    Set<Resource> clusterResource = null;
     try {
-      serviceResource = serviceResourceProvider.getResources(
-        PropertyHelper.getReadRequest(ServiceResourceProvider.SERVICE_CLUSTER_NAME_PROPERTY_ID,
-          ServiceResourceProvider.SERVICE_SERVICE_NAME_PROPERTY_ID,
-          ServiceResourceProvider.SERVICE_DESIRED_CONFIGS_PROPERTY_ID), basePredicate);
+      clusterResource = clusterResourceProvider.getResources(
+        PropertyHelper.getReadRequest(ClusterResourceProvider.CLUSTER_NAME_PROPERTY_ID,
+          ClusterResourceProvider.CLUSTER_DESIRED_CONFIGS_PROPERTY_ID), basePredicate);
     } catch (NoSuchResourceException e) {
       LOG.error("Resource for the desired config not found. " + e);
     }
 
     String versionTag = "version1";
-    if (serviceResource != null) {
-      for (Resource res : serviceResource) {
-        Map<String, String> configs = (Map<String, String>)
-            res.getPropertyValue(ServiceResourceProvider.SERVICE_DESIRED_CONFIGS_PROPERTY_ID);
+    if (clusterResource != null) {
+      for (Resource resource : clusterResource) {
+        Map<String, Object> configs =
+        resource.getPropertiesMap().get(ClusterResourceProvider
+          .CLUSTER_DESIRED_CONFIGS_PROPERTY_ID);
         if (configs != null) {
-          versionTag = configs.get(configType);
+          DesiredConfig config = (DesiredConfig) configs.get(configType);
+          if (config != null) {
+            versionTag = config.getVersion();
+          }
         }
       }
     }
@@ -464,5 +519,128 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
       }
     }
     return mConfigs;
+  }
+
+  /**
+   * Create the JMX property provider for the given type.
+   */
+  private PropertyProvider createJMXPropertyProvider(Resource.Type type, StreamProvider streamProvider,
+                                                     JMXHostProvider jmxHostProvider,
+                                                     String clusterNamePropertyId,
+                                                     String hostNamePropertyId,
+                                                     String componentNamePropertyId,
+                                                     String statePropertyId,
+                                                     Set<String> healthyStates) {
+    updateClusterVersion();
+
+    Map<PropertyHelper.MetricsVersion, AbstractPropertyProvider> providers =
+        new HashMap<PropertyHelper.MetricsVersion, AbstractPropertyProvider>();
+    AbstractPropertyProvider lastProvider = null;
+
+    for (PropertyHelper.MetricsVersion version : PropertyHelper.MetricsVersion.values()) {
+
+      lastProvider = new JMXPropertyProvider(PropertyHelper.getJMXPropertyIds(type, version), streamProvider,
+          jmxHostProvider, clusterNamePropertyId, hostNamePropertyId, componentNamePropertyId, statePropertyId, healthyStates);
+      providers.put(version, lastProvider);
+    }
+
+    return new VersioningPropertyProvider(clusterVersionsMap, providers, lastProvider, clusterNamePropertyId);
+  }
+
+  /**
+   * Create the Ganglia report property provider for the given type.
+   */
+  private PropertyProvider createGangliaReportPropertyProvider( Resource.Type type, StreamProvider streamProvider,
+                                                                ComponentSSLConfiguration configuration,
+                                                                GangliaHostProvider hostProvider,
+                                                                String clusterNamePropertyId) {
+    updateClusterVersion();
+
+    Map<PropertyHelper.MetricsVersion, AbstractPropertyProvider> providers =
+        new HashMap<PropertyHelper.MetricsVersion, AbstractPropertyProvider>();
+    AbstractPropertyProvider lastProvider = null;
+
+    for (PropertyHelper.MetricsVersion version : PropertyHelper.MetricsVersion.values()) {
+
+      lastProvider = new GangliaReportPropertyProvider(PropertyHelper.getGangliaPropertyIds(type, version), streamProvider,
+          configuration, hostProvider, clusterNamePropertyId);
+      providers.put(version, lastProvider);
+    }
+
+    return new VersioningPropertyProvider(clusterVersionsMap, providers, lastProvider, clusterNamePropertyId);
+  }
+
+  /**
+   * Create the Ganglia host property provider for the given type.
+   */
+  private PropertyProvider createGangliaHostPropertyProvider( Resource.Type type, StreamProvider streamProvider,
+                                                              ComponentSSLConfiguration configuration,
+                                                              GangliaHostProvider hostProvider,
+                                                              String clusterNamePropertyId,
+                                                              String hostNamePropertyId) {
+    updateClusterVersion();
+
+    Map<PropertyHelper.MetricsVersion, AbstractPropertyProvider> providers =
+        new HashMap<PropertyHelper.MetricsVersion, AbstractPropertyProvider>();
+    AbstractPropertyProvider lastProvider = null;
+
+    for (PropertyHelper.MetricsVersion version : PropertyHelper.MetricsVersion.values()) {
+
+      lastProvider = new GangliaHostPropertyProvider(PropertyHelper.getGangliaPropertyIds(type, version), streamProvider,
+          configuration, hostProvider, clusterNamePropertyId, hostNamePropertyId);
+      providers.put(version, lastProvider);
+    }
+
+    return new VersioningPropertyProvider(clusterVersionsMap, providers, lastProvider, clusterNamePropertyId);
+  }
+
+  /**
+   * Create the Ganglia component property provider for the given type.
+   */
+  private PropertyProvider createGangliaComponentPropertyProvider( Resource.Type type, StreamProvider streamProvider,
+                                                                   ComponentSSLConfiguration configuration,
+                                                                   GangliaHostProvider hostProvider,
+                                                                   String clusterNamePropertyId,
+                                                                   String componentNamePropertyId) {
+    updateClusterVersion();
+
+    Map<PropertyHelper.MetricsVersion, AbstractPropertyProvider> providers =
+        new HashMap<PropertyHelper.MetricsVersion, AbstractPropertyProvider>();
+    AbstractPropertyProvider lastProvider = null;
+
+    for (PropertyHelper.MetricsVersion version : PropertyHelper.MetricsVersion.values()) {
+      lastProvider =
+          new GangliaComponentPropertyProvider(PropertyHelper.getGangliaPropertyIds(type, version),
+              streamProvider, configuration, hostProvider, clusterNamePropertyId, componentNamePropertyId);
+
+      providers.put(version, lastProvider);
+    }
+
+    return new VersioningPropertyProvider(clusterVersionsMap, providers, lastProvider, clusterNamePropertyId);
+  }
+
+  /**
+   * Create the Ganglia host component property provider for the given type.
+   */
+  private PropertyProvider createGangliaHostComponentPropertyProvider( Resource.Type type, StreamProvider streamProvider,
+                                                                       ComponentSSLConfiguration configuration,
+                                                                       GangliaHostProvider hostProvider,
+                                                                       String clusterNamePropertyId,
+                                                                       String hostNamePropertyId,
+                                                                       String componentNamePropertyId) {
+    updateClusterVersion();
+
+    Map<PropertyHelper.MetricsVersion, AbstractPropertyProvider> providers =
+        new HashMap<PropertyHelper.MetricsVersion, AbstractPropertyProvider>();
+    AbstractPropertyProvider lastProvider = null;
+
+    for (PropertyHelper.MetricsVersion version : PropertyHelper.MetricsVersion.values()) {
+
+      lastProvider = new GangliaHostComponentPropertyProvider(PropertyHelper.getGangliaPropertyIds(type, version), streamProvider,
+          configuration, hostProvider, clusterNamePropertyId, hostNamePropertyId, componentNamePropertyId);
+      providers.put(version, lastProvider);
+    }
+
+    return new VersioningPropertyProvider(clusterVersionsMap, providers, lastProvider, clusterNamePropertyId);
   }
 }

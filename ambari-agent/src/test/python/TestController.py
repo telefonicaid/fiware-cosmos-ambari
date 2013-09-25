@@ -20,11 +20,12 @@ limitations under the License.
 '''
 
 import StringIO
+import ssl
 import unittest
 from ambari_agent import Controller, ActionQueue
 from ambari_agent import hostname
 import sys
-from mock.mock import patch, MagicMock, call
+from mock.mock import patch, MagicMock, call, Mock
 import logging
 
 class TestController(unittest.TestCase):
@@ -290,7 +291,7 @@ class TestController(unittest.TestCase):
     loadsMock.return_value = response
 
     def one_heartbeat(*args, **kwargs):
-      self.controller.DEBUG_STOP_HEARTBITTING = True
+      self.controller.DEBUG_STOP_HEARTBEATING = True
       return "data"
 
     sendRequest.side_effect = one_heartbeat
@@ -310,12 +311,12 @@ class TestController(unittest.TestCase):
         response["responseId"] = "3"
         raise Exception()
       if len(calls) > 0:
-        self.controller.DEBUG_STOP_HEARTBITTING = True
+        self.controller.DEBUG_STOP_HEARTBEATING = True
       return "data"
 
     # exception, retry, successful and stop
     sendRequest.side_effect = retry
-    self.controller.DEBUG_STOP_HEARTBITTING = False
+    self.controller.DEBUG_STOP_HEARTBEATING = False
     self.controller.heartbeatWithServer()
 
     self.assertEqual(1, self.controller.DEBUG_SUCCESSFULL_HEARTBEATS)
@@ -323,10 +324,35 @@ class TestController(unittest.TestCase):
     # retry registration
     response["registrationCommand"] = "true"
     sendRequest.side_effect = one_heartbeat
-    self.controller.DEBUG_STOP_HEARTBITTING = False
+    self.controller.DEBUG_STOP_HEARTBEATING = False
     self.controller.heartbeatWithServer()
 
     self.assertTrue(self.controller.repeatRegistration)
+
+    # components are not mapped
+    response["registrationCommand"] = "false"
+    response["hasMappedComponents"] = False
+    sendRequest.side_effect = one_heartbeat
+    self.controller.DEBUG_STOP_HEARTBEATING = False
+    self.controller.heartbeatWithServer()
+
+    self.assertFalse(self.controller.hasMappedComponents)
+
+    # components are mapped
+    response["hasMappedComponents"] = True
+    sendRequest.side_effect = one_heartbeat
+    self.controller.DEBUG_STOP_HEARTBEATING = False
+    self.controller.heartbeatWithServer()
+
+    self.assertTrue(self.controller.hasMappedComponents)
+
+    # components are mapped
+    del response["hasMappedComponents"]
+    sendRequest.side_effect = one_heartbeat
+    self.controller.DEBUG_STOP_HEARTBEATING = False
+    self.controller.heartbeatWithServer()
+
+    self.assertTrue(self.controller.hasMappedComponents)
 
     # wrong responseId => restart
     response = {"responseId":"2", "restartAgent":"false"}
@@ -334,7 +360,7 @@ class TestController(unittest.TestCase):
 
     restartAgent = MagicMock(name="restartAgent")
     self.controller.restartAgent = restartAgent
-    self.controller.DEBUG_STOP_HEARTBITTING = False
+    self.controller.DEBUG_STOP_HEARTBEATING = False
     self.controller.heartbeatWithServer()
 
     restartAgent.assert_called_once_with()
@@ -345,7 +371,7 @@ class TestController(unittest.TestCase):
     self.controller.addToQueue = addToQueue
     response["executionCommands"] = "executionCommands"
     response["statusCommands"] = "statusCommands"
-    self.controller.DEBUG_STOP_HEARTBITTING = False
+    self.controller.DEBUG_STOP_HEARTBEATING = False
     self.controller.heartbeatWithServer()
 
     addToQueue.assert_has_calls([call("executionCommands"),
@@ -353,7 +379,7 @@ class TestController(unittest.TestCase):
 
     # restartAgent command
     self.controller.responseId = 1
-    self.controller.DEBUG_STOP_HEARTBITTING = False
+    self.controller.DEBUG_STOP_HEARTBEATING = False
     response["restartAgent"] = "true"
     restartAgent = MagicMock(name="restartAgent")
     self.controller.restartAgent = restartAgent
@@ -363,7 +389,7 @@ class TestController(unittest.TestCase):
 
     # actionQueue not idle
     self.controller.responseId = 1
-    self.controller.DEBUG_STOP_HEARTBITTING = False
+    self.controller.DEBUG_STOP_HEARTBEATING = False
     actionQueue.isIdle.return_value = False
     response["restartAgent"] = "false"
     self.controller.heartbeatWithServer()
@@ -374,6 +400,26 @@ class TestController(unittest.TestCase):
     sys.stdout = sys.__stdout__
     self.controller.sendRequest = Controller.Controller.sendRequest
     self.controller.sendRequest = Controller.Controller.addToQueue
+
+  @patch("pprint.pformat")
+  @patch("time.sleep")
+  @patch("json.loads")
+  @patch("json.dumps")
+  def test_certSigningFailed(self, dumpsMock, loadsMock, sleepMock, pformatMock):
+    register = MagicMock()
+    self.controller.register = register
+
+    dumpsMock.return_value = "request"
+    response = {"responseId":1,}
+    loadsMock.return_value = response
+
+    self.controller.sendRequest = Mock(side_effect=ssl.SSLError())
+
+    self.controller.repeatRegistration=True
+    self.controller.registerWithServer()
+
+    #Conroller thread and the agent stop if the repeatRegistration flag is False
+    self.assertFalse(self.controller.repeatRegistration)
 
 if __name__ == "__main__":
   unittest.main(verbosity=2)

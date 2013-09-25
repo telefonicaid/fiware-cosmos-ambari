@@ -25,7 +25,6 @@ class hdp-templeton::server(
 {  
 
   $templeton_user = $hdp-templeton::params::templeton_user
-  $smoke_test_user = $hdp::params::smokeuser
   if ($service_state == 'no_op') { 
   } elsif ($service_state in ['running','stopped','installed_and_configured','uninstalled']) {
   $hdp::params::service_exists['hdp-templeton::server'] = true
@@ -55,12 +54,6 @@ class hdp-templeton::server(
      }
   }
 
-  if ($security_enabled == true) {
-    $kinit_if_needed = "${hdp::params::kinit_path_local} -kt ${hdp::params::keytab_path}/${smoke_test_user}.headless.keytab ${smoke_test_user};"
-  } else {
-    $kinit_if_needed = "echo 0;"
-  }
-
   class{ 'hdp-templeton' :
     service_state => $service_state,
     server        => true
@@ -85,35 +78,55 @@ class hdp-templeton::copy-hdfs-directories($service_state)
 {
  $webhcat_apps_dir = $hdp::params::webhcat_apps_dir
  $webhcat_user = $hdp::params::webhcat_user
-# $pig_src_tar = "$hdp::params::artifact_dir/pig.tar.gz"
+ $smoke_test_user = $hdp::params::smokeuser
+ $smokeuser_keytab = $hdp::params::smokeuser_keytab
+ if ($hdp::params::security_enabled == true) {
+     $kinit_if_needed = "${hdp::params::kinit_path_local} -kt ${smokeuser_keytab} ${smoke_test_user};"
+   } else {
+     $kinit_if_needed = "echo 0;"
+   }
 
-#  hdp-hadoop::hdfs::copyfromlocal { '/usr/share/templeton/templeton*jar':
-#    service_state => $service_state,
-#    owner => $hdp-templeton::params::templeton_user,
-#    mode  => '755',
-#    dest_dir => '/apps/templeton/ugi.jar'
-#  }
-  hdp-hadoop::hdfs::copyfromlocal { '/usr/lib/hadoop/contrib/streaming/hadoop-streaming*.jar':
-   service_state => $service_state,
-   owner => $webhcat_user,
-   mode  => '755',
-   dest_dir => "$webhcat_apps_dir/hadoop-streaming.jar",
-   kinit_if_needed => $kinit_if_needed
+  anchor{ "hdp::hdp-templeton::copy-hdfs-directories::begin" : }
+  anchor{ "hdp::hdp-templeton::copy-hdfs-directories::end" : }
+
+  $kinit_cmd = "su - ${webhcat_user} -c '${kinit_if_needed}'"
+  exec { $kinit_cmd:
+    command => $kinit_cmd,
+    path => ['/bin']
   }
-  #TODO: Use ${hdp::params::artifact_dir}/${hdp-templeton::params::pig_tar_name} instead
+
+  if (hdp_get_major_stack_version($hdp::params::stack_version) >= 2) {
+    hdp-hadoop::hdfs::copyfromlocal { '/usr/lib/hadoop-mapreduce/hadoop-streaming*.jar':
+      service_state => $service_state,
+      owner => $webhcat_user,
+      mode  => '755',
+      dest_dir => "$webhcat_apps_dir/hadoop-streaming.jar",
+      kinit_if_needed => $kinit_if_needed
+    }
+  }
+  else {
+    hdp-hadoop::hdfs::copyfromlocal { '/usr/lib/hadoop/contrib/streaming/hadoop-streaming*.jar':
+      service_state => $service_state,
+      owner => $webhcat_user,
+      mode  => '755',
+      dest_dir => "$webhcat_apps_dir/hadoop-streaming.jar",
+      kinit_if_needed => $kinit_if_needed
+    }
+  }
   hdp-hadoop::hdfs::copyfromlocal { '/usr/share/HDP-webhcat/pig.tar.gz' :
     service_state => $service_state,
     owner => $webhcat_user,
     mode  => '755',
     dest_dir => "$webhcat_apps_dir/pig.tar.gz",
-    kinit_if_needed => $kinit_if_needed
   }
-  #TODO: Use ${hdp::params::artifact_dir}/${hdp-templeton::params::hive_tar_name} instead
   hdp-hadoop::hdfs::copyfromlocal { '/usr/share/HDP-webhcat/hive.tar.gz' :
     service_state => $service_state,
     owner => $webhcat_user,
     mode  => '755',
     dest_dir => "$webhcat_apps_dir/hive.tar.gz",
-    kinit_if_needed => $kinit_if_needed
   }
+  Anchor["hdp::hdp-templeton::copy-hdfs-directories::begin"] ->
+  Exec[$kinit_cmd] ->
+  Hdp-hadoop::Hdfs::Copyfromlocal<||>  ->
+  Anchor["hdp::hdp-templeton::copy-hdfs-directories::end"]
 }

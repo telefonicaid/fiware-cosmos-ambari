@@ -58,14 +58,12 @@ export hadoop_conf_dir=$2
 export smoke_test_user=$3
 export security_enabled=$4
 export smoke_user_keytab=$5
-export realm=$6
-export JTHOST=$7
-export NNHOST=$8
+export kinit_path_local=$6
 
 export OOZIE_EXIT_CODE=0
 export JOBTRACKER=`getValueFromField ${hadoop_conf_dir}/mapred-site.xml mapred.job.tracker`
 export NAMENODE=`getValueFromField ${hadoop_conf_dir}/core-site.xml fs.default.name`
-export OOZIE_SERVER=`getValueFromField ${oozie_conf_dir}/oozie-site.xml oozie.base.url`
+export OOZIE_SERVER=`getValueFromField ${oozie_conf_dir}/oozie-site.xml oozie.base.url | tr '[:upper:]' '[:lower:]'`
 export OOZIE_EXAMPLES_DIR=`rpm -ql oozie-client | grep 'oozie-examples.tar.gz$' | xargs dirname`
 cd $OOZIE_EXAMPLES_DIR
 
@@ -78,8 +76,6 @@ sed -i "s|oozie.wf.application.path=hdfs://localhost:9000|oozie.wf.application.p
 
 if [[ $security_enabled == "true" ]]; then
   kinitcmd="${kinit_path_local} -kt ${smoke_user_keytab} ${smoke_test_user}; "
-  echo "dfs.namenode.kerberos.principal=nn/`echo ${NNHOST} | tr '[:upper:]' '[:lower:]'`@${realm}" >> examples/apps/map-reduce/job.properties
-  echo "mapreduce.jobtracker.kerberos.principal=jt/`echo ${JTHOST} | tr '[:upper:]' '[:lower:]'`@${realm}" >> examples/apps/map-reduce/job.properties
 else 
   kinitcmd=""
 fi

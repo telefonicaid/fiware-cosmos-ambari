@@ -42,29 +42,37 @@
       <tbody>
     {{/unless}}
 
-      <!-- NameNode -->
-      <tr>
-        <td>{{t dashboard.services.hdfs.nanmenode}}</td>
-        <td><a href="#" {{action showDetails view.service.nameNode}}>{{view.service.nameNode.publicHostName}}</a></td>
-      </tr>
-      <!-- SecondaryNameNode -->
-      <tr>
-        <td>{{t dashboard.services.hdfs.snanmenode}}</td>
-        <td><a href="#" {{action showDetails view.service.snameNode}}>{{view.service.snameNode.publicHostName}}</a></td>
-      </tr>
+      {{view view.dashboardMasterComponentView}}
       <!-- Data Nodes -->
       <tr>
         <td>{{t dashboard.services.hdfs.datanodes}}</td>
         <td>
-          <a href="#" {{action filterHosts view.dataNodeComponent}}>{{view.service.dataNodes.length}} {{t dashboard.services.hdfs.datanodes}}</a>
+          <span>
+            {{#view view.dataNodesLiveTextView}}
+              {{view.liveComponents}}/{{view.totalComponents}}
+            {{/view}}
+          </span>  {{t services.service.summary.DataNodesLive}}
+          <div class="summary-view-host">
+            <a href="#" {{action filterHosts view.dataNodeComponent}}>{{view.dataNodeHostText}}</a>
+          </div>
         </td>
       </tr>
-      <!-- NameNode Web UI -->
-      <tr>
-        <td>{{t dashboard.services.hdfs.nameNodeWebUI}}</td>
-        <td><a {{bindAttr href="view.nodeWebUrl"}} target="_blank">{{view.service.nameNode.publicHostName}}:50070</a>
-        </td>
-      </tr>
+      <!-- Journal Nodes -->
+      {{#if view.showJournalNodes}}
+        <tr>
+          <td>{{t dashboard.services.hdfs.journalnodes}}</td>
+          <td>
+                <span>
+                  {{#view view.journalNodesLiveTextView}}
+                    {{view.liveComponents}}/{{view.totalComponents}}
+                  {{/view}}
+                </span>  {{t services.service.summary.JournalNodesLive}}
+            <div class="summary-view-host">
+              <a href="#" {{action filterHosts view.journalNodeComponent}}>{{view.journalNodeHostText}}</a>
+            </div>
+          </td>
+        </tr>
+      {{/if}}
       <!-- NameNode Uptime -->
       <tr>
         <td>{{t dashboard.services.hdfs.nodes.uptime}}</td>
@@ -79,8 +87,8 @@
       <tr>
         <td>{{t dashboard.services.hdfs.datanodecounts}}</td>
         <td>
-          {{view.service.liveDataNodes.length}} {{t dashboard.services.hdfs.nodes.live}} /
-          {{view.service.deadDataNodes.length}} {{t dashboard.services.hdfs.nodes.dead}} /
+          {{view.dataNodesLive.length}} {{t dashboard.services.hdfs.nodes.live}} /
+          {{view.dataNodesDead.length}} {{t dashboard.services.hdfs.nodes.dead}} /
           {{view.service.decommissionDataNodes.length}} {{t dashboard.services.hdfs.nodes.decom}}
         </td>
       </tr>

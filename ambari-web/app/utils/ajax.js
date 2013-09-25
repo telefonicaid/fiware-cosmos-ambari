@@ -41,7 +41,7 @@ var urls = {
     'testInProduction': true
   },
   'background_operations.get_most_recent': {
-    'real': '/clusters/{clusterName}/requests?fields=*,tasks/Tasks/*',
+    'real': '/clusters/{clusterName}/requests?to=end&page_size=10&fields=*,tasks/Tasks/*',
     'mock': '/data/background_operations/list_on_start.json',
     'testInProduction': true
   },
@@ -67,12 +67,12 @@ var urls = {
   'service.item.smoke': {
     'real': '/clusters/{clusterName}/services/{serviceName}/actions/{actionName}',
     'mock': '/data/wizard/deploy/poll_1.json',
-    'format': function () {
+    'format': function (data) {
       return {
         'type': 'POST',
         data: JSON.stringify({
           RequestInfo: {
-            "context": "Smoke Test"
+            "context": data.displayName + " Smoke Test"
           }
         })
       };
@@ -173,6 +173,7 @@ var urls = {
   },
   'reassign.get_logs': {
     'real': '/clusters/{clusterName}/requests/{requestId}?fields=tasks/*',
+    'mock': '/data/wizard/reassign/step14PolledData/tasks_poll{pollCounter}.json',
     'type': 'GET'
 
   },
@@ -201,7 +202,7 @@ var urls = {
   },
   'config.advanced': {
     'real': '{stack2VersionUrl}/stackServices/{serviceName}/configurations?fields=*',
-    'mock': '/data/wizard/stack/hdp/version130/{serviceName}.json',
+    'mock': '/data/wizard/stack/hdp/version{stackVersion}/{serviceName}.json',
     'format': function (data) {
       return {
         async: false
@@ -210,7 +211,7 @@ var urls = {
   },
   'config.advanced.global': {
     'real': '{stack2VersionUrl}/stackServices?fields=configurations/StackConfigurations/type',
-    'mock': '/data/wizard/stack/hdp/version130/global.json',
+    'mock': '/data/wizard/stack/hdp/version1.3.0/global.json',
     'format': function (data) {
       return {
         async: false
@@ -221,7 +222,7 @@ var urls = {
     'real': '/clusters/{clusterName}',
     'mock': '/data/clusters/cluster.json'
   },
-  'config.on-site': {
+  'config.on_site': {
     'real': '/clusters/{clusterName}/configurations?{params}',
     'mock': '/data/configurations/cluster_level_configs.json?{params}',
     'format': function (data) {
@@ -238,6 +239,51 @@ var urls = {
         async: false
       };
     }
+  },
+  'service.metrics.flume.channel_fill_percent': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/flume/flume/CHANNEL/*/ChannelFillPercentage[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/channelFillPct.json',
+    'testInProduction': true
+  },
+  'service.metrics.flume.channel_size': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/flume/flume/CHANNEL/*/ChannelSize[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/channelSize.json',
+    'testInProduction': true
+  },
+  'service.metrics.flume.sink_drain_success': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/flume/flume/SINK/*/EventDrainSuccessCount[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/sinkDrainSuccessCount.json',
+    'testInProduction': true
+  },
+  'service.metrics.flume.sink_connection_failed': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/flume/flume/SINK/*/ConnectionFailedCount[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/sinkConnectionFailedCount.json',
+    'testInProduction': true
+  },
+  'service.metrics.flume.gc': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/jvm/gcTimeMillis[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/jvmGcTime.json',
+    'testInProduction': true
+  },
+  'service.metrics.flume.jvm_heap_used': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/jvm/memHeapUsedM[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/jvmMemHeapUsedM.json',
+    'testInProduction': true
+  },
+  'service.metrics.flume.jvm_threads_runnable': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/jvm/threadsRunnable[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/jvmThreadsRunnable.json',
+    'testInProduction': true
+  },
+  'service.metrics.flume.cpu_user': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/cpu/cpu_user[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '',
+    'testInProduction': true
+  },
+  'service.metrics.flume.source_accepted': {
+    'real': '/clusters/{clusterName}/services/FLUME/components/FLUME_SERVER?fields=host_components/metrics/flume/flume/SOURCE/*/EventAcceptedCount[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/flume/sourceEventAccepted.json',
+    'testInProduction': true
   },
   'service.metrics.hbase.cluster_requests': {
     'real': '/clusters/{clusterName}/services/HBASE/components/HBASE_MASTER?fields=metrics/hbase/master/cluster_requests[{fromSeconds},{toSeconds},{stepSeconds}]',
@@ -349,6 +395,78 @@ var urls = {
     'mock': '/data/services/metrics/hdfs/space_utilization.json',
     'testInProduction': true
   },
+  'service.start_stop': {
+    'real': '/clusters/{clusterName}/services?params/run_smoke_test=true',
+    'mock': '/data/mirroring/poll/poll_6.json',
+    'format': function (data, opt) {
+      return {
+        type: 'PUT',
+        async: false,
+        data: data.data
+      };
+    }
+  },
+  'service.metrics.yarn.gc': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/jvm/gcTimeMillis[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/yarn/gc.json',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.jobs_threads': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/jvm/threadsRunnable[{fromSeconds},{toSeconds},{stepSeconds}],metrics/jvm/threadsBlocked[{fromSeconds},{toSeconds},{stepSeconds}],metrics/jvm/threadsWaiting[{fromSeconds},{toSeconds},{stepSeconds}],metrics/jvm/threadsTimedWaiting[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/yarn/jvm_threads.json',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.rpc': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/rpc/RpcQueueTime_avg_time[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/yarn/rpc.json',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.jobs_heap': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/jvm/memNonHeapUsedM[{fromSeconds},{toSeconds},{stepSeconds}],metrics/jvm/memNonHeapCommittedM[{fromSeconds},{toSeconds},{stepSeconds}],metrics/jvm/memHeapUsedM[{fromSeconds},{toSeconds},{stepSeconds}],metrics/jvm/memHeapCommittedM[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '/data/services/metrics/yarn/jvm_heap.json',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.queue.allocated': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/yarn/Queue/root/AvailableMB[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/PendingMB[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/AllocatedMB[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.queue.allocated.container': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/yarn/Queue/root/AllocatedContainers[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/ReservedContainers[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/PendingContainers[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.node.manager.statuses': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/yarn/ClusterMetrics/NumActiveNMs[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/ClusterMetrics/NumDecommissionedNMs[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/ClusterMetrics/NumLostNMs[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/ClusterMetrics/NumRebootedNMs[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/ClusterMetrics/NumUnhealthyNMs[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.queue.memory.resource': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=',
+    'mock': '',
+    'format': function (data, opt) {
+      var field1 = 'metrics/yarn/Queue/{queueName}/AllocatedMB[{fromSeconds},{toSeconds},{stepSeconds}]';
+      var field2 = 'metrics/yarn/Queue/{queueName}/AvailableMB[{fromSeconds},{toSeconds},{stepSeconds}]';
+      if (opt.url != null && data.queueNames != null) {
+        data.queueNames.forEach(function (q) {
+          data.queueName = q;
+          opt.url += (formatUrl(field1, data) + ",");
+          opt.url += (formatUrl(field2, data) + ",");
+        });
+      }
+    },
+    'testInProduction': true
+  },
+  'service.metrics.yarn.queue.apps.states.current': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/yarn/Queue/root/AppsPending[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/AppsRunning[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '',
+    'testInProduction': true
+  },
+  'service.metrics.yarn.queue.apps.states.finished': {
+    'real': '/clusters/{clusterName}/hosts/{resourceManager}/host_components/RESOURCEMANAGER?fields=metrics/yarn/Queue/root/AppsKilled[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/AppsFailed[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/AppsSubmitted[{fromSeconds},{toSeconds},{stepSeconds}],metrics/yarn/Queue/root/AppsCompleted[{fromSeconds},{toSeconds},{stepSeconds}]',
+    'mock': '',
+    'testInProduction': true
+  },
   'dashboard.cluster_metrics.cpu': {
     'real': '/clusters/{clusterName}/?fields=metrics/cpu[{fromSeconds},{toSeconds},{stepSeconds}]',
     'mock': '/data/cluster_metrics/cpu_1hr.json',
@@ -399,12 +517,12 @@ var urls = {
     'mock': '/data/hosts/metrics/processes.json',
     'testInProduction': true
   },
-  'admin.security_status': {
-    'real': '/clusters/{clusterName}',
+  'host.service_config_hosts_overrides': {
+    'real': '/clusters/{clusterName}/configurations?{urlParams}',
     'format': function (data, opt) {
       return {
-        timeout: 10000,
-        async: false
+        async: false,
+        timeout: 10000
       };
     }
   },
@@ -417,12 +535,12 @@ var urls = {
       };
     }
   },
-  'router.set_ambari_stacks': {
-    'real': '/stacks',
-    'mock': '/data/wizard/stack/stacks.json',
+  'admin.security_status': {
+    'real': '/clusters/{clusterName}',
     'format': function (data, opt) {
       return {
-        async: false
+        async: false,
+        timeout: 10000
       };
     }
   },
@@ -435,6 +553,17 @@ var urls = {
       };
     }
   },
+  'cluster.state': {
+    'type': 'POST',
+    'real': '/persist/',
+    'format': function (data, opt) {
+      return {
+        async: false,
+        data: JSON.stringify(data.key),
+        newValue: data.newVal
+      };
+    }
+  },
   'cluster.update_upgrade_version': {
     'real': '/stacks2/HDP/versions?fields=stackServices/StackServices,Versions',
     'mock': '/data/wizard/stack/stacks.json',
@@ -444,17 +573,197 @@ var urls = {
       };
     }
   },
-  'wizard.launch_bootstrap': {
-    'real': '/bootstrap',
-    'mock': '/data/wizard/bootstrap/bootstrap.json',
+  'admin.high_availability.stop_all_services': {
+    'real': '/clusters/{clusterName}/services?ServiceInfo/state=STARTED',
+    'mock': '',
+    'format': function (data, opt) {
+      return {
+        type: 'PUT',
+        data:  JSON.stringify({
+          "RequestInfo": {
+            "context": "Stop all services"
+          },
+          "Body": {
+            "ServiceInfo": {
+              "state": "INSTALLED"
+            }
+          }
+        })
+      }
+    }
+  },
+  'admin.high_availability.start_all_services': {
+    'real': '/clusters/{clusterName}/services?ServiceInfo/state=INSTALLED',
+    'mock': '',
+    'format': function (data, opt) {
+      return {
+        type: 'PUT',
+        data:  JSON.stringify({
+          "RequestInfo": {
+            "context": "Start all services"
+          },
+          "Body": {
+            "ServiceInfo": {
+              "state": "STARTED"
+            }
+          }
+        })
+      }
+    }
+  },
+  'admin.high_availability.polling': {
+    'real': '/clusters/{clusterName}/requests/{requestId}?fields=tasks/*',
+    'mock': '',
+    'type': 'GET'
+  },
+  'admin.high_availability.getNnCheckPointStatus': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/NAMENODE',
+    'mock': '',
+    'type': 'GET'
+  },
+  'admin.high_availability.getJnCheckPointStatus': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/JOURNALNODE?fields=metrics',
+    'mock': ''
+  },
+  'admin.high_availability.create_component': {
+    'real': '/clusters/{clusterName}/hosts?Hosts/host_name={hostName}',
+    'mock': '',
     'type': 'POST',
     'format': function (data) {
       return {
-        async: false,
-        contentType: 'application/json',
-        data: data.bootStrapData
+        data: JSON.stringify({
+          "host_components": [
+            {
+              "HostRoles": {
+                "component_name": data.componentName
+              }
+            }
+          ]
+        })
       }
     }
+  },
+  'admin.high_availability.create_journalnode': {
+    'real': '/clusters/{clusterName}/services?ServiceInfo/service_name=HDFS',
+    'mock': '',
+    'type': 'POST',
+    'format': function (data) {
+      return {
+        data: JSON.stringify({
+          "components": [
+            {
+              "ServiceComponentInfo": {
+                "component_name": "JOURNALNODE"
+              }
+            }
+          ]
+        })
+      }
+    }
+  },
+  'admin.high_availability.create_zkfc': {
+    'real': '/clusters/{clusterName}/services?ServiceInfo/service_name=HDFS',
+    'mock': '',
+    'type': 'POST',
+    'format': function (data) {
+      return {
+        data: JSON.stringify({
+          "components": [
+            {
+              "ServiceComponentInfo": {
+                "component_name": "ZKFC"
+              }
+            }
+          ]
+        })
+      }
+    }
+  },
+  'admin.high_availability.install_component': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
+    'mock': '',
+    'type': 'PUT',
+    'format': function (data) {
+      return {
+        data: JSON.stringify({
+          RequestInfo: {
+            "context": "Install " + data.displayName
+          },
+          Body: {
+            "HostRoles": {
+              "state": "INSTALLED"
+            }
+          }
+        })
+      }
+    }
+  },
+  'admin.high_availability.start_component': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
+    'mock': '',
+    'type': 'PUT',
+    'format': function (data) {
+      return {
+        data: JSON.stringify({
+          RequestInfo: {
+            "context": "Start " + data.displayName
+          },
+          Body: {
+            "HostRoles": {
+              "state": "STARTED"
+            }
+          }
+        })
+      }
+    }
+  },
+  'admin.high_availability.maintenance_mode': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
+    'mock': '',
+    'type': 'PUT',
+    'format': function () {
+      return {
+        data: JSON.stringify({
+          "HostRoles": {
+            "state": "MAINTENANCE"
+          }
+        })
+      }
+    }
+  },
+  'admin.high_availability.load_configs': {
+    'real': '/clusters/{clusterName}/configurations?(type=core-site&tag={coreSiteTag})|(type=hdfs-site&tag={hdfsSiteTag})',
+    'mock': '',
+    'type': 'GET'
+  },
+  'admin.high_availability.save_configs': {
+    'real': '/clusters/{clusterName}',
+    'mock': '',
+    'type': 'PUT',
+    'format': function (data) {
+      return {
+        async: false,
+        data: JSON.stringify({
+          Clusters: {
+            desired_config: {
+              "type": data.siteName,
+              "tag": 'version' + (new Date).getTime(),
+              "properties": data.properties
+            }
+          }
+        })
+      }
+    }
+  },
+  'admin.high_availability.load_hbase_configs': {
+    'real': '/clusters/{clusterName}/configurations?type=hbase-site&tag={hbaseSiteTag}',
+    'mock': '',
+    'type': 'GET'
+  },
+  'admin.high_availability.delete_snamenode': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/SECONDARY_NAMENODE',
+    'mock': '',
+    'type': 'DELETE'
   },
   'admin.security.cluster_configs': {
     'real': '/clusters/{clusterName}',
@@ -491,17 +800,6 @@ var urls = {
       };
     }
   },
-  'service.start_stop': {
-    'real': '/clusters/{clusterName}/services?ServiceInfo',
-    'mock': '/data/mirroring/poll/poll_6.json',
-    'format': function (data, opt) {
-      return {
-        type: 'PUT',
-        async: false,
-        data: data.data
-      };
-    }
-  },
   'admin.stack_upgrade.run_upgrade': {
     'real': '/clusters/{clusterName}',
     'format': function (data, opt) {
@@ -526,15 +824,6 @@ var urls = {
     'real': '/clusters/{cluster}/requests/{requestId}?fields=tasks/*',
     'mock': '/data/wizard/{mock}'
   },
-  'host.service_config_hosts_overrides': {
-    'real': '/clusters/{clusterName}/configurations?{urlParams}',
-    'format': function (data, opt) {
-      return {
-        async: false,
-        timeout: 10000
-      };
-    }
-  },
   'wizard.install_services.add_host_controller.is_retry': {
     'real': '/clusters/{cluster}/host_components',
     'format': function (data, opt) {
@@ -558,9 +847,9 @@ var urls = {
   'wizard.install_services.installer_controller.is_retry': {
     'real': '/clusters/{cluster}/host_components?HostRoles/state=INSTALLED',
     'mock': '/data/wizard/deploy/2_hosts/poll_1.json',
+    'type': 'PUT',
     'format': function (data, opt) {
       return {
-        type: 'PUT',
         async: false,
         data: data.data
       };
@@ -569,9 +858,9 @@ var urls = {
   'wizard.install_services.installer_controller.not_is_retry': {
     'real': '/clusters/{cluster}/services?ServiceInfo/state=INIT',
     'mock': '/data/wizard/deploy/2_hosts/poll_1.json',
+    'type': 'PUT',
     'format': function (data, opt) {
       return {
-        type: 'PUT',
         async: false,
         data: data.data
       };
@@ -579,9 +868,10 @@ var urls = {
   },
   'wizard.service_components': {
     'real': '{stackUrl}/stackServices?fields=StackServices',
-    'mock': '/data/wizard/stack/hdp/version/1.3.0.json',
+    'mock': '/data/wizard/stack/hdp/version/{stackVersion}.json',
     'format': function (data, opt) {
       return {
+        timeout: 10000,
         async: false
       };
     }
@@ -630,7 +920,7 @@ var urls = {
     }
   },
   'wizard.step3.host_info': {
-    'real': '/hosts?fields=Hosts/total_mem,Hosts/cpu_count,Hosts/disk_info,Hosts/last_agent_env',
+    'real': '/hosts?fields=Hosts/total_mem,Hosts/cpu_count,Hosts/disk_info,Hosts/last_agent_env,Hosts/host_name',
     'mock': '/data/wizard/bootstrap/two_hosts_information.json',
     'format': function (data, opt) {
       return {
@@ -655,6 +945,36 @@ var urls = {
     'real': '/hosts',
     'mock': '/data/wizard/bootstrap/single_host_registration.json'
   },
+  'wizard.stacks': {
+    'real': '/stacks2',
+    'mock': '/data/wizard/stack/stacks2.json',
+    'format': function (data) {
+      return {
+        async: false
+      };
+    }
+  },
+  'wizard.stacks_versions': {
+    'real': '/stacks2/{stackName}/versions?fields=Versions,operatingSystems/repositories/Repositories',
+    'mock': '/data/wizard/stack/{stackName}_versions.json',
+    'format': function (data) {
+      return {
+        async: false
+      };
+    }
+  },
+  'wizard.launch_bootstrap': {
+    'real': '/bootstrap',
+    'mock': '/data/wizard/bootstrap/bootstrap.json',
+    'type': 'POST',
+    'format': function (data) {
+      return {
+        async: false,
+        contentType: 'application/json',
+        data: data.bootStrapData
+      }
+    }
+  },
   'router.login': {
     'real': '/users/{loginName}',
     'mock': '/data/users/user_{usr}.json',
@@ -675,6 +995,15 @@ var urls = {
   'router.logoff': {
     'real': '/logout'
   },
+  'router.set_ambari_stacks': {
+    'real': '/stacks',
+    'mock': '/data/wizard/stack/stacks.json',
+    'format': function (data, opt) {
+      return {
+        async: false
+      };
+    }
+  },
   'router.authentication': {
     'real': '/clusters',
     'mock': '/data/clusters/info.json',
@@ -683,6 +1012,10 @@ var urls = {
         async: false
       };
     }
+  },
+  'ambari.service': {
+    'real': '/services/AMBARI/components/AMBARI_SERVER',
+    'mock': ''
   }
 };
 /**
@@ -779,6 +1112,8 @@ App.ajax = {
     var opt = {};
     opt = formatRequest.call(urls[config.name], params);
 
+    opt.context = this;
+
     // object sender should be provided for processing beforeSend, success and error responses
     opt.beforeSend = function (xhr) {
       if (config.beforeSend) {
@@ -794,6 +1129,8 @@ App.ajax = {
     opt.error = function (request, ajaxOptions, error) {
       if (config.error) {
         config.sender[config.error](request, ajaxOptions, error, opt);
+      } else {
+       this.defaultErrorHandler(request,opt.url,opt.type);
       }
     };
     opt.complete = function () {
@@ -805,5 +1142,51 @@ App.ajax = {
       opt.url = 'http://' + $.hostName + opt.url;
     }
     return $.ajax(opt);
+  },
+
+  // A single instance of App.ModalPopup view
+  modalPopup: null,
+  /**
+   * defaultErrorHandler function is referred from App.ajax.send function and App.HttpClient.defaultErrorHandler function
+   * @jqXHR {jqXHR Object}
+   * @url {string}
+   * @method {String} Http method
+   */
+  defaultErrorHandler: function(jqXHR,url,method) {
+    method = method || 'GET';
+    var self = this;
+    var api = " received on " + method + " method for API: " + url;
+    var showMessage = true;
+    try {
+      var json = $.parseJSON(jqXHR.responseText);
+      var message = json.message;
+    } catch (err) {
+    }
+
+    if (message === undefined) {
+      showMessage = false;
+    }
+    var statusCode = jqXHR.status + " status code";
+    if (jqXHR.status === 500 && !this.modalPopup) {
+      this.modalPopup = App.ModalPopup.show({
+        header: jqXHR.statusText,
+        secondary: false,
+        onPrimary: function () {
+          this.hide();
+          self.modalPopup = null;
+        },
+        bodyClass: Ember.View.extend({
+          classNames: ['api-error'],
+          template: Ember.Handlebars.compile(['<span class="text-error">{{view.statusCode}}</span><span>{{view.api}}</span>',
+            '{{#if view.showMessage}}',
+            '<br><br><pre><strong>Error message: </strong><span class="text-error">{{view.message}}</span></pre>',
+            '{{/if}}'].join('\n')),
+          api: api,
+          statusCode: statusCode,
+          message: message,
+          showMessage: showMessage
+        })
+      });
+    }
   }
-}
+};

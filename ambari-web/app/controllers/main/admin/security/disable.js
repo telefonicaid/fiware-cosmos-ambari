@@ -20,9 +20,21 @@ var App = require('app');
 App.MainAdminSecurityDisableController = Em.Controller.extend({
 
   name: 'mainAdminSecurityDisableController',
-  secureMapping: require('data/secure_mapping'),
-  configMapping: require('data/config_mapping'),
-  secureProperties: require('data/secure_properties').configProperties.slice(0),
+  secureMapping: function() {
+    if(App.get('isHadoop2Stack')) {
+      return require('data/HDP2/secure_mapping');
+    } else {
+      return require('data/secure_mapping');
+    }
+  }.property('App.isHadoop2Stack'),
+  secureProperties: function() {
+    if(App.get('isHadoop2Stack')) {
+      return require('data/HDP2/secure_properties').configProperties;
+    } else {
+      return require('data/secure_properties').configProperties;
+    }
+  }.property('App.isHadoop2Stack'),
+
   stages: [],
   configs: [],
   noOfWaitingAjaxCalls: 0,
@@ -33,6 +45,7 @@ App.MainAdminSecurityDisableController = Em.Controller.extend({
   services: [],
   serviceTimestamp: null,
   isSubmitDisabled: true,
+  totalSteps: 3,
 
   clearStep: function () {
     this.get('stages').clear();
@@ -40,101 +53,141 @@ App.MainAdminSecurityDisableController = Em.Controller.extend({
     this.get('serviceConfigTags').clear();
   },
 
+  retry: function () {
+    var failedStage = this.get('stages').findProperty('isError', true);
+    if (failedStage) {
+      failedStage.set('isStarted', false);
+      failedStage.set('isError', false);
+      this.startStage(failedStage);
+    }
+  },
+
   loadStep: function () {
     this.clearStep();
-    this.loadStages();
+    var stages = App.db.getSecurityDeployStages();
+    if (stages && stages.length > 0) {
+      stages.forEach(function (_stage, index) {
+        stages[index] = App.Poll.create(_stage);
+      }, this);
+      if (stages.someProperty('isError', true)) {
+        this.get('stages').pushObjects(stages);
+        this.loadSecureServices();
+        this.addObserver('stages.@each.isSuccess', this.onCompleteStage);
+        return;
+      } else if (stages.filterProperty('isStarted', true).someProperty('isCompleted', false)) {
+        var runningStage = stages.filterProperty('isStarted', true).findProperty('isCompleted', false);
+        runningStage.set('isStarted', false);
+        this.get('stages').pushObjects(stages);
+      } else {
+        this.get('stages').pushObjects(stages);
+      }
+    } else {
+      this.loadStages();
+      this.addInfoToStages();
+      var runningOperations = App.router.get('backgroundOperationsController.services').filterProperty('isRunning');
+      var stopAllOperation = runningOperations.findProperty('name', 'Stop All Services');
+      var stopStage = this.get('stages').findProperty('name', 'STOP_SERVICES');
+      if (stopStage.get('name') === 'STOP_SERVICES' && stopAllOperation) {
+        stopStage.set('requestId', stopAllOperation.get('id'));
+      }
+    }
     this.loadSecureServices();
-    this.addInfoToStages();
+    this.addObserver('stages.@each.isSuccess', this.onCompleteStage);
     this.moveToNextStage();
   },
 
 
   loadStages: function () {
     this.get('stages').pushObjects([
-      App.Poll.create({stage: 'stage2', label: Em.I18n.translations['admin.addSecurity.apply.stage2'], isPolling: true}),
-      App.Poll.create({stage: 'stage3', label: Em.I18n.translations['admin.addSecurity.apply.stage3'], isPolling: false}),
-      App.Poll.create({stage: 'stage4', label: Em.I18n.translations['admin.addSecurity.apply.stage4'], isPolling: true})
+      App.Poll.create({stage: 'stage2', label: Em.I18n.translations['admin.addSecurity.apply.stage2'], isPolling: true, name: 'STOP_SERVICES'}),
+      App.Poll.create({stage: 'stage3', label: Em.I18n.translations['admin.addSecurity.apply.stage3'], isPolling: false, name: 'APPLY_CONFIGURATIONS'}),
+      App.Poll.create({stage: 'stage4', label: Em.I18n.translations['admin.addSecurity.apply.stage4'], isPolling: true, name: 'START_SERVICES'})
     ]);
-  },
-
-
-  moveToNextStage: function () {
-    var nextStage = this.get('stages').findProperty('isStarted', false);
-    if (nextStage) {
-      nextStage.set('isStarted', true);
-    }
   },
 
   enableSubmit: function () {
     if (this.get('stages').someProperty('isError', true) || this.get('stages').everyProperty('isSuccess', true)) {
       this.set('isSubmitDisabled', false);
-      App.router.get('addSecurityController').setStepsEnable();
+    } else {
+      this.set('isSubmitDisabled', true);
     }
   }.observes('stages.@each.isCompleted'),
 
-  startStage: function () {
-    var startedStages = this.get('stages').filterProperty('isStarted', true);
-    if (startedStages.length) {
-      var currentStage = startedStages.findProperty('isCompleted', false);
+  startStage: function (currentStage) {
+    if (this.get('stages').length === this.totalSteps) {
+      if (!currentStage) {
+        var startedStages = this.get('stages').filterProperty('isStarted', true);
+        currentStage = startedStages.findProperty('isCompleted', false);
+      }
       if (currentStage && currentStage.get('isPolling') === true) {
+        currentStage.set('isStarted', true);
         currentStage.start();
       } else if (currentStage && currentStage.get('stage') === 'stage3') {
+        currentStage.set('isStarted', true);
         if (App.testMode) {
+          currentStage.set('isError', false);
           currentStage.set('isSuccess', true);
-          currentStage.set('isCompleted', true);
-          this.moveToNextStage();
         } else {
-          var self = this;
-          window.setTimeout(function () {
-            self.loadClusterConfigs();
-          }, 12000);
+          this.loadClusterConfigs();
         }
       }
     }
-  }.observes('stages.@each.isStarted'),
+  },
 
   onCompleteStage: function () {
-    var index = this.get('stages').filterProperty('isCompleted', true).length;
-    if (index > 0) {
-      var self = this;
-      var lastCompletedStageResult = this.get('stages').objectAt(index - 1).get('isSuccess');
-      if (lastCompletedStageResult) {
-        self.moveToNextStage();
+    if (this.get('stages').length === this.totalSteps) {
+      var index = this.get('stages').filterProperty('isSuccess', true).length;
+      if (index > 0) {
+        var lastCompletedStageResult = this.get('stages').objectAt(index - 1).get('isSuccess');
+        if (lastCompletedStageResult) {
+          var nextStage = this.get('stages').objectAt(index);
+          this.moveToNextStage(nextStage);
+        }
       }
     }
-  }.observes('stages.@each.isCompleted'),
+  },
+
+  moveToNextStage: function (nextStage) {
+    if (!nextStage) {
+      nextStage = this.get('stages').findProperty('isStarted', false);
+    }
+    if (nextStage) {
+      this.startStage(nextStage);
+    }
+  },
 
   updateServices: function () {
     this.services.clear();
     var services = this.get("services");
-    this.get("stages").forEach(function (stages) {
+    this.get("stages").forEach(function (stage) {
       var newService = Ember.Object.create({
-        name: stages.label,
+        name: stage.label,
         hosts: []
       });
-      var hostNames = stages.get("polledData").mapProperty('Tasks.host_name').uniq();
-      hostNames.forEach(function (name) {
-        newService.hosts.push({
-          name: name,
-          publicName: name,
-          logTasks: stages.polledData.filterProperty("Tasks.host_name", name)
+      if (stage && stage.get("polledData")) {
+        var hostNames = stage.get("polledData").mapProperty('Tasks.host_name').uniq();
+        hostNames.forEach(function (name) {
+          newService.hosts.push({
+            name: name,
+            publicName: name,
+            logTasks: stage.polledData.filterProperty("Tasks.host_name", name)
+          });
         });
-      });
-      services.push(newService);
+        services.push(newService);
+      }
     });
     this.set('serviceTimestamp', new Date().getTime());
-  }.observes("stages.@each.polledData"),
+  }.observes('stages.@each.polledData'),
 
   addInfoToStages: function () {
     this.addInfoToStage2();
-    this.addInfoToStage3();
     this.addInfoToStage4();
   },
 
   addInfoToStage1: function () {
     var stage1 = this.get('stages').findProperty('stage', 'stage1');
     if (App.testMode) {
-      stage1.set('isSucces', true);
+      stage1.set('isSuccess', true);
       stage1.set('isStarted', true);
       stage1.set('isCompleted', true);
     }
@@ -148,13 +201,9 @@ App.MainAdminSecurityDisableController = Em.Controller.extend({
     stage2.set('data', data);
   },
 
-  addInfoToStage3: function () {
-
-  },
-
   addInfoToStage4: function () {
     var stage4 = this.get('stages').findProperty('stage', 'stage4');
-    var url = (App.testMode) ? '/data/wizard/deploy/2_hosts/poll_1.json' : App.apiPrefix + '/clusters/' + App.router.getClusterName() + '/services';
+    var url = (App.testMode) ? '/data/wizard/deploy/2_hosts/poll_1.json' : App.apiPrefix + '/clusters/' + App.router.getClusterName() + '/services?params/run_smoke_test=true';
     var data = '{"RequestInfo": {"context": "' + Em.I18n.t('requestInfo.startAllServices') + '"}, "Body": {"ServiceInfo": {"state": "STARTED"}}}';
     stage4.set('url', url);
     stage4.set('data', data);
@@ -189,16 +238,19 @@ App.MainAdminSecurityDisableController = Em.Controller.extend({
   },
 
   loadClusterConfigsSuccessCallback: function (jsonData) {
-    var self = this;
     //prepare tags to fetch all configuration for a service
     this.get('secureServices').forEach(function (_secureService) {
-      self.setServiceTagNames(_secureService, jsonData.Clusters.desired_configs);
-    });
+      this.setServiceTagNames(_secureService, jsonData.Clusters.desired_configs);
+    }, this);
     this.getAllConfigurations();
   },
 
   loadClusterConfigsErrorCallback: function (request, ajaxOptions, error) {
-    this.get('stages').findProperty('stage', 'stage3').set('isError', true);
+    var stage3 = this.get('stages').findProperty('stage', 'stage3');
+    if (stage3) {
+      stage3.set('isSuccess', false);
+      stage3.set('isError', true);
+    }
     console.log("TRACE: error code status is: " + request.status);
   },
 
@@ -222,15 +274,29 @@ App.MainAdminSecurityDisableController = Em.Controller.extend({
 
   getAllConfigurationsSuccessCallback: function (data) {
     console.log("TRACE: In success function for the GET getServiceConfigsFromServer call");
+    var stage3 = this.get('stages').findProperty('stage', 'stage3');
     this.get('serviceConfigTags').forEach(function (_tag) {
+      if (!data.items.someProperty('type', _tag.siteName)) {
+        console.log("Error: Metadata for secure services (secure_configs.js) is having config tags that are not being retrieved from server");
+        if (stage3) {
+          stage3.set('isSuccess', false);
+          stage3.set('isError', true);
+        }
+      }
       _tag.configs = data.items.findProperty('type', _tag.siteName).properties;
-    });
-    this.removeSecureConfigs();
-    this.applyConfigurationsToCluster();
+    }, this);
+    if (this.removeSecureConfigs()) {
+      this.escapeXMLCharacters(this.get('serviceConfigTags'));
+      this.applyConfigurationsToCluster();
+    }
   },
 
   getAllConfigurationsErrorCallback: function (request, ajaxOptions, error) {
-    this.get('stages').findProperty('stage', 'stage3').set('isError', true);
+    var stage3 = this.get('stages').findProperty('stage', 'stage3');
+    if (stage3) {
+      stage3.set('isSuccess', false);
+      stage3.set('isError', true);
+    }
     console.log("TRACE: In error function for the getServiceConfigsFromServer call");
     console.log("TRACE: error code status is: " + request.status);
   },
@@ -239,11 +305,12 @@ App.MainAdminSecurityDisableController = Em.Controller.extend({
   loadSecureServices: function () {
     var secureServices = require('data/secure_configs');
     var installedServices = App.Service.find().mapProperty('serviceName');
+    this.get('secureServices').pushObject(secureServices.findProperty('serviceName', 'GENERAL'));
     //General (only non service tab) tab is always displayed
     installedServices.forEach(function (_service) {
       var secureService = secureServices.findProperty('serviceName', _service);
       if (secureService) {
-        this.get('secureServices').push(secureService);
+        this.get('secureServices').pushObject(secureService);
       }
     }, this);
   },
@@ -277,61 +344,134 @@ App.MainAdminSecurityDisableController = Em.Controller.extend({
     if (this.get('noOfWaitingAjaxCalls') == 0) {
       var currentStage = this.get('stages').findProperty('stage', 'stage3');
       currentStage.set('isSuccess', true);
-      currentStage.set('isCompleted', true);
+      currentStage.set('isError', false);
     }
   },
 
   applyConfigurationToClusterErrorCallback: function (request, ajaxOptions, error) {
-    this.get('stages').findProperty('stage', 'stage3').set('isError', true);
+    var stage3 = this.get('stages').findProperty('stage', 'stage3');
+    if (stage3) {
+      stage3.set('isSuccess', false);
+      stage3.set('isError', true);
+    }
   },
 
+  /*
+   Iterate over keys of all configurations and escape xml characters in their values
+   */
+  escapeXMLCharacters: function(serviceConfigTags) {
+    serviceConfigTags.forEach(function (_serviceConfigTags) {
+      var configs = _serviceConfigTags.configs;
+      for (var key in configs) {
+        configs[key] =  App.config.escapeXMLCharacters(configs[key]);
+      }
+    },this);
+  },
 
   removeSecureConfigs: function () {
-    this.get('serviceConfigTags').forEach(function (_serviceConfigTags, index) {
-      _serviceConfigTags.newTagName = 'version' + (new Date).getTime();
-      if (_serviceConfigTags.siteName === 'global') {
-        this.get('secureProperties').forEach(function (_config) {
-          if (_config.name in _serviceConfigTags.configs) {
-            delete _serviceConfigTags.configs[_config.name];
-          }
-        }, this);
-        _serviceConfigTags.configs.security_enabled = false;
-      } else {
-        this.get('secureMapping').filterProperty('filename', _serviceConfigTags.siteName + '.xml').forEach(function (_config) {
-          var configName = _config.name;
-          if (configName in _serviceConfigTags.configs) {
-            switch (configName) {
-              case 'dfs.datanode.address':
-                _serviceConfigTags.configs[configName] = '0.0.0.0:50010';
-                break;
-              case 'dfs.datanode.http.address':
-                _serviceConfigTags.configs[configName] = '0.0.0.0:50075';
-                break;
-              case 'hbase.security.authentication':
-                _serviceConfigTags.configs[configName] = 'simple';
-                break;
-              case 'hbase.rpc.engine':
-                _serviceConfigTags.configs[configName] = 'org.apache.hadoop.hbase.ipc.WritableRpcEngine';
-                break;
-              case 'hbase.security.authorization':
-                _serviceConfigTags.configs[configName] = 'false';
-                break;
-              case 'hbase.coprocessor.master.classes':
-                _serviceConfigTags.configs[configName] = 'org.apache.hadoop.hbase.security.access.AccessController';
-                break;
-              case 'zookeeper.znode.parent':
-                _serviceConfigTags.configs[configName] = '/hbase-unsecure';
-                break;
-              case 'oozie.service.AuthorizationService.authorization.enabled':
-                _serviceConfigTags.configs[configName] = 'false';
-                break;
-              default:
-                delete _serviceConfigTags.configs[configName];
+    try {
+      this.get('serviceConfigTags').forEach(function (_serviceConfigTags, index) {
+        _serviceConfigTags.newTagName = 'version' + (new Date).getTime();
+        if (_serviceConfigTags.siteName === 'global') {
+          this.get('secureProperties').forEach(function (_config) {
+            if (_config.name in _serviceConfigTags.configs) {
+              delete _serviceConfigTags.configs[_config.name];
             }
-          }
-          console.log("Not Deleted" + _config.name);
-        }, this);
+          }, this);
+          _serviceConfigTags.configs.security_enabled = 'false';
+          _serviceConfigTags.configs.dfs_datanode_address = '50010';
+          _serviceConfigTags.configs.dfs_datanode_http_address = '50075';
+        } else {
+          this.get('secureMapping').filterProperty('filename', _serviceConfigTags.siteName + '.xml').forEach(function (_config) {
+            var configName = _config.name;
+            if (configName in _serviceConfigTags.configs) {
+              switch (configName) {
+                case 'dfs.datanode.address':
+                  _serviceConfigTags.configs[configName] = '0.0.0.0:50010';
+                  break;
+                case 'dfs.datanode.http.address':
+                  _serviceConfigTags.configs[configName] = '0.0.0.0:50075';
+                  break;
+                case 'mapred.task.tracker.task-controller':
+                  _serviceConfigTags.configs[configName] = 'org.apache.hadoop.mapred.DefaultTaskController';
+                  break;
+                case 'yarn.nodemanager.container-executor.class':
+                  _serviceConfigTags.configs[configName] = 'org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor';
+                  break;
+                case 'hbase.security.authentication':
+                  _serviceConfigTags.configs[configName] = 'simple';
+                  break;
+                case 'hbase.rpc.engine':
+                  _serviceConfigTags.configs[configName] = 'org.apache.hadoop.hbase.ipc.WritableRpcEngine';
+                  break;
+                case 'hbase.security.authorization':
+                  _serviceConfigTags.configs[configName] = 'false';
+                  break;
+                case 'zookeeper.znode.parent':
+                  _serviceConfigTags.configs[configName] = '/hbase-unsecure';
+                  break;
+                default:
+                  delete _serviceConfigTags.configs[configName];
+              }
+            }
+            console.log("Not Deleted" + _config.name);
+          }, this);
+        }
+      }, this);
+    } catch (err) {
+      var stage3 = this.get('stages').findProperty('stage', 'stage3');
+      if (stage3) {
+        stage3.set('isSuccess', false);
+        stage3.set('isError', true);
       }
-    }, this);
+      if (err) {
+        console.log("Error: Error occurred while applying secure configs to the server. Error message: " + err);
+      }
+      return false;
+    }
+    return true;
+  },
+
+  saveStagesOnRequestId: function () {
+    this.saveStages();
+  }.observes('stages.@each.requestId'),
+
+  saveStagesOnCompleted: function () {
+    var nonPollingStages = this.get('stages').filterProperty('isPolling', false).someProperty('isCompleted', true);
+    if (nonPollingStages) {
+      this.saveStages();
+    }
+  }.observes('stages.@each.isCompleted'),
+
+  saveStages: function () {
+    var stages = [];
+    if (this.get('stages').length === this.totalSteps) {
+      this.get('stages').forEach(function (_stage) {
+        var stage = {
+          name: _stage.get('name'),
+          stage: _stage.get('stage'),
+          label: _stage.get('label'),
+          isPolling: _stage.get('isPolling'),
+          isStarted: _stage.get('isStarted'),
+          requestId: _stage.get('requestId'),
+          isSuccess: _stage.get('isSuccess'),
+          isError: _stage.get('isError'),
+          url: _stage.get('url'),
+          polledData: _stage.get('polledData'),
+          data: _stage.get('data')
+        };
+        stages.pushObject(stage);
+      }, this);
+      App.db.setSecurityDeployStages(stages);
+      if (!App.testMode) {
+        App.clusterStatus.setClusterStatus({
+          clusterName: this.get('clusterName'),
+          clusterState: 'DISABLE_SECURITY',
+          wizardControllerName: this.get('name'),
+          localdb: App.db.data.AddSecurity
+        });
+      }
+    }
   }
+
 });

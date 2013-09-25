@@ -57,12 +57,14 @@ define hdp-hadoop::service(
     } else {
       $daemon_cmd = "su - ${user} -c  '${cmd} start ${name}'"
     }
+    # Here we check if pid file exists and if yes, then we run 'ps pid' command
+    # that returns 1 if process is not running
     $service_is_up = "ls ${pid_file} >/dev/null 2>&1 && ps `cat ${pid_file}` >/dev/null 2>&1"
   } elsif ($ensure == 'stopped') {
     if ($run_as_root == true) {
-      $daemon_cmd = "su - root -c  '${cmd} stop ${name}'"
+      $daemon_cmd = "su - root -c  '${cmd} stop ${name}' && rm -f ${pid_file}"
     } else {
-      $daemon_cmd = "su - ${user} -c  '${cmd} stop ${name}'"
+      $daemon_cmd = "su - ${user} -c  '${cmd} stop ${name}' && rm -f ${pid_file}"
     }
     $service_is_up = undef
   } else {
@@ -73,7 +75,7 @@ define hdp-hadoop::service(
     hdp::directory_recursive_create { $pid_dir: 
       owner       => $user,
       context_tag => 'hadoop_service',
-      service_state => $service_state,
+      service_state => $::service_state,
       force => true
     }
   }
@@ -82,11 +84,18 @@ define hdp-hadoop::service(
     hdp::directory_recursive_create { $log_dir: 
       owner       => $user,
       context_tag => 'hadoop_service',
-      service_state => $service_state,
+      service_state => $::service_state,
       force => true
     }
   }
-  if ($daemon_cmd != undef) {  
+  if ($daemon_cmd != undef) {
+    if ($name == 'datanode' and $ensure == 'running') {
+      exec { 'delete_pid_before_datanode_start':
+        command  => "rm -f ${pid_file}",
+        unless       => $service_is_up,
+        path => $hdp::params::exec_path
+      }
+    }
     hdp::exec { $daemon_cmd:
       command      => $daemon_cmd,
       unless       => $service_is_up,
@@ -104,6 +113,9 @@ define hdp-hadoop::service(
     }
      if ($create_log_dir == true) {
       Anchor["hdp-hadoop::service::${name}::begin"] -> Hdp::Directory_recursive_create[$log_dir] -> Hdp::Exec[$daemon_cmd] 
+    }
+    if ($name == 'datanode' and $ensure == 'running') {
+      Anchor["hdp-hadoop::service::${name}::begin"] -> Exec['delete_pid_before_datanode_start'] -> Hdp::Exec[$daemon_cmd]
     }
   }
   if ($ensure == 'running') {

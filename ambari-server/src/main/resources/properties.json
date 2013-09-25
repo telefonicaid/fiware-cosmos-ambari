@@ -118,6 +118,7 @@
         "Versions/stack_name",
         "Versions/stack_version",
         "Versions/min_upgrade_version",
+        "Versions/active",
         "_"
     ],
     "OperatingSystem":[
@@ -134,6 +135,7 @@
         "Repositories/repo_id",
         "Repositories/repo_name",
         "Repositories/mirrors_list",
+        "Repositories/default_base_url",
         "_"
     ],
     "StackService":[
@@ -236,5 +238,22 @@
         "TaskAttempt/output_bytes",
         "TaskAttempt/status",
         "TaskAttempt/locality"
+     ],
+     "RootService":[
+        "RootService/service_name"
+     ],
+    "RootServiceComponent":[
+        "RootServiceComponents/service_name",
+        "RootServiceComponents/component_name",
+        "RootServiceComponents/properties",
+        "RootServiceComponents/component_version"
+     ],
+    "RootServiceHostComponent":[
+        "RootServiceHostComponents/service_name",
+        "RootServiceHostComponents/component_name",
+        "RootServiceHostComponents/host_name",
+        "RootServiceHostComponents/component_state",
+        "RootServiceHostComponents/component_version",
+        "RootServiceHostComponents/properties"
      ]
 }

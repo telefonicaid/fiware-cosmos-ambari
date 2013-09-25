@@ -159,6 +159,8 @@ App.ChartLinearTimeView = Ember.View.extend({
     var nameNodeName = HDFSService ? HDFSService.get('nameNode.hostName') : "";
     var MapReduceService = App.MapReduceService.find().objectAt(0);
     var jobTrackerNode = MapReduceService ? MapReduceService.get('jobTracker.hostName') : "";
+    var YARNService = App.YARNService.find().objectAt(0);
+    var resourceManager = YARNService ? YARNService.get('resourceManagerNode.hostName') : "";
     var timeUnit = this.get('timeUnitSeconds');
     return {
       toSeconds: toSeconds,
@@ -166,7 +168,8 @@ App.ChartLinearTimeView = Ember.View.extend({
       stepSeconds: 15,
       hostName: hostName,
       nameNodeName: nameNodeName,
-      jobTrackerNode: jobTrackerNode
+      jobTrackerNode: jobTrackerNode,
+      resourceManager: resourceManager
     };
   },
   loadDataErrorCallback: function(xhr, textStatus, errorThrown){
@@ -238,10 +241,18 @@ App.ChartLinearTimeView = Ember.View.extend({
    */
   transformData: function (seriesData, displayName) {
     var seriesArray = [];
-    if (seriesData) {
+    if (seriesData != null) {
       // Is it a string?
       if ("string" == typeof seriesData) {
         seriesData = JSON.parse(seriesData);
+      }
+      // Is it a number?
+      if ("number" == typeof seriesData) {
+        // Same number applies to all time.
+        var number = seriesData;
+        seriesData = [];
+        seriesData.push([number, new Date().getTime()-(60*60)]);
+        seriesData.push([number, new Date().getTime()]);
       }
       // We have valid data
       var series = {};
@@ -260,28 +271,13 @@ App.ChartLinearTimeView = Ember.View.extend({
   /**
    * Provides the formatter to use in displaying Y axis.
    *
-   * The default is Rickshaw.Fixtures.Number.formatKMBT which shows 10K,
+   * Uses the App.ChartLinearTimeView.DefaultFormatter which shows 10K,
    * 300M etc.
    *
    * @type Function
    */
   yAxisFormatter: function(y) {
-    if(isNaN(y)){
-      return 0;
-    }
-    var value = Rickshaw.Fixtures.Number.formatKMBT(y);
-    if (value == '') return '0';
-    value = String(value);
-    var c = value[value.length - 1];
-    if (!isNaN(parseInt(c))) {
-      // c is digit
-      value = parseFloat(value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
-    }
-    else {
-      // c in not digit
-      value = parseFloat(value.substr(0, value.length - 1)).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + c;
-    }
-    return value;
+    return App.ChartLinearTimeView.DefaultFormatter(y);
   },
 
   /**
@@ -349,6 +345,8 @@ App.ChartLinearTimeView = Ember.View.extend({
       if (graph_container.length) {
         this.draw(seriesData);
         this.set('hasData', true);
+          //move yAxis value lower to make them fully visible
+        $("#" + this.id + "-container").find('.y_axis text').attr('y',8);
       }
     }
     else {
@@ -508,6 +506,11 @@ App.ChartLinearTimeView = Ember.View.extend({
     }
 
     var height = 150;
+    var diff = 32;
+    if(this.get('inWidget')){
+      height = 105; // for widgets view
+      diff = 22;
+    }
     var width = 400;
     if (isPopup) {
       height = 180;
@@ -518,8 +521,8 @@ App.ChartLinearTimeView = Ember.View.extend({
       var thisElement = this.get('element');
       if (thisElement!=null) {
         var calculatedWidth = $(thisElement).width();
-        if (calculatedWidth > 32) {
-          width = calculatedWidth-32;
+        if (calculatedWidth > diff) {
+          width = calculatedWidth - diff;
         }
       }
     }
@@ -607,7 +610,7 @@ App.ChartLinearTimeView = Ember.View.extend({
       var self = this;
       // In popup save selected metrics and show only them after data update
       _graph.series.forEach(function(series, index) {
-        if (self.get('_seriesProperties') !== null && self.get('_seriesProperties')[index] !== null) {
+        if (self.get('_seriesProperties') !== null && self.get('_seriesProperties')[index] !== null && self.get('_seriesProperties')[index] !== undefined ) {
           if(self.get('_seriesProperties')[self.get('_seriesProperties').length - index - 1].length > 1) {
             $('#'+self.get('id')+'-container'+self.get('popupSuffix')+' a.action:eq('+(self.get('_seriesProperties').length - index - 1)+')').parent('li').addClass('disabled');
             series.disable();
@@ -832,4 +835,48 @@ App.ChartLinearTimeView.TimeElapsedFormatter = function (millis) {
     }
   }
   return value;
+};
+
+/**
+ * The default formatter which uses Rickshaw.Fixtures.Number.formatKMBT 
+ * which shows 10K, 300M etc.
+ *
+ * @type Function
+ */
+App.ChartLinearTimeView.DefaultFormatter = function(y) {
+  if(isNaN(y)){
+    return 0;
+  }
+  var value = Rickshaw.Fixtures.Number.formatKMBT(y);
+  if (value == '') return '0';
+  value = String(value);
+  var c = value[value.length - 1];
+  if (!isNaN(parseInt(c))) {
+    // c is digit
+    value = parseFloat(value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+  }
+  else {
+    // c in not digit
+    value = parseFloat(value.substr(0, value.length - 1)).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + c;
+  }
+  return value;
+};
+
+
+/**
+ * Creates and returns a formatter that can convert a 'value' 
+ * to 'value units/s'. 
+ * 
+ * @param unitsPrefix Prefix which will be used in 'unitsPrefix/s'
+ * @param valueFormatter  Value itself will need further processing 
+ *        via provided formatter. Ex: '10M requests/s'. Generally
+ *        should be App.ChartLinearTimeView.DefaultFormatter. 
+ * @return Function
+ */
+App.ChartLinearTimeView.CreateRateFormatter = function (unitsPrefix, valueFormatter) {
+  var suffix = " "+unitsPrefix+"/s";
+  return function (value) {
+    value = valueFormatter(value) + suffix;
+    return value;
+  };
 };

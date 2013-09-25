@@ -25,11 +25,13 @@ import pprint
 import threading
 from threading import Thread
 
+from shell import shellRunner
 from manifestGenerator import generateManifest
 from RepoInstaller import RepoInstaller
 from Grep import Grep
 import shell
 
+JAVANOTVALID_MSG = "Cannot access JDK! Make sure you have permission to execute {0}/bin/java"
 
 logger = logging.getLogger()
 
@@ -54,6 +56,7 @@ class PuppetExecutor:
     self.reposInstalled = False
     self.config = config
     self.modulesdir = self.puppetModule + "/modules"
+    self.sh = shellRunner()
 
   def configureEnviron(self, environ):
     if not self.config.has_option("puppet", "ruby_home"):
@@ -111,8 +114,10 @@ class PuppetExecutor:
       result = grep.tail(stdout, grep.OUTPUT_LAST_LINES)
     else:
       result = grep.grep(stdout, "fail", grep.ERROR_LAST_LINES_BEFORE, grep.ERROR_LAST_LINES_AFTER)
+      result = grep.cleanByTemplate(result, "warning")
       if result is None: # Second try
        result = grep.grep(stdout, "err", grep.ERROR_LAST_LINES_BEFORE, grep.ERROR_LAST_LINES_AFTER)
+       result = grep.cleanByTemplate(result, "warning")
     filteredresult = grep.filterMarkup(result)
     return filteredresult
 
@@ -143,8 +148,18 @@ class PuppetExecutor:
 
     logger.info("ExitCode : "  + str(result["exitcode"]))
     return result
-
+  
+  def isJavaAvailable(self, command):
+    javaExecutablePath = "{0}/bin/java".format(command)
+    return not self.sh.run([javaExecutablePath, '-version'])['exitCode']
+    
   def runCommand(self, command, tmpoutfile, tmperrfile):
+    # After installing we must have jdk available for start/stop/smoke
+    java64_home = str(command['configurations']['global']['java64_home']).strip()
+    if command['roleCommand']!="INSTALL" and not self.isJavaAvailable(java64_home):
+      errMsg = JAVANOTVALID_MSG.format(java64_home)
+      return {'stdout': '', 'stderr': errMsg, 'exitcode': 1}
+
     taskId = 0
     if command.has_key("taskId"):
       taskId = command['taskId']
@@ -170,7 +185,8 @@ class PuppetExecutor:
     puppetEnv = self.configureEnviron(puppetEnv)
     logger.debug("Setting RUBYLIB as: " + rubyLib)
     logger.info("Running command " + pprint.pformat(puppetcommand))
-    puppet = self.lauch_puppet_subprocess(puppetcommand,tmpout, tmperr, puppetEnv)
+    puppet = self.lauch_puppet_subprocess(puppetcommand, tmpout, tmperr, puppetEnv)
+    logger.info("Command started with PID: " + str(puppet.pid))
     logger.debug("Launching watchdog thread")
     self.event.clear()
     self.last_puppet_has_been_killed = False
@@ -222,13 +238,11 @@ class PuppetExecutor:
   def puppet_watchdog_func(self, puppet):
     self.event.wait(self.PUPPET_TIMEOUT_SECONDS)
     if puppet.returncode is None:
-      logger.error("Task timed out and will be killed")
-      self.runShellKillPgrp(puppet)
+      logger.error("Task timed out, killing process with PID: " + str(puppet.pid))
+      shell.kill_process_with_children(puppet.pid)
       self.last_puppet_has_been_killed = True
     pass
 
-  def runShellKillPgrp(self, puppet):
-    shell.killprocessgrp(puppet.pid)
 
 def main():
   logging.basicConfig(level=logging.DEBUG)    

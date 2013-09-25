@@ -37,9 +37,7 @@ AMBARI_PASSPHRASE_VAR = "AMBARI_PASSPHRASE"
 def execOsCommand(osCommand):
   osStat = subprocess.Popen(osCommand, stdout=subprocess.PIPE)
   log = osStat.communicate(0)
-  ret = {}
-  ret["exitstatus"] = osStat.returncode
-  ret["log"] = log
+  ret = {"exitstatus": osStat.returncode, "log": log}
   return ret
 
 def is_suse():
@@ -53,47 +51,39 @@ def installAgentSuse(projectVersion):
   zypperCommand = ["zypper", "install", "-y", "ambari-agent" + projectVersion]
   return execOsCommand(zypperCommand)
 
-def installPreReq():
-  """ required for ruby deps """
-  checkepel = ["yum", "repolist", "enabled"]
-  retval = execOsCommand(checkepel)
-  logval = str(retval["log"])
-  if not "epel" in logval:
-    yumCommand = ["yum", "-y", "install", "epel-release"]
-  else:
-    yumCommand = ["echo", "Epel already exists"]
-  return execOsCommand(yumCommand)
-
 def installAgent(projectVersion):
   """ Run yum install and make sure the agent install alright """
   # The command doesn't work with file mask ambari-agent*.rpm, so rename it on agent host
   rpmCommand = ["yum", "-y", "install", "--nogpgcheck", "ambari-agent" + projectVersion]
   return execOsCommand(rpmCommand)
 
-def configureAgent(host):
+def configureAgent(server_hostname):
   """ Configure the agent so that it has all the configs knobs properly installed """
-  osCommand = ["sed", "-i.bak", "s/hostname=localhost/hostname=" + host + "/g", "/etc/ambari-agent/conf/ambari-agent.ini"]
+  osCommand = ["sed", "-i.bak", "s/hostname=localhost/hostname=" + server_hostname +\
+                                "/g", "/etc/ambari-agent/conf/ambari-agent.ini"]
   execOsCommand(osCommand)
-
   return
 
-def runAgent(passPhrase):
+def runAgent(passPhrase, expected_hostname):
   os.environ[AMBARI_PASSPHRASE_VAR] = passPhrase
-  subprocess.call("/usr/sbin/ambari-agent start", shell=True)
+  agent_retcode = subprocess.call("/usr/sbin/ambari-agent restart --expected-hostname=" +\
+                                  expected_hostname, shell=True)
   try:
-
     ret = execOsCommand(["tail", "-20", "/var/log/ambari-agent/ambari-agent.log"])
+    try:
+      log = ret['log']
+    except Exception:
+      log = "Log not found"
+    print log
     if not 0 == ret['exitstatus']:
       return ret['exitstatus']
-    print ret['log']
 
-    return 0
+    return agent_retcode
   except (Exception), e:
     return 1
 
+
 def getOptimalVersion(initialProjectVersion):
-  if initialProjectVersion == "":
-    return initialProjectVersion
   optimalVersion = initialProjectVersion
 
   if is_suse():
@@ -129,38 +119,67 @@ def checkAgentPackageAvailability(projectVersion):
   return execOsCommand(yumCommand)
 
 def findNearestAgentPackageVersionSuse(projectVersion):
-  zypperCommand = ["bash", "-c", "zypper search -s --match-exact ambari-agent | grep ' " + projectVersion + "' | cut -d '|' -f 4 | head -n1"]
+  zypperCommand = ["bash", "-c", "zypper search -s --match-exact ambari-agent | grep ' " + projectVersion +\
+                                 "' | cut -d '|' -f 4 | head -n1"]
   return execOsCommand(zypperCommand)
 
 def findNearestAgentPackageVersion(projectVersion):
-  yumCommand = ["bash", "-c", "yum list available ambari-agent | grep ' " + projectVersion + "' | sed -re 's/\s+/ /g' | cut -d ' ' -f 2 | head -n1"]
+  yumCommand = ["bash", "-c", "yum list available ambari-agent | grep ' " + projectVersion +\
+                              "' | sed -re 's/\s+/ /g' | cut -d ' ' -f 2 | head -n1"]
   return execOsCommand(yumCommand)
+
+def checkServerReachability(host, port):
+  ret = {}
+  s = socket.socket() 
+  try: 
+   s.connect((host, port)) 
+   return
+  except Exception:
+   ret["exitstatus"] = 1
+   ret["log"] = "Host registration aborted. Ambari Agent host cannot reach Ambari Server '" +\
+                host+":"+str(port) + "'. "+\
+  		        "Please check the network connectivity between the Ambari Agent host and the Ambari Server"
+   sys.exit(ret)
+  pass
 
 def main(argv=None):
   scriptDir = os.path.realpath(os.path.dirname(argv[0]))
   # Parse the input
   onlyargs = argv[1:]
-  passPhrase = onlyargs[0]
-  hostName = onlyargs[1]
+  expected_hostname = onlyargs[0]
+  passPhrase = onlyargs[1]
+  hostname = onlyargs[2]
   projectVersion = None
-  if len(onlyargs) > 2:
-    projectVersion = onlyargs[2]
+  server_port = 8080
+  if len(onlyargs) > 3:
+    projectVersion = onlyargs[3]
+  if len(onlyargs) > 4:
+    server_port = onlyargs[4]
+  try:
+    server_port = int(server_port)
+  except (Exception), e:
+    server_port = 8080
+
+  checkServerReachability(hostname, server_port)
 
   if projectVersion is None or projectVersion == "null":
+    projectVersion = getOptimalVersion("")
+  elif (projectVersion != "" and projectVersion != "{ambariVersion}"):
+    projectVersion = "-" + projectVersion
+  elif projectVersion == "{ambariVersion}":
     projectVersion = ""
 
-  projectVersion = getOptimalVersion(projectVersion)
-  if projectVersion != "":
-    projectVersion = "-" + projectVersion
-
   if is_suse():
-    installAgentSuse(projectVersion)
+    ret = installAgentSuse(projectVersion)
+    if (not ret["exitstatus"]==0):
+      sys.exit(ret)
   else:
-    installPreReq()
-    installAgent(projectVersion)
+    ret = installAgent(projectVersion)
+    if (not ret["exitstatus"]==0):
+      sys.exit(ret)
 
-  configureAgent(hostName)
-  sys.exit(runAgent(passPhrase))
+  configureAgent(hostname)
+  sys.exit(runAgent(passPhrase, expected_hostname))
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.DEBUG)
