@@ -227,8 +227,8 @@ def main():
   # Launch Controller communication
   controller = Controller(config)
   if (len(sys.argv) >1) and sys.argv[1]=='unregister':
-    controller.unregisterWithServer()
-    os._exit(0)
+    ret = controller.unregisterWithServer()
+    os._exit(0 if ret["response"] == "OK" else 1)
 
   # Daemonize current instance of Ambari Agent
   pid = str(os.getpid())

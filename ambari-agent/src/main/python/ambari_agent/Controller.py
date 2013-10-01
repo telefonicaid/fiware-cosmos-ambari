@@ -75,8 +75,13 @@ class Controller(threading.Thread):
   def unregisterWithServer(self):
     id = -1
     ret = self.retriedRequest(self.unregisterUrl, lambda: self.unregister.build(id))
-    logger.info("Unregistered with the server")
-    print("Unregistered with the server")
+    if ret["response"] == "OK":
+        logger.info("Unregistered with the server")
+        print("Unregistered with the server")
+    else:
+        logMsg = "Error while unregistering with server: %s" % ret["errorMessage"]
+        logger.info(logMsg)
+        print(logMsg)
     return ret
   
   def registerWithServer(self):

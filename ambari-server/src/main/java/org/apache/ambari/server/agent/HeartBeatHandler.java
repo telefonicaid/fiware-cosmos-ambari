@@ -471,20 +471,26 @@ public class HeartBeatHandler {
     return response;
   }
 
-  public UnregistrationResponse handleUnregistration(Unregister unregister)
-            throws InvalidStateTransitionException, AmbariException {
+  public UnregistrationResponse handleUnregistration(Unregister unregister) {
     String hostname = unregister.getHostname();
     String agentVersion = unregister.getAgentVersion();
     String serverVersion = ambariMetaInfo.getServerVersion();
-    ensureVersionsCompatible(serverVersion, agentVersion, hostname);
-
-    clusterFsm.removeHost(hostname);
-    hostResponseIds.remove(hostname);
 
     UnregistrationResponse response = new UnregistrationResponse();
-    response.setResponseStatus(RequestStatus.OK);
     Long requestId = 0L;
     response.setResponseId(requestId);
+    try {
+      ensureVersionsCompatible(serverVersion, agentVersion, hostname);
+      clusterFsm.removeHost(hostname);
+      hostResponseIds.remove(hostname);
+      response.setResponseStatus(RequestStatus.OK);
+    } catch (AmbariException ex) {
+      LOG.warn("Error while unregistering agent. Returning failed response.");
+      LOG.warn(ex.getMessage());
+      response.setResponseStatus(RequestStatus.FAILED);
+      response.setErrorMessage(ex.getMessage());
+    }
+
     return response;
   }
 
