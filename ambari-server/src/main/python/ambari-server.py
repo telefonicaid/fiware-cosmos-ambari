@@ -2372,8 +2372,8 @@ def upgrade(args):
 #
 def status(args):
   args.exit_message = None
-  status, pid = is_server_runing()
-  if status:
+  pstatus, pid = is_server_runing()
+  if pstatus:
     print "Ambari Server running"
     print "Found Ambari Server PID: '" + str(pid) + " at: " + PID_DIR + os.sep + PID_NAME
   else:
@@ -3675,8 +3675,8 @@ def main():
       parser.error("Invalid action")
 
     if action in ACTION_REQUIRE_RESTART and need_restart:
-      status, pid = is_server_runing()
-      if status:
+      pstatus, pid = is_server_runing()
+      if pstatus:
         print 'NOTE: Restart Ambari Server to apply changes'+ \
               ' ("ambari-server restart|stop|start")'
 
