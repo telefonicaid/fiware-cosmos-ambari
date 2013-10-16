@@ -19,6 +19,7 @@
 package org.apache.ambari.server.state.cluster;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -43,27 +44,10 @@ import org.apache.ambari.server.api.services.AmbariMetaInfo;
 import org.apache.ambari.server.controller.ClusterResponse;
 import org.apache.ambari.server.orm.GuiceJpaInitializer;
 import org.apache.ambari.server.orm.InMemoryDefaultTestModule;
-import org.apache.ambari.server.orm.entities.ClusterEntity;
-import org.apache.ambari.server.orm.entities.ClusterServiceEntity;
-import org.apache.ambari.server.orm.entities.HostEntity;
-import org.apache.ambari.server.orm.entities.HostStateEntity;
-import org.apache.ambari.server.orm.entities.ServiceDesiredStateEntity;
-import org.apache.ambari.server.state.AgentVersion;
-import org.apache.ambari.server.state.Cluster;
-import org.apache.ambari.server.state.Clusters;
-import org.apache.ambari.server.state.Config;
-import org.apache.ambari.server.state.ConfigFactory;
-import org.apache.ambari.server.state.DesiredConfig;
+import org.apache.ambari.server.orm.dao.HostConfigMappingDAO;
+import org.apache.ambari.server.orm.entities.*;
+import org.apache.ambari.server.state.*;
 import org.apache.ambari.server.state.DesiredConfig.HostOverride;
-import org.apache.ambari.server.state.Host;
-import org.apache.ambari.server.state.HostState;
-import org.apache.ambari.server.state.Service;
-import org.apache.ambari.server.state.ServiceComponent;
-import org.apache.ambari.server.state.ServiceComponentFactory;
-import org.apache.ambari.server.state.ServiceComponentHost;
-import org.apache.ambari.server.state.ServiceComponentHostFactory;
-import org.apache.ambari.server.state.ServiceFactory;
-import org.apache.ambari.server.state.StackId;
 import org.apache.ambari.server.state.fsm.InvalidStateTransitionException;
 import org.apache.ambari.server.state.host.HostHealthyHeartbeatEvent;
 import org.apache.ambari.server.state.host.HostRegistrationRequestEvent;
@@ -173,9 +157,8 @@ public class ClusterTest {
     Directory dir2 = new Directory();
     dir2.setName("/var/log/hadoop");
     dir2.setType("not_exist");
-    agentEnv.setPaths(new Directory[] { dir1, dir2 });
-    
-    
+    agentEnv.setStackFoldersAndFiles(new Directory[] { dir1, dir2 });
+
     AgentVersion agentVersion = new AgentVersion("0.0.x");
     long currentTime = 1001;
 
@@ -310,14 +293,14 @@ public class ClusterTest {
     c1.addConfig(config2);
     c1.addConfig(config3);
     
-    c1.addDesiredConfig(config1);
+    c1.addDesiredConfig("_test", config1);
     Config res = c1.getDesiredConfigByType("global");
     Assert.assertNotNull("Expected non-null config", res);
     
     res = c1.getDesiredConfigByType("core-site");
     Assert.assertNull("Expected null config", res);
     
-    c1.addDesiredConfig(config2);
+    c1.addDesiredConfig("_test", config2);
     res = c1.getDesiredConfigByType("global");
     Assert.assertEquals("Expected version tag to be 'version2'", "version2", res.getVersionTag());
     
@@ -341,8 +324,16 @@ public class ClusterTest {
     c1.addConfig(config2);
     c1.addConfig(config3);
     
-    c1.addDesiredConfig(config1);
-    c1.addDesiredConfig(config3);
+    try {
+      c1.addDesiredConfig(null, config1);
+      fail("Cannot set a null user with config");
+    }
+    catch (Exception e) {
+      // test failure
+    }
+    
+    c1.addDesiredConfig("_test1", config1);
+    c1.addDesiredConfig("_test3", config3);
     
     Map<String, DesiredConfig> desiredConfigs = c1.getDesiredConfigs();
     Assert.assertFalse("Expect desired config not contain 'mapred-site'", desiredConfigs.containsKey("mapred-site"));
@@ -350,13 +341,20 @@ public class ClusterTest {
     Assert.assertTrue("Expect desired config contain " + config3.getType(), desiredConfigs.containsKey("core-site"));
     Assert.assertEquals("Expect desired config for global should be " + config1.getVersionTag(),
         config1.getVersionTag(), desiredConfigs.get(config1.getType()).getVersion());
+    Assert.assertEquals("_test1", desiredConfigs.get(config1.getType()).getUser());
+    Assert.assertEquals("_test3", desiredConfigs.get(config3.getType()).getUser());
     DesiredConfig dc = desiredConfigs.get(config1.getType());
     Assert.assertTrue("Expect no host-level overrides",
         (null == dc.getHostOverrides() || dc.getHostOverrides().size() == 0));
+    
+    c1.addDesiredConfig("_test2", config2);
+    Assert.assertEquals("_test2", c1.getDesiredConfigs().get(config2.getType()).getUser());
+    
+    c1.addDesiredConfig("_test1", config1);
 
     // setup a host that also has a config override
     Host host = clusters.getHost("h1");
-    host.addDesiredConfig(c1.getClusterId(), true, config2);
+    host.addDesiredConfig(c1.getClusterId(), true, "_test2", config2);
 
     desiredConfigs = c1.getDesiredConfigs();
     dc = desiredConfigs.get(config1.getType());
@@ -460,5 +458,31 @@ public class ClusterTest {
     assertEquals(1, c1.getServices().size());
     assertEquals(1, injector.getProvider(EntityManager.class).get().
         createQuery("SELECT service FROM ClusterServiceEntity service").getResultList().size());
+  }
+
+  @Test
+  public void testGetHostsDesiredConfigs() throws Exception {
+    Host host1 = clusters.getHost("h1");
+
+    Config config = configFactory.createNew(c1, "hdfs-site", new HashMap<String, String>(){{
+      put("test", "test");
+    }});
+    config.setVersionTag("1");
+
+    host1.addDesiredConfig(c1.getClusterId(), true, "test", config);
+
+    Map<String, Map<String, DesiredConfig>> configs = c1.getAllHostsDesiredConfigs();
+
+    assertTrue(configs.containsKey("h1"));
+    assertEquals(1, configs.get("h1").size());
+
+    List<String> hostnames = new ArrayList<String>();
+    hostnames.add("h1");
+
+    configs = c1.getHostsDesiredConfigs(hostnames);
+
+    assertTrue(configs.containsKey("h1"));
+    assertEquals(1, configs.get("h1").size());
+
   }
 }

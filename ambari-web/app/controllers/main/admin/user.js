@@ -57,7 +57,7 @@ App.MainAdminUserController = Em.Controller.extend({
             event.context.deleteRecord();
 
             try {
-              App.store.commit()
+              App.store.commit();
             } catch (err) {
 
             }
@@ -78,11 +78,13 @@ App.MainAdminUserController = Em.Controller.extend({
    * @param callback
    */
   sendCommandToServer : function(url, method, postData, callback){
-    var url =  (App.testMode) ?
-        '/data/wizard/deploy/poll_1.json' : //content is the same as ours
-        App.apiPrefix + url;
-
-    var method = App.testMode ? 'GET' : method;
+    if (App.testMode) {
+      url = '/data/users/users.json';
+      method = 'GET';
+      postData = undefined;
+    } else {
+      url = App.apiPrefix + url;
+    }
 
     $.ajax({
       type: method,
@@ -95,11 +97,10 @@ App.MainAdminUserController = Em.Controller.extend({
       },
 
       error: function (request, ajaxOptions, error) {
-        //do something
         var message = $.parseJSON(request.responseText).message;
-        message = message.substr(message.indexOf(':') + 1); // Remove classname
+        message = message.substr(message.lastIndexOf(':') + 1);
         callback(false, message);
-        console.log('error on change component host status')
+        console.log(message);
       },
 
       statusCode: require('data/statusCodes')

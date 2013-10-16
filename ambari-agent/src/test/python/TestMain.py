@@ -31,7 +31,10 @@ from ambari_agent.AmbariConfig import AmbariConfig
 import ConfigParser
 import os
 import tempfile
+from ambari_agent.PingPortListener import PingPortListener
 from ambari_agent.Controller import Controller
+from optparse import OptionParser
+from ambari_agent.DataCleaner import DataCleaner
 
 
 class TestMain(unittest.TestCase):
@@ -144,12 +147,22 @@ class TestMain(unittest.TestCase):
   @patch("sys.exit")
   @patch("os.path.isfile")
   @patch("os.path.isdir")
-  def test_perform_prestart_checks(self, isdir_mock, isfile_mock, exit_mock):
+  @patch("hostname.hostname")
+  def test_perform_prestart_checks(self, hostname_mock, isdir_mock, isfile_mock, exit_mock):
     main.config = AmbariConfig().getConfig()
+
+    # Check expected hostname test
+    hostname_mock.return_value = "test.hst"
+
+    main.perform_prestart_checks("another.hst")
+    self.assertTrue(exit_mock.called)
+
+    exit_mock.reset_mock()
+
     # Trying case if there is another instance running
     isfile_mock.return_value = True
     isdir_mock.return_value = True
-    main.perform_prestart_checks()
+    main.perform_prestart_checks(None)
     self.assertTrue(exit_mock.called)
 
     isfile_mock.reset_mock()
@@ -159,7 +172,7 @@ class TestMain(unittest.TestCase):
     # Trying case if agent prefix dir does not exist
     isfile_mock.return_value = False
     isdir_mock.return_value = False
-    main.perform_prestart_checks()
+    main.perform_prestart_checks(None)
     self.assertTrue(exit_mock.called)
 
     isfile_mock.reset_mock()
@@ -169,7 +182,7 @@ class TestMain(unittest.TestCase):
     # Trying normal case
     isfile_mock.return_value = False
     isdir_mock.return_value = True
-    main.perform_prestart_checks()
+    main.perform_prestart_checks(None)
     self.assertFalse(exit_mock.called)
 
 
@@ -220,25 +233,45 @@ class TestMain(unittest.TestCase):
   @patch.object(main, "killstaleprocesses")
   @patch.object(main, "update_log_level")
   @patch.object(NetUtil.NetUtil, "try_to_connect")
-  @patch.object(security.CertificateManager, "initSecurity")
-  @patch.object(Controller, "run")
+  @patch.object(Controller, "__init__")
   @patch.object(Controller, "start")
-  @patch("ambari_agent.Controller.Controller")
-  def test_main(self, controller_mock, controller_start_mock, controller_run_mock, CertificateManager_initSecurity_mock,
-                try_to_connect_mock, update_log_level_mock,
-                killstaleprocesses_mock, daemonize_mock, perform_prestart_checks_mock,
+  @patch.object(Controller, "join")
+  @patch("optparse.OptionParser.parse_args")
+  @patch.object(DataCleaner,"start")
+  @patch.object(DataCleaner,"__init__")
+  @patch.object(PingPortListener,"start")
+  @patch.object(PingPortListener,"__init__")
+  def test_main(self, ping_port_init_mock, ping_port_start_mock, data_clean_init_mock,data_clean_start_mock,
+                parse_args_mock, join_mock, start_mock, Controller_init_mock, try_to_connect_mock,
+                update_log_level_mock, killstaleprocesses_mock, daemonize_mock, perform_prestart_checks_mock,
                 resolve_ambari_config_mock, stop_mock, bind_signal_handlers_mock, setup_logging_mock):
+    data_clean_init_mock.return_value = None
+    Controller_init_mock.return_value = None
+    ping_port_init_mock.return_value = None
+    options = MagicMock()
+    parse_args_mock.return_value = (options, MagicMock)
+
     #testing call without command-line arguments
     main.main()
 
     self.assertTrue(setup_logging_mock.called)
     self.assertTrue(bind_signal_handlers_mock.called)
-    self.assertFalse(stop_mock.called)
+    self.assertTrue(stop_mock.called)
     self.assertTrue(resolve_ambari_config_mock.called)
     self.assertTrue(perform_prestart_checks_mock.called)
     self.assertTrue(daemonize_mock.called)
     self.assertTrue(killstaleprocesses_mock.called)
     self.assertTrue(update_log_level_mock.called)
     try_to_connect_mock.assert_called_once_with(ANY, -1, ANY)
-    self.assertTrue(CertificateManager_initSecurity_mock.called)
-    self.assertTrue(controller_start_mock.called)
+    self.assertTrue(start_mock.called)
+    self.assertTrue(data_clean_init_mock.called)
+    self.assertTrue(data_clean_start_mock.called)
+    self.assertTrue(ping_port_init_mock.called)
+    self.assertTrue(ping_port_start_mock.called)
+
+    perform_prestart_checks_mock.reset_mock()
+
+    # Testing call with --expected-hostname parameter
+    options.expected_hostname = "test.hst"
+    main.main()
+    perform_prestart_checks_mock.assert_called_once_with(options.expected_hostname)

@@ -17,6 +17,7 @@
 
 var App = require('app');
 var date = require('utils/date');
+var numberUtils = require('utils/number_utils');
 
 App.MainDashboardServiceHbaseView = App.MainDashboardServiceView.extend({
   templateName: require('templates/main/dashboard/service/hbase'),
@@ -36,6 +37,29 @@ App.MainDashboardServiceHbaseView = App.MainDashboardServiceView.extend({
     }
     return [];
   }.property('masters'),
+
+
+  liveRegionServers: function () {
+    return App.HostComponent.find().filterProperty('componentName', 'HBASE_REGIONSERVER').filterProperty("workStatus","STARTED");
+  }.property('service.hostComponents.@each'),
+
+  regionServesText: function () {
+    if(this.get('service.regionServers').get("length") > 1){
+      return Em.I18n.t('services.service.summary.viewHosts');
+    }else{
+      return Em.I18n.t('services.service.summary.viewHost');
+    }
+  }.property("service"),
+
+  regionServersLiveTextView: App.ComponentLiveTextView.extend({
+    liveComponents: function() {
+      return App.HostComponent.find().filterProperty('componentName', 'HBASE_REGIONSERVER').filterProperty("workStatus","STARTED").get('length');
+    }.property("service.hostComponents.@each"),
+    totalComponents: function() {
+      return this.get("service.regionServers.length");
+    }.property("service.regionServers.length")
+  }),
+
   /**
    * Formatted output for passive master components
    */
@@ -65,8 +89,8 @@ App.MainDashboardServiceHbaseView = App.MainDashboardServiceView.extend({
     var heapUsed = this.get('service').get('heapMemoryUsed');
     var heapMax = this.get('service').get('heapMemoryMax');
     var percent = heapMax > 0 ? 100 * heapUsed / heapMax : 0;
-    var heapString = heapUsed > 0 ? heapUsed.bytesToSize(1, "parseFloat") : 0;
-    var heapMaxString = heapMax > 0 ? heapMax.bytesToSize(1, "parseFloat") : 0;
+    var heapString = numberUtils.bytesToSize(heapUsed, 1, "parseFloat");
+    var heapMaxString = numberUtils.bytesToSize(heapMax, 1, "parseFloat");
     return this.t('dashboard.services.hbase.masterServerHeap.summary').format(heapString, heapMaxString, percent.toFixed(1));
   }.property('service.heapMemoryUsed', 'service.heapMemoryMax'),
 
@@ -80,7 +104,7 @@ App.MainDashboardServiceHbaseView = App.MainDashboardServiceView.extend({
 
   hbaseMasterWebUrl: function () {
     if (this.get('activeMaster.host') && this.get('activeMaster.host').get('publicHostName')) {
-      return "http://" + this.get('activeMaster.host').get('publicHostName') + ":60010";
+      return "http://" + (App.singleNodeInstall ? App.singleNodeAlias : this.get('activeMaster.host').get('publicHostName')) + ":60010";
     }
   }.property('activeMaster'),
 

@@ -17,6 +17,7 @@
  */
 
 var App = require('app');
+var service_components = require('data/service_components');
 
 App.MainServiceItemController = Em.Controller.extend({
   name: 'mainServiceItemController',
@@ -88,6 +89,7 @@ App.MainServiceItemController = Em.Controller.extend({
     }
     var self = this;
     App.showConfirmationPopup(function() {
+      self.set('isPending', true);
       self.startStopPopupPrimary(serviceHealth);
     });
   },
@@ -110,8 +112,8 @@ App.MainServiceItemController = Em.Controller.extend({
         'state': serviceHealth
       }
     });
-    this.set('content.isStopDisabled',true);
-    this.set('content.isStartDisabled',true);
+    this.set('isStopDisabled',true);
+    this.set('isStartDisabled',true);
   },
 
   /**
@@ -160,6 +162,10 @@ App.MainServiceItemController = Em.Controller.extend({
    */
   runSmokeTest: function (event) {
     var self = this;
+    if (this.get('content.serviceName') === 'MAPREDUCE2' && !App.Service.find('YARN').get('isStarted')) {
+      App.showAlertPopup(Em.I18n.t('common.error'), Em.I18n.t('services.mapreduce2.smokeTest.requirement'));
+      return;
+    }
     App.showConfirmationPopup(function() {
       self.runSmokeTestPrimary();
     });
@@ -172,6 +178,7 @@ App.MainServiceItemController = Em.Controller.extend({
       'success':'runSmokeTestSuccessCallBack',
       'data': {
         'serviceName': this.get('content.serviceName'),
+        'displayName': this.get('content.displayName'),
         'actionName': this.get('content.serviceName') === 'ZOOKEEPER' ? 'ZOOKEEPER_QUORUM_SERVICE_CHECK' : this.get('content.serviceName') + '_SERVICE_CHECK'
       }
     });
@@ -191,8 +198,11 @@ App.MainServiceItemController = Em.Controller.extend({
    * @param hostComponent
    */
   reassignMaster: function (hostComponent) {
+    var component = App.HostComponent.find().findProperty('componentName', hostComponent.get('componentName'));
     console.log('In Reassign Master', hostComponent);
-    App.router.get('reassignMasterController').saveComponentToReassign(hostComponent);
+    var reassignMasterController = App.router.get('reassignMasterController');
+    reassignMasterController.saveComponentToReassign(component);
+    reassignMasterController.setCurrentStep('1');
     App.router.transitionTo('reassignMaster');
   },
 
@@ -210,5 +220,50 @@ App.MainServiceItemController = Em.Controller.extend({
     if (methodName) {
       this[methodName](context);
     }
-  }
+    },
+
+
+    setStartStopState: function () {
+        var serviceName = this.get('content.serviceName');
+        var backgroundOperations = App.router.get('backgroundOperationsController.services');
+        if(backgroundOperations.length>0) {
+            for (var i = 0; i < backgroundOperations.length; i++) {
+                var hosts = backgroundOperations[i].hosts;
+                for (var j = 0; j < hosts.length; j++) {
+                    var logTasks = hosts[j].logTasks;
+                    for (var k = 0; k < logTasks.length; k++) {
+                        var service = service_components.findProperty('component_name', logTasks[k].Tasks.role);
+                        if (service && serviceName == service.service_name) {
+                            if (logTasks[k].Tasks.status == 'PENDING' || logTasks[k].Tasks.status == 'IN_PROGRESS' || logTasks[k].Tasks.status == 'QUEUED') {
+                                this.set('isPending', true);
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            this.set('isPending', false);
+        }
+        else {
+            this.set('isPending', true);
+        }
+
+    }.observes('App.router.backgroundOperationsController.serviceTimestamp'),
+    
+  isServiceRestartable: function() {
+    return this.get('content.serviceName') !== "FLUME";
+  }.property('content.serviceName'),
+
+  isStartDisabled: function () {
+    if(this.get('isPending')) return true;
+    return !(this.get('content.healthStatus') == 'red');
+  }.property('content.healthStatus','isPending'),
+
+  isStopDisabled: function () {
+    if(this.get('isPending')) return true;
+    return !(this.get('content.healthStatus') == 'green');
+  }.property('content.healthStatus','isPending'),
+
+  isPending:true
+
 })

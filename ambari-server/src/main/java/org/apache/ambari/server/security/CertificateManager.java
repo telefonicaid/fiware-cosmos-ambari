@@ -68,9 +68,7 @@ public class CertificateManager {
    */
   public void initRootCert() {
     LOG.info("Initialization of root certificate");
-
     boolean certExists = isCertExists();
-
     LOG.info("Certificate exists:" + certExists);
 
     if (!certExists) {
@@ -191,13 +189,8 @@ public class CertificateManager {
     LOG.info("Signing of agent certificate");
     LOG.info("Verifying passphrase");
 
-
-
     String passphraseSrvr = configs.getConfigsMap().get(Configuration.
         PASSPHRASE_KEY).trim();
-
-    LOG.info("Pass phrase Server " + passphraseSrvr);
-    LOG.info("Pass phrase Agent " + passphraseAgent);
 
     if (!passphraseSrvr.equals(passphraseAgent.trim())) {
       LOG.warn("Incorrect passphrase from the agent");
@@ -214,6 +207,21 @@ public class CertificateManager {
     String agentCrtReqName = agentHostname + ".csr";
     String agentCrtName = agentHostname + ".crt";
 
+    Object[] scriptArgs = {srvrKstrDir, agentCrtReqName, agentCrtName,
+        srvrCrtPass, srvrKeyName, srvrCrtName};
+
+    //Revoke previous agent certificate if exists
+    File agentCrtFile = new File(srvrKstrDir + File.separator + agentCrtName);
+
+    if (agentCrtFile.exists()) {
+      LOG.info("Revoking of " + agentHostname + " certificate.");
+      RevokeCertResponse revokeResoponse = revokeAgentCrt(agentHostname);
+      if (revokeResoponse.getResult() == RevokeCertResponse.ERROR_STATUS) {
+        response.setResult(SignCertResponse.ERROR_STATUS);
+        response.setMessage(revokeResoponse.getMessage());
+        return response;
+      }
+    }
 
     File agentCrtReqFile = new File(srvrKstrDir + File.separator +
         agentCrtReqName);
@@ -223,22 +231,19 @@ public class CertificateManager {
       // TODO Auto-generated catch block
       e1.printStackTrace();
     }
-    Object[] scriptArgs = {srvrKstrDir,agentCrtReqName,agentCrtName,
-        srvrCrtPass,srvrKeyName,srvrCrtName};
 
-    String command = MessageFormat.format(SIGN_AGENT_CRT,scriptArgs);
+    String command = MessageFormat.format(SIGN_AGENT_CRT, scriptArgs);
 
-    LOG.debug(command);
+    LOG.debug(ShellCommandUtil.hideOpenSslPassword(command));
 
     int commandExitCode = runCommand(command); // ssl command execution
-    if(commandExitCode != 0) {
+    if (commandExitCode != 0) {
       response.setResult(SignCertResponse.ERROR_STATUS);
       response.setMessage(ShellCommandUtil.getOpenSslCommandResult(command, commandExitCode));
       //LOG.warn(ShellCommandUtil.getOpenSslCommandResult(command, commandExitCode));
       return response;
     }
 
-    File agentCrtFile = new File(srvrKstrDir + File.separator + agentCrtName);
     String agentCrtContent = "";
     try {
       agentCrtContent = FileUtils.readFileToString(agentCrtFile);
@@ -287,7 +292,7 @@ public class CertificateManager {
 
     int commandExitCode = runCommand(command); // ssl command execution
     if(commandExitCode != 0) {
-      String errorMessage = "OpenSSL command ended with non-zero exit code";
+      String errorMessage = ShellCommandUtil.getOpenSslCommandResult(command, commandExitCode);
       LOG.warn(errorMessage);
       response.setResult(RevokeCertResponse.ERROR_STATUS);
       response.setMessage(errorMessage);

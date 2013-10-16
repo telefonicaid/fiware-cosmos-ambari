@@ -26,7 +26,7 @@ App.HostComponent = DS.Model.extend({
   service: DS.belongsTo('App.Service'),
   actualConfigs: null,
   isClient:function () {
-    if(['PIG', 'SQOOP', 'HCAT'].contains(this.get('componentName'))){
+    if(['PIG', 'SQOOP', 'HCAT', 'MAPREDUCE2_CLIENT'].contains(this.get('componentName'))){
       return true;
     }
 
@@ -43,6 +43,7 @@ App.HostComponent = DS.Model.extend({
       case 'NAMENODE':
       case 'SECONDARY_NAMENODE':
       case 'SNAMENODE':
+      case 'JOURNALNODE':
       case 'JOBTRACKER':
       case 'ZOOKEEPER_SERVER':
       case 'HIVE_SERVER':
@@ -54,6 +55,9 @@ App.HostComponent = DS.Model.extend({
       case 'OOZIE_SERVER':
       case 'WEBHCAT_SERVER':
       case 'HUE_SERVER':
+      case 'HISTORYSERVER':
+      case 'FLUME_SERVER':
+      case 'RESOURCEMANAGER':
         return true;
       default:
         return false;
@@ -65,6 +69,7 @@ App.HostComponent = DS.Model.extend({
       case 'TASKTRACKER':
       case 'HBASE_REGIONSERVER':
       case 'GANGLIA_MONITOR':
+      case 'NODEMANAGER':
         return true;
       default:
         return false;
@@ -78,16 +83,40 @@ App.HostComponent = DS.Model.extend({
     var decommissioning = false;
     var hostName = this.get('host.hostName');
     var componentName = this.get('componentName');
-    if (componentName == 'DATANODE') {
-      var hdfsSvc = App.router.get('mainServiceController.hdfsService');
-      if (hdfsSvc) {
-        var decomNodes = hdfsSvc.get('decommissionDataNodes');
-        var decomNode = decomNodes != null ? decomNodes.findProperty("hostName", hostName) : null;
-        decommissioning = decomNode != null;
-      }
+    var hdfsSvc = App.HDFSService.find().objectAt(0);
+    if (componentName === 'DATANODE' && hdfsSvc) {
+      var decomNodes = hdfsSvc.get('decommissionDataNodes');
+      var decomNode = decomNodes != null ? decomNodes.findProperty("hostName", hostName) : null;
+      decommissioning = decomNode != null;
     }
     return decommissioning;
-  }.property('componentName', 'host.hostName', 'App.router.mainServiceController.hdfsService.decommissionDataNodes.@each.hostName')
+  }.property('componentName', 'host.hostName', 'App.router.clusterController.isLoaded', 'App.router.updateController.isUpdated'),
+  /**
+   * User friendly host component status
+   */
+  componentTextStatus: function () {
+    var value = this.get("workStatus");
+
+    switch(value){
+      case "INSTALLING":
+        return 'Installing...';
+      case "INSTALL_FAILED":
+        return 'Install Failed';
+      case "INSTALLED":
+        return 'Stopped';
+      case "STARTED":
+        return 'Started';
+      case "STARTING":
+        return 'Starting...';
+      case "STOPPING":
+        return 'Stopping...';
+      case "UNKNOWN":
+        return 'Heartbeat lost...';
+      case "UPGRADE_FAILED":
+        return 'Upgrade Failed';
+    }
+    return 'Unknown';
+  }.property('workStatus','isDecommissioning')
 });
 
 App.HostComponent.FIXTURES = [];
@@ -97,11 +126,10 @@ App.HostComponentStatus = {
   starting: "STARTING",
   stopped: "INSTALLED",
   stopping: "STOPPING",
-  stop_failed: "STOP_FAILED",
-  start_failed: "START_FAILED",
   install_failed: "INSTALL_FAILED",
   installing: "INSTALLING",
   upgrade_failed: "UPGRADE_FAILED",
+  maintenance: "MAINTENANCE",
   unknown: "UNKNOWN",
 
   getKeyName:function(value){
@@ -114,16 +142,14 @@ App.HostComponentStatus = {
         return 'installed';
       case this.stopping:
         return 'stopping';
-      case this.stop_failed:
-        return 'stop_failed';
-      case this.start_failed:
-        return 'start_failed';
       case this.install_failed:
         return 'install_failed';
       case this.installing:
         return 'installing';
       case this.upgrade_failed:
         return 'upgrade_failed';
+      case this.maintenance:
+        return 'maintenance';
       case this.unknown:
         return 'unknown';
     }

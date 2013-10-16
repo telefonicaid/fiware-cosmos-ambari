@@ -39,34 +39,68 @@ class hdp::params()
     $yarn-site = $configuration['yarn-site']
   }
 
+  ## Stack version
+    $stack_version = hdp_default("stack_version", "1.3.0")
+    if (hdp_get_major_stack_version($hdp::params::stack_version) >= 2) {
+      $isHadoop2Stack = true
+    } else {
+      $isHadoop2Stack = false
+    }
+
   ##### global state defaults ####
   $cluster_service_state = hdp_default("cluster_service_state","running")
   $cluster_client_state = hdp_default("cluster_client_state","installed_and_configured")
 
   ## Hostname defaults
-  $hostname = hdp_default("myhostname", $::fqdn)
+  $hostname = hdp_to_lowercase(hdp_default("myhostname", $::fqdn))
   $public_hostname = hdp_default("public_hostname")
 
   ##### for secure install
-  $security_enabled = hdp_default("security_enabled",false)
+  $hadoop_security_authenticatoin = hdp_default("core-site/hadoop.security.authentication", "simple")
+  
+  $security_enabled = $hadoop_security_authenticatoin ? {
+    'kerberos' => true,
+    default => false,
+  }
+
   $kerberos_domain = hdp_default("kerberos_domain","EXAMPLE.COM")
-  $smoketest_user_secure_uid = hdp_default("smoketest_user_secure_uid",1012)
-  ## $smoketest_user_secure_uid = 1012
-  $kinit_path_local = hdp_default("kinit_path_local","/usr/bin/kinit")
+  $kinit_path_local = hdp_get_kinit_path(hdp_default("kinit_path_local"), "/usr/bin", "/usr/kerberos/bin", "/usr/sbin")
   $keytab_path = hdp_default("keytab_path", "/etc/security/keytabs")
-  $use_hostname_in_principal = hdp_default("instance_name", false)
+  $use_hostname_in_principal = hdp_default("instance_name", true)
+  $smokeuser_keytab = hdp_default("smokeuser_keytab", "/etc/security/keytabs/smokeuser.headless.keytab")
+  $hdfs_user_keytab = hdp_default("hdfs_user_keytab", "/etc/security/keytabs/hdfs.headless.keytab")
+  $hbase_user_keytab = hdp_default("hbase_user_keytab", "/etc/security/keytabs/hbase.headless.keytab")
+  $nagios_keytab_path = hdp_default("nagios_keytab_path", "/etc/security/keytabs/nagios.service.keytab")
+  $nagios_principal_name = hdp_default("nagios_principal_name", "nagios")
 
   ###### hostnames
   $namenode_host = hdp_default("namenode_host")
   $snamenode_host = hdp_default("snamenode_host")
   $jtnode_host = hdp_default("jtnode_host")
   $slave_hosts = hdp_default("slave_hosts")
-
+  $journalnode_hosts = hdp_default("journalnode_hosts")
+  $zkfc_hosts = hdp_default("zkfc_hosts")
   $rm_host = hdp_default("rm_host")
   $nm_hosts = hdp_default("nm_hosts")
   $hs_host = hdp_default("hs_host")
-
   $zookeeper_hosts = hdp_default("zookeeper_hosts")
+  $flume_hosts = hdp_default("flume_hosts")
+
+
+  $nn_principal_str = hdp_default("hdfs-site/dfs.namenode.kerberos.principal", "nn/_HOST@EXAMPLE.COM")
+  if ("_HOST" in $nn_principal_str and hdp_is_empty($namenode_host) == false) {
+    $nn_principal = regsubst($nn_principal_str, "_HOST", hdp_to_lowercase(hdp_first_value_from_list($namenode_host)))
+  } else {
+    $nn_principal = $nn_principal_str
+  }
+  $jt_principal_str = hdp_default("mapred-site/mapreduce.jobtracker.kerberos.principal", "jt/_HOST@EXAMPLE.COM")
+  if ("_HOST" in $jt_principal_str and hdp_is_empty($jtnode_host) == false) {
+    $jt_principal = regsubst($jt_principal_str, "_HOST", hdp_to_lowercase(hdp_first_value_from_list($jtnode_host)))
+  } else {
+    $jt_principal = $jt_principal_str
+  }
+
+  $flume_port = hdp_default("flume_port", "4159")
 
   $hbase_master_hosts = hdp_default("hbase_master_hosts", "")
 
@@ -91,10 +125,6 @@ class hdp::params()
 
   $hdp_os = $::operatingsystem
   $hdp_os_version = $::operatingsystemrelease
-  
-  
-  ## Stack version
-  $stack_version = hdp_default("stack_version", "1.3.0")
 
   
   case $::operatingsystem {
@@ -134,6 +164,8 @@ class hdp::params()
     $public_rm_host = hdp_host_attribute($hostAttributes,"publicfqdn",$rm_host)
     $public_nm_hosts = hdp_host_attribute($hostAttributes,"publicfqdn",$nm_hosts)
     $public_hs_host = hdp_host_attribute($hostAttributes,"publicfqdn",$hs_host)
+    $public_journalnode_hosts = hdp_host_attribute($hostAttributes,"publicfqdn",$journalnode_hosts)
+    $public_zkfc_hosts = hdp_host_attribute($hostAttributes,"publicfqdn",$zkfc_hosts)
     $public_jtnode_host = hdp_host_attribute($hostAttributes,"publicfqdn",$jtnode_host)
     $public_hbase_master_hosts = hdp_host_attribute($hostAttributes,"publicfqdn",$hbase_master_hosts)
     $public_zookeeper_hosts = hdp_host_attribute($hostAttributes,"publicfqdn",$zookeeper_hosts)
@@ -149,6 +181,8 @@ class hdp::params()
     $public_rm_host = hdp_default("rm_host")
     $public_nm_hosts = hdp_default("nm_hosts")
     $public_hs_host = hdp_default("hs_host")
+    $public_journalnode_hosts = hdp_default("journalnode_hosts")
+    $public_zkfc_hosts = hdp_default("zkfc_hosts")
     $public_jtnode_host = hdp_default("jtnode_host")
     $public_hbase_master_hosts = hdp_default("hbase_master_hosts")
     $public_zookeeper_hosts = hdp_default("zookeeper_hosts")
@@ -163,6 +197,12 @@ class hdp::params()
 
   ############ users
   $user_info = hdp_default("user_info",{})
+  $defined_groups = {}
+
+  $nagios_default_user = "nagios"
+  $nagios_default_group = "nagios"
+  $nagios_user = hdp_default("nagios_user", $nagios_default_user)
+  $nagios_group = hdp_default("nagios_group",$nagios_default_group)
 
   $hdfs_user = hdp_default("hdfs_user","hdfs")
   $mapred_user = hdp_default("mapred_user","mapred")
@@ -202,6 +242,7 @@ class hdp::params()
   $hive_apps_whs_dir = hdp_default("hive_apps_whs_dir", "/apps/hive/warehouse")
   $webhcat_apps_dir = hdp_default("webhcat_apps_dir", "/apps/webhcat")
   $hbase_hdfs_root_dir = hdp_default("hbase-site/hbase.hdfs.root.dir","/apps/hbase/data")
+  $hbase_staging_dir = hdp_default("hbase-site/hbase.bulkload.staging.dir","/apps/hbase/staging")
 
   $yarn_nm_app_log_dir = hdp_default("yarn-site/yarn.nodemanager.remote-app-log-dir","/app-logs")
 
@@ -232,6 +273,10 @@ class hdp::params()
 
   $jce_policy_zip = "jce_policy-6.zip"
   $jce_location = hdp_default("jce_location","http://download.oracle.com/otn-pub/java/jce_policy/6")
+  $server_db_name = hdp_default("db_name", "postgres")
+  $oracle_jdbc_url = hdp_default("oracle_jdbc_url", "")
+  $mysql_jdbc_url = hdp_default("mysql_jdbc_url", "")
+  $db_driver_file = hdp_default("db_driver_filename", "")
 
   #####
   $hadoop_home = hdp_default("hadoop_home","/usr")
@@ -263,15 +308,34 @@ class hdp::params()
  
   $exec_path = ["/bin","/usr/bin", "/usr/sbin"]
 
-   #### params used on multiple modules
-  $dfs_data_dir = hdp_default("hdfs-site/dfs.data.dir","/tmp/hadoop-hdfs/dfs/data")
+  #### params used on multiple modules
+  if (hdp_get_major_stack_version($stack_version) >= 2) {
+    $dfs_data_dir = hdp_default("hdfs-site/dfs.datanode.data.dir","/tmp/hadoop-hdfs/dfs/data")
+  } else {
+    $dfs_data_dir = hdp_default("hdfs-site/dfs.data.dir","/tmp/hadoop-hdfs/dfs/data")
+  }
 
   ### artifact dir
   $artifact_dir = hdp_default("artifact_dir","/tmp/HDP-artifacts/")
 
   ### artifacts download url ##
   $apache_artifacts_download_url = hdp_default("apache_artifacts_download_url","")
-  $gpl_artifacts_download_url = hdp_default("gpl_artifacts_download_url","") 
+  $gpl_artifacts_download_url = hdp_default("gpl_artifacts_download_url","")
+
+  # hdfs ha settings
+  $dfs_ha_nameservices = hdp_default("hdfs-site/dfs.nameservices")
+  $dfs_ha_namenode_ids = hdp_default("hdfs-site/dfs.ha.namenodes.${dfs_ha_nameservices}")
+  if (hdp_is_empty($dfs_ha_namenode_ids) == false) {
+    $dfs_ha_namenode_ids_array_len = inline_template("<%=(dfs_ha_namenode_ids).split(',').size()%>")
+    if ($dfs_ha_namenode_ids_array_len > 1) {
+      $dfs_ha_enabled = true
+    }
+  } else {
+    $dfs_ha_enabled = false
+  }
+
+  # Directory for limits configurations
+  $limits_conf_dir = "/etc/security/limits.d"
 
   $packages = 'bigtop' 
   if ($packages == 'hdp') {
@@ -284,6 +348,7 @@ class hdp::params()
     $pig_conf_dir = "/etc/pig"
     $oozie_conf_dir = "/etc/oozie"
     $hadoop_jar_location = "/usr/share/hadoop"
+    $hadoop_mapred2_jar_location = "/usr/lib/hadoop-mapreduce"
     $hbase_daemon_script = "/usr/bin/hbase-daemon.sh"
     $use_32_bits_on_slaves = false
     $zk_bin = '/usr/sbin'
@@ -299,12 +364,15 @@ class hdp::params()
    
     $mapred_smoke_test_script = "/usr/lib/hadoop/sbin/hadoop-validate-setup.sh"
 
-    if $stack_version in ("2.0.1") {
+    if (hdp_get_major_stack_version($stack_version) >= 2) {
       $hadoop_bin = "/usr/lib/hadoop/sbin"
+      $hadoop_deps = ['hadoop','hadoop-libhdfs','hadoop-lzo', 'hadoop-lzo-native']
     } else {
       $hadoop_bin = "/usr/lib/hadoop/bin"
+      $hadoop_deps = ['hadoop','hadoop-libhdfs','hadoop-native','hadoop-pipes','hadoop-sbin','hadoop-lzo', 'hadoop-lzo-native']
     }
     $yarn_bin = "/usr/lib/hadoop-yarn/sbin"
+    $yarn_container_bin = "/usr/lib/hadoop-yarn/bin"
     $mapred_bin = "/usr/lib/hadoop-mapreduce/sbin"
     $hadoop_conf_dir = "/etc/hadoop/conf"
     $yarn_conf_dir = "/etc/hadoop/conf"
@@ -316,6 +384,7 @@ class hdp::params()
     $hive_conf_dir = "/etc/hive/conf"
     $hcat_conf_dir = "/etc/hcatalog/conf"
     $hadoop_jar_location = "/usr/lib/hadoop/"
+    $hadoop_mapred2_jar_location = "/usr/lib/hadoop-mapreduce"
     $hbase_daemon_script = "/usr/lib/hbase/bin/hbase-daemon.sh"
     $use_32_bits_on_slaves = false
     $zk_bin = '/usr/lib/zookeeper/bin'
@@ -351,7 +420,7 @@ class hdp::params()
      suse => 'htpasswd2'} 
 
     }
-    
+
     # StackId => Arch => Os
     $package_names = 
     {
@@ -386,12 +455,7 @@ class hdp::params()
             'ALL' => ['hadoop','hadoop-libhdfs.i386','hadoop-native.i386','hadoop-pipes.i386','hadoop-sbin.i386','hadoop-lzo', 'hadoop-lzo-native.i386']
           },
           64 => {
-            'ALL' => ['hadoop','hadoop-libhdfs','hadoop-native','hadoop-pipes','hadoop-sbin','hadoop-lzo', 'hadoop-lzo-native']
-          }
-        },
-        '2.0.1' => {
-          64 => {
-            'ALL' => ['hadoop','hadoop-libhdfs','hadoop-lzo', 'hadoop-lzo-native']
+            'ALL' => $hadoop_deps
           }
         }
       },
@@ -415,7 +479,7 @@ class hdp::params()
     yarn-nodemanager => { 
       'ALL' => {
         64 => {
-          'ALL' => ['hadoop-yarn-nodemanager']
+          'ALL' => ['hadoop-yarn-nodemanager', 'hadoop-mapreduce']
         }
       }
     },
@@ -536,14 +600,17 @@ class hdp::params()
     {
       'ALL' => {64 => {'ALL' => 'perl-Net-SNMP'}}
     },
-
+        
     nagios-server => {
       'ALL' => {
         64 => {
-            'ALL' => 'nagios-3.2.3',
-            suse => ['nagios-3.2.3','nagios-www-3.2.3']
+            'ALL' => ['nagios-3.5.0-99','nagios-www-3.5.0-99']
           }
         }
+    },
+
+    nagios-devel => {
+      'ALL' => {64 => {'ALL' => 'nagios-devel-3.5.0-99'}}
     },
 
     nagios-fping => {
@@ -573,20 +640,28 @@ class hdp::params()
       }
     },
 
+    ganglia-devel => {
+      'ALL' => {64 => {'ALL' => 'ganglia-devel-3.5.0-99'}}
+    },
+
+    libganglia => {
+      'ALL' => {64 => {'ALL' => 'libganglia-3.5.0-99'}}
+    },
+
     ganglia-server => {
-      'ALL' => {64 => {'ALL' => 'ganglia-gmetad-3.2.0'}}
+      'ALL' => {64 => {'ALL' => 'ganglia-gmetad-3.5.0-99'}}
     },
 
-    ganglia-gweb => {
-      'ALL' => {64 => {'ALL' => 'gweb'}}
-    },
-
-    ganglia-hdp-gweb-addons => {
-      'ALL' => {64 => {'ALL' => 'hdp_mon_ganglia_addons'}}
+    ganglia-web => {
+      'ALL' => {64 => {'ALL' => 'ganglia-web-3.5.7-99.noarch'}}
     },
 
     ganglia-monitor => {
-      'ALL' => {64 => {'ALL' =>'ganglia-gmond-3.2.0'}}
+      'ALL' => {64 => {'ALL' =>'ganglia-gmond-3.5.0-99'}}
+    },
+
+    ganglia-gmond-modules-python => {
+      'ALL' => {64 => {'ALL' =>'ganglia-gmond-modules-python-3.5.0-99'}}
     },
 
     rrdtool-python => {
@@ -642,6 +717,10 @@ class hdp::params()
           suse => ['apache2', 'apache2-mod_php5']
         }
       }
+    },
+    
+    unzip => {
+      'ALL' => {'ALL' => {'ALL' => 'unzip'}}
     }
 }
 
@@ -670,10 +749,10 @@ class hdp::params()
   $nagios_lookup_daemon_strs = 
   {
     suse => '/usr/sbin/nagios',
-    centos6 => '/usr/bin/nagios',
-    centos5 => '/usr/bin/nagios',
-    redhat6 => '/usr/bin/nagios',
-    redhat5 => '/usr/bin/nagios',
+    centos6 => '/usr/sbin/nagios',
+    centos5 => '/usr/sbin/nagios',
+    redhat6 => '/usr/sbin/nagios',
+    redhat5 => '/usr/sbin/nagios',
     oraclelinux6 => '/usr/bin/nagios',
     oraclelinux5 => '/usr/bin/nagios'
   }
@@ -695,7 +774,17 @@ class hdp::params()
   $component_exists = {} 
   $service_exists = {}
 
-  $is_namenode_master = $::fqdn in $namenode_host
-  $is_jtnode_master   = $::fqdn in $jtnode_host
-  $is_hbase_master    = $::fqdn in $hbase_master_hosts
+  $is_namenode_master = $hdp::params::hostname in $namenode_host
+  $is_jtnode_master   = $hdp::params::hostname in $jtnode_host
+  $is_rmnode_master   = $hdp::params::hostname in $rm_host
+  $is_hsnode_master   = $hdp::params::hostname in $hs_host
+  $is_hbase_master    = $hdp::params::hostname in $hbase_master_hosts
+  $is_slave           = $hdp::params::hostname in $slave_hosts
+  
+  $has_namenodes = hdp_is_empty($namenode_host) == false
+  $has_jobtracker = hdp_is_empty($jtnode_host) == false
+  $has_resourcemanager = hdp_is_empty($rm_host) == false
+  $has_histroryserver = hdp_is_empty($hs_host) == false
+  $has_hbase_masters = hdp_is_empty($hbase_master_hosts) == false
+  $has_slaves = hdp_is_empty($slave_hosts) == false
 }

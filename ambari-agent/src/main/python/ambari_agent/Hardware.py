@@ -30,14 +30,36 @@ import AmbariConfig
 logger = logging.getLogger()
 
 class Hardware:
-  def __init__(self):
+  def __init__(self, config):
+    self.config = config
     self.hardware = {}
     osdisks = self.osdisks()
     self.hardware['mounts'] = osdisks
     otherInfo = self.facterInfo()
     self.hardware.update(otherInfo)
     pass
-  
+
+  @staticmethod
+  def extractMountInfo(outputLine):
+    if outputLine == None or len(outputLine) == 0:
+      return None
+
+      """ this ignores any spaces in the filesystemname and mounts """
+    split = outputLine.split()
+    if (len(split)) == 7:
+      device, type, size, used, available, percent, mountpoint = split
+      mountinfo = {
+        'size' : size,
+        'used' : used,
+        'available' : available,
+        'percent' : percent,
+        'mountpoint' : mountpoint,
+        'type': type,
+        'device' : device }
+      return mountinfo
+    else:
+      return None
+
   def osdisks(self):
     """ Run df to find out the disks on the host. Only works on linux 
     platforms. Note that this parser ignores any filesystems with spaces 
@@ -47,24 +69,13 @@ class Hardware:
     dfdata = df.communicate()[0]
     lines = dfdata.splitlines()
     for l in lines:
-      split = l.split()
-      """ this ignores any spaces in the filesystemname and mounts """
-      if (len(split)) == 7:
-        device, type, size, used, available, percent, mountpoint = split
-        mountinfo = { 
-                     'size' : size,
-                     'used' : used,
-                     'available' : available,
-                     'percent' : percent,
-                     'mountpoint' : mountpoint,
-                     'type': type,
-                     'device' : device }
-        if os.access(mountpoint, os.W_OK):
-          mounts.append(mountinfo)
-        pass
+      mountinfo = self.extractMountInfo(l)
+      if mountinfo != None and os.access(mountinfo['mountpoint'], os.W_OK):
+        mounts.append(mountinfo)
       pass
+    pass
     return mounts
-    
+
   def facterBin(self, facterHome):
     facterBin = facterHome + "/bin/facter"
     if (os.path.exists(facterBin)):
@@ -78,9 +89,9 @@ class Hardware:
     pass
   
   def configureEnviron(self, environ):
-    if not AmbariConfig.config.has_option("puppet", "ruby_home"):
+    if not self.config.has_option("puppet", "ruby_home"):
       return environ
-    ruby_home = AmbariConfig.config.get("puppet", "ruby_home")
+    ruby_home = self.config.get("puppet", "ruby_home")
     if os.path.exists(ruby_home):
       """Only update ruby home if the config is configured"""
       path = os.environ["PATH"]
@@ -133,8 +144,8 @@ class Hardware:
     logger.info("Facter info : \n" + pprint.pformat(retDict))
     return retDict  
   
-  def facterInfo(self):   
-    facterHome = AmbariConfig.config.get("puppet", "facter_home")
+  def facterInfo(self):
+    facterHome = self.config.get("puppet", "facter_home")
     facterEnv = os.environ
     logger.info("Using facter home as: " + facterHome)
     facterInfo = {}
@@ -173,7 +184,7 @@ class Hardware:
     return self.hardware
 
 def main(argv=None):
-  hardware = Hardware()
+  hardware = Hardware(AmbariConfig.config)
   print hardware.get()
 
 if __name__ == '__main__':

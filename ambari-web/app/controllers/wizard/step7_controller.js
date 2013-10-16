@@ -17,7 +17,7 @@
  */
 
 var App = require('app');
-
+var numberUtils = require('utils/number_utils');
 /**
  * By Step 7, we have the following information stored in App.db and set on this
  * controller by the router.
@@ -38,9 +38,17 @@ App.WizardStep7Controller = Em.Controller.extend({
 
   slaveHostToGroup: null,
 
+  secureConfigs: require('data/secure_mapping'),
+
+  miscModalVisible: false, //If miscConfigChange Modal is shown
+
+  gangliaAvailableSpace: null,
+
+  gangliaMoutDir:'/',
+
   isSubmitDisabled: function () {
-    return !this.stepConfigs.filterProperty('showConfig', true).everyProperty('errorCount', 0);
-  }.property('stepConfigs.@each.errorCount'),
+    return (!this.stepConfigs.filterProperty('showConfig', true).everyProperty('errorCount', 0) || this.get("miscModalVisible"));
+  }.property('stepConfigs.@each.errorCount', 'miscModalVisible'),
 
   selectedServiceNames: function () {
     return this.get('content.services').filterProperty('isSelected', true).filterProperty('isInstalled', false).mapProperty('serviceName');
@@ -80,31 +88,23 @@ App.WizardStep7Controller = Em.Controller.extend({
     App.config.addAdvancedConfigs(configs, advancedConfigs);
     //STEP 5: Add custom configs
     App.config.addCustomConfigs(configs);
+    //put properties from capacity-scheduler.xml into one config with textarea view
+    if(this.get('allInstalledServiceNames').contains('YARN') && !App.supports.capacitySchedulerUi){
+      configs = App.config.fileConfigsIntoTextarea(configs, 'capacity-scheduler.xml');
+    }
     //STEP 6: Distribute configs by service and wrap each one in App.ServiceConfigProperty (configs -> serviceConfigs)
-    var serviceConfigs = App.config.renderConfigs(configs, this.get('allInstalledServiceNames'), this.get('selectedServiceNames'));
+    var serviceConfigs = App.config.renderConfigs(configs, storedConfigs, this.get('allInstalledServiceNames'), this.get('selectedServiceNames'));
     this.set('stepConfigs', serviceConfigs);
     this.activateSpecialConfigs();
     this.set('selectedService', this.get('stepConfigs').filterProperty('showConfig', true).objectAt(0));
   },
+
    /**
    * make some configs visible depending on active services
    */
   activateSpecialConfigs: function () {
     var miscConfigs = this.get('stepConfigs').findProperty('serviceName', 'MISC').configs;
-    var showProxyGroup = this.get('selectedServiceNames').contains('HIVE') ||
-      this.get('selectedServiceNames').contains('HCATALOG') ||
-      this.get('selectedServiceNames').contains('OOZIE');
-    miscConfigs.findProperty('name', 'proxyuser_group').set('isVisible', showProxyGroup);
-    miscConfigs.findProperty('name', 'hbase_user').set('isVisible', this.get('selectedServiceNames').contains('HBASE'));
-    miscConfigs.findProperty('name', 'mapred_user').set('isVisible', this.get('selectedServiceNames').contains('MAPREDUCE'));
-    miscConfigs.findProperty('name', 'hive_user').set('isVisible', this.get('selectedServiceNames').contains('HIVE'));
-    miscConfigs.findProperty('name', 'hcat_user').set('isVisible', this.get('selectedServiceNames').contains('HCATALOG'));
-    miscConfigs.findProperty('name', 'webhcat_user').set('isVisible', this.get('selectedServiceNames').contains('WEBHCAT'));
-    miscConfigs.findProperty('name', 'oozie_user').set('isVisible', this.get('selectedServiceNames').contains('OOZIE'));
-    miscConfigs.findProperty('name', 'zk_user').set('isVisible', this.get('selectedServiceNames').contains('ZOOKEEPER'));
-    miscConfigs.findProperty('name', 'gmetad_user').set('isVisible', this.get('selectedServiceNames').contains('GANGLIA'));
-    miscConfigs.findProperty('name', 'rrdcached_base_dir').set('isVisible', this.get('selectedServiceNames').contains('GANGLIA'));
-    miscConfigs.findProperty('name', 'nagios_user').set('isVisible', this.get('selectedServiceNames').contains('NAGIOS'));
+    miscConfigs = App.config.miscConfigVisibleProperty(miscConfigs, this.get('selectedServiceNames'));
   },
 
   /**

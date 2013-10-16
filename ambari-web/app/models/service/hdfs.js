@@ -22,6 +22,7 @@ App.HDFSService = App.Service.extend({
   nameNode: DS.belongsTo('App.Host'),
   snameNode: DS.belongsTo('App.Host'),
   dataNodes: DS.hasMany('App.Host'),
+  journalNodes: DS.hasMany('App.Host'),
   nameNodeStartTime: DS.attr('number'),
   jvmMemoryHeapUsed: DS.attr('number'),
   jvmMemoryHeapCommitted: DS.attr('number'),
@@ -37,7 +38,9 @@ App.HDFSService = App.Service.extend({
   dfsUnderReplicatedBlocks: DS.attr('number'),
   dfsTotalFiles: DS.attr('number'),
   upgradeStatus: DS.attr('boolean'),
-  safeModeStatus: DS.attr('string')
+  safeModeStatus: DS.attr('string'),
+  nameNodeCpu: DS.attr('number'),
+  nameNodeRpc: DS.attr('number')
 });
 
 App.HDFSService.FIXTURES = [];

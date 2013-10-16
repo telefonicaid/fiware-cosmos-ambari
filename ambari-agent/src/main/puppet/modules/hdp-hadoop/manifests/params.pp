@@ -54,7 +54,7 @@ class hdp-hadoop::params(
   $dtnode_heapsize = hdp_default("dtnode_heapsize","1024m")
   $ttnode_heapsize = hdp_default("ttnode_heapsize","1024m")
 
-  $hadoop_heapsize = hdp_default("hadoop_heapsize","1024m")
+  $hadoop_heapsize = hdp_default("hadoop_heapsize","1024")
 
   $hdfs_log_dir_prefix = hdp_default("hdfs_log_dir_prefix","/var/log/hadoop")
 
@@ -81,7 +81,14 @@ class hdp-hadoop::params(
   
   $mapred_log_dir_prefix = hdp_default("mapred_log_dir_prefix","/var/log/hadoop-mapreduce")
 
-  $mapred_pid_dir_prefix = hdp_default("mapreduce_libs_path","/var/run/hadoop-mapreduce")
+  $mapred_pid_dir_prefix = hdp_default("mapred_pid_dir_prefix","/var/run/hadoop-mapreduce")
+
+  ### JSVC_HOME path is correct for AMD64 only, but can be changed through API
+  if ($hdp::params::hdp_os_type == "suse") {
+    $jsvc_path = hdp_default("jsvc_path","/usr/lib/hadoop/sbin/Linux-amd64-64/")
+  } else {
+    $jsvc_path = hdp_default("jsvc_path","/usr/libexec/bigtop-utils")
+  }
 
   ### compression related
   if (($hdp::params::lzo_enabled == true) and ($hdp::params::snappy_enabled == true)) {
@@ -103,9 +110,15 @@ class hdp-hadoop::params(
   }
 
   ### core-site
-  $fs_checkpoint_dir = hdp_default("core-site/fs.checkpoint.dir","/tmp/hadoop-hdfs/dfs/namesecondary")
+  if (hdp_get_major_stack_version($stack_version) >= 2) {
+    $fs_checkpoint_dir = hdp_default("core-site/dfs.namenode.checkpoint.dir","/tmp/hadoop-hdfs/dfs/namesecondary")
+  } else {
+    $fs_checkpoint_dir = hdp_default("core-site/fs.checkpoint.dir","/tmp/hadoop-hdfs/dfs/namesecondary")
+  }
 
   $proxyuser_group = hdp_default("core-site/proxyuser.group","users")
+  
+  $hadoop_tmp_dir = hdp_default("core-site/hadoop.tmp.dir","/tmp/hadoop-$hdfs_user")
 
   ### hdfs-site
   $datanode_du_reserved = hdp_default("hdfs-site/datanode.du.reserved",1073741824)
@@ -122,23 +135,26 @@ class hdp-hadoop::params(
 
   $dfs_include = hdp_default("hdfs-site/dfs.include","dfs.include")
   
-  $dfs_name_dir = hdp_default("hdfs-site/dfs.name.dir","/tmp/hadoop-hdfs/dfs/name")
+  if (hdp_get_major_stack_version($stack_version) >= 2) {
+    $dfs_name_dir = hdp_default("hdfs-site/dfs.namenode.name.dir","/tmp/hadoop-hdfs/dfs/name")
+  } else {
+    $dfs_name_dir = hdp_default("hdfs-site/dfs.name.dir","/tmp/hadoop-hdfs/dfs/name")
+  }
   
   $dfs_replication = hdp_default("hdfs-site/dfs.replication",3)
 
   $dfs_support_append = hdp_default("hdfs-site/dfs.support.append",true)
 
   $dfs_webhdfs_enabled = hdp_default("hdfs-site/dfs.webhdfs.enabled",false)
-
+  
+  $jn_edits_dir = hdp_default("hdfs-site/dfs.journalnode.edits.dir", "/grid/0/hdfs/journal")
+  
+  $dfs_domain_socket_path = hdp_default("hdfs-site/dfs.domain.socket.path","/var/lib/hadoop-hdfs/dn_socket")
 
  ######### mapred #######
    ### mapred-site
 
   $mapred_system_dir = '/mapred/system'
-
-  $io_sort_mb = hdp_default("mapred-site/io.sort.mb","200")
-
-  $io_sort_spill_percent = hdp_default("mapred-site/io.sort.spill.percent","0.9")
 
   $mapred_child_java_opts_sz = hdp_default("mapred-site/mapred.child.java.opts.sz","-Xmx768m")
 
@@ -150,22 +166,18 @@ class hdp-hadoop::params(
 
   $mapred_cluster_red_mem_mb = hdp_default("mapred-site/mapred.cluster.red.mem.mb","-1")
 
-  $mapred_hosts_exclude = hdp_default("mapred-site/mapred.hosts.exclude","mapred.exclude")
-
-  $mapred_hosts_include = hdp_default("mapred-site/mapred.hosts.include","mapred.include")
-
   $mapred_job_map_mem_mb = hdp_default("mapred-site/mapred.job.map.mem.mb","-1")
 
   $mapred_job_red_mem_mb = hdp_default("mapred-site/mapred.job.red.mem.mb","-1")
 
   $mapred_jobstatus_dir = hdp_default("mapred-site/mapred.jobstatus.dir","file:////mapred/jobstatus")
 
-  $mapred_local_dir = hdp_default("mapred-site/mapred.local.dir","/tmp/hadoop-mapred/mapred/local")
+  if (hdp_get_major_stack_version($stack_version) >= 2) {
+    $mapred_local_dir = hdp_default("mapred-site/mapreduce.cluster.local.dir","/tmp/hadoop-mapred/mapred/local")
+  } else {
+    $mapred_local_dir = hdp_default("mapred-site/mapred.local.dir","/tmp/hadoop-mapred/mapred/local")
+  }
    
-  $mapred_map_tasks_max = hdp_default("mapred-site/mapred.map.tasks.max",4)
-
-  $mapred_red_tasks_max = hdp_default("mapred-site/mapred.red.tasks.max",4)
-
   $mapreduce_userlog_retainhours = hdp_default("mapred-site/mapreduce.userlog.retainhours",24)
 
   $maxtasks_per_job = hdp_default("mapred-site/maxtasks.per.job","-1")
@@ -189,5 +201,10 @@ class hdp-hadoop::params(
   $ambari_db_rca_driver = hdp_default("ambari_db_rca_driver", "org.postgresql.Driver")
   $ambari_db_rca_username = hdp_default("ambari_db_rca_username", "mapred")
   $ambari_db_rca_password = hdp_default("ambari_db_rca_password", "mapred")
+
+  if ($hdp::params::dfs_ha_enabled == true) {
+    $nameservice = $hdp::params::dfs_ha_nameservices
+    $namenode_id = hdp_hadoop_get_namenode_id("dfs.namenode.rpc-address.${nameservice}", "hdfs-site")
+  }
 
 }

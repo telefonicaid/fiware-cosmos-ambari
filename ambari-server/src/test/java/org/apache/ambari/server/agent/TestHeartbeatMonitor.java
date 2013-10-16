@@ -49,6 +49,7 @@ import org.apache.ambari.server.state.StackId;
 import org.apache.ambari.server.state.State;
 import org.apache.ambari.server.state.fsm.InvalidStateTransitionException;
 import org.apache.ambari.server.state.svccomphost.ServiceComponentHostInstallEvent;
+import org.apache.ambari.server.state.svccomphost.ServiceComponentHostMaintenanceEvent;
 import org.apache.ambari.server.state.svccomphost.ServiceComponentHostOpSucceededEvent;
 import org.apache.ambari.server.state.svccomphost.ServiceComponentHostStartedEvent;
 import org.junit.After;
@@ -113,7 +114,7 @@ public class TestHeartbeatMonitor {
         new HashMap<String,String>() {{ put("a", "b"); }});
     config.setVersionTag("version1");
     cluster.addConfig(config);
-    cluster.addDesiredConfig(config);
+    cluster.addDesiredConfig("_test", config);
     
     
     clusters.mapHostsToCluster(hostNames, clusterName);
@@ -191,7 +192,7 @@ public class TestHeartbeatMonitor {
       }});
     config.setVersionTag("version1");
     cluster.addConfig(config);
-    cluster.addDesiredConfig(config);
+    cluster.addDesiredConfig("_test", config);
 
 
     clusters.mapHostsToCluster(hostNames, clusterName);
@@ -426,6 +427,18 @@ public class TestHeartbeatMonitor {
         // installing
         sch.handleEvent(new ServiceComponentHostInstallEvent(
             sch.getServiceComponentName(), sch.getHostName(), System.currentTimeMillis(), "HDP-0.1"));
+      } else if (sch.getServiceComponentName().equals("SECONDARY_NAMENODE"))  {
+        // installing
+        sch.handleEvent(new ServiceComponentHostInstallEvent(
+          sch.getServiceComponentName(), sch.getHostName(), System.currentTimeMillis(), "HDP-0.1"));
+
+        // installed
+        sch.handleEvent(new ServiceComponentHostOpSucceededEvent(sch.getServiceComponentName(),
+          sch.getHostName(), System.currentTimeMillis()));
+
+        // maintenance
+        sch.handleEvent(new ServiceComponentHostMaintenanceEvent(sch.getServiceComponentName(),
+          sch.getHostName(), System.currentTimeMillis()));
       }
     }
     
@@ -455,9 +468,9 @@ public class TestHeartbeatMonitor {
         assertEquals(sch.getServiceComponentName(), State.INSTALLING, sch.getState());
       else if (sc.isClientComponent())
         assertEquals(sch.getServiceComponentName(), State.INIT, sch.getState());
+      else if (sch.getServiceComponentName().equals("SECONDARY_NAMENODE"))
+        assertEquals(sch.getServiceComponentName(), State.MAINTENANCE,
+          sch.getState());
     }
-
-    
-    
   }
 }

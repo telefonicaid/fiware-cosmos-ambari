@@ -20,12 +20,13 @@
 #
 class hdp-nagios::params() inherits hdp::params
 {   
-  $nagios_default_user = "nagios"
-  $nagios_default_group = "nagios"
-  $nagios_user = hdp_default("nagios_user", $nagios_default_user)
-  $nagios_group = hdp_default("nagios_group",$nagios_default_group)
-  
   $conf_dir = hdp_default("nagios_conf_dir","/etc/nagios")
+
+  if (hdp_get_major_stack_version($hdp::params::stack_version) >= 2) {
+    $nn_metrics_property = "FSNamesystem"
+  } else {
+    $nn_metrics_property = "FSNamesystemMetrics"
+  }
 
   if hdp_is_empty($hdp::params::services_names[httpd]) {
     hdp_fail("There is no service name for service httpd")
@@ -46,8 +47,9 @@ class hdp-nagios::params() inherits hdp::params
   $httpd_conf_file = "/etc/${service_name}/conf.d/nagios.conf"
 
   $plugins_dir = "/usr/lib64/nagios/plugins"
-  $eventhandlers_dir = "/usr/lib64/nagios/eventhandlers"  # Does not exist yet
+  $eventhandlers_dir = "/usr/lib/nagios/eventhandlers"  # Does not exist yet
   $nagios_pid_dir = "/var/run/nagios"
+  $nagios_pid_file = "${nagios_pid_dir}/nagios.pid"
   $nagios_log_dir = '/var/log/nagios'
   $nagios_log_archives_dir = "${nagios_log_dir}/archives"
   
@@ -80,6 +82,7 @@ class hdp-nagios::params() inherits hdp::params
     nagios-server => {host_member_info => 'nagios_server_host'},
     jobtracker  => {host_member_info => 'jtnode_host'},
     ganglia-server => {host_member_info => 'ganglia_server_host'},
+    flume-servers => {host_member_info => 'flume_hosts'},
     zookeeper-servers => {host_member_info => 'zookeeper_hosts'},
     hbasemasters => {host_member_info => 'hbase_master_hosts'},
     hiveserver => {host_member_info => 'hive_server_host'},
@@ -87,7 +90,7 @@ class hdp-nagios::params() inherits hdp::params
     oozie-server => {host_member_info => 'oozie_server'},
     webhcat-server => {host_member_info => 'webhcat_server_host'},
     hue-server => {host_member_info => 'hue_server_host'},
-    resorcemanager => {host_member_info => 'rm_host'},
+    resourcemanager => {host_member_info => 'rm_host'},
     nodemanagers => {host_member_info => 'nm_hosts'},
     historyserver2 => {host_member_info => 'hs_host'}
   }

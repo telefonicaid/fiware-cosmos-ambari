@@ -18,6 +18,7 @@
 
 <div class="host-component-popup-wrap">
 
+    {{#if view.parentView.isLoaded}}
     <!-- SERVICES --->
 
     <div {{bindAttr class="view.isServiceListHidden:hidden :task-list-main-warp"}}>
@@ -64,11 +65,13 @@
 
   <div {{bindAttr class="view.isHostListHidden:hidden :task-list-main-warp"}}>
     <div class="task-top-wrap">
-      <a class="task-detail-back-to-hosts" href="javascript:void(null)" {{action backToServiceList}} ><i class="icon-arrow-left"></i>&nbsp;{{t common.operations}}</a>
-      <div>
-        <span class="task-detail-log-rolename" >{{t common.hosts}}</span>
-      </div>
-      <div {{bindAttr class="controller.showServices:tasks-list-select :select-wrap"}}>
+      {{#if controller.showServices}}
+        <a class="task-detail-back-to-hosts" href="javascript:void(null)" {{action backToServiceList}} >
+          <i class="icon-arrow-left"></i>&nbsp;{{t common.operations}}
+        </a>
+      {{/if}}
+      <span class="task-detail-log-rolename" >{{t common.hosts}}</span>
+      <div class="select-wrap">
         {{t common.show}}:
         {{view Ember.Select
           contentBinding="view.categories"
@@ -142,7 +145,7 @@
   </div>
 
 
-  <!-- TASKS DETAILS --->
+  <!-- TASK DETAILS --->
 
   <div {{bindAttr class="view.isLogWrapHidden:hidden :task-detail-info"}}>
     <div class="task-top-wrap">
@@ -168,4 +171,7 @@
       </div>
     </div>
   </div>
+    {{else}}
+      <div class="spinner"></div>
+    {{/if}}
 </div>

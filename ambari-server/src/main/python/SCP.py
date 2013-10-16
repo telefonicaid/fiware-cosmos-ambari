@@ -29,51 +29,36 @@ import threading
 import traceback
 from pprint import pformat
 
+DEBUG=False
 
 class SCP(threading.Thread):
 
     """ SCP implementation that is thread based. The status can be returned using
      status val """
-    def __init__(self, user, sshKeyFile, host, inputFile, remote, bootdir):
+    def __init__(self, user, sshkey_file, host, inputFile, remote, bootdir, host_log):
         self.user = user
-        self.sshKeyFile = sshKeyFile
+        self.sshkey_file = sshkey_file
         self.host = host
         self.inputFile = inputFile
         self.remote = remote
         self.bootdir = bootdir
-        self.ret = {"exitstatus": -1, "log": "FAILED"}
-        threading.Thread.__init__(self)
-        self.daemon = True
+        self.host_log = host_log
         pass
-
-    def getStatus(self):
-        return self.ret
-        pass
-
-    def getHost(self):
-        return self.host
 
     def run(self):
         scpcommand = ["scp",
                       "-o", "ConnectTimeout=60",
                       "-o", "BatchMode=yes",
                       "-o", "StrictHostKeyChecking=no",
-                      "-i", self.sshKeyFile, self.inputFile, self.user + "@" +
+                      "-i", self.sshkey_file, self.inputFile, self.user + "@" +
                       self.host + ":" + self.remote]
-        logging.info("Running scp command " + ' '.join(scpcommand))
+        if DEBUG:
+            self.host_log.write("Running scp command " + ' '.join(scpcommand))
         scpstat = subprocess.Popen(scpcommand, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         log = scpstat.communicate()
-        self.ret["exitstatus"] = scpstat.returncode
-        self.ret["log"] = "STDOUT\n" + log[0] + "\nSTDERR\n" + log[1]
-        logFilePath = os.path.join(self.bootdir, self.host + ".log")
-        self.writeLogToFile(logFilePath)
-        logging.info("scp " + self.inputFile + " done for host " +
-                     self.host + ", exitcode=" + str(scpstat.returncode))
-        pass
-
-    def writeLogToFile(self, logFilePath):
-        logFile = open(logFilePath, "a+")
-        logFile.write(self.ret["log"])
-        logFile.close
-        pass
+        log = "STDOUT\n" + log[0] + "\nSTDERR\n" + log[1]
+        self.host_log.write(log)
+        self.host_log.write("scp " + self.inputFile + " done for host " + self.host +
+                 ", exitcode=" + str(scpstat.returncode))
+        return scpstat.returncode

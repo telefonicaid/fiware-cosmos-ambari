@@ -31,6 +31,9 @@ secured_url_port=8441
 
 [agent]
 prefix=/tmp/ambari-agent
+data_cleanup_interval=86400
+data_cleanup_max_age=2592000
+ping_port=0
 
 [services]
 
@@ -55,7 +58,7 @@ passphrase_env_var_name=AMBARI_PASSPHRASE
 [heartbeat]
 state_interval = 6
 dirs=/etc/hadoop,/etc/hadoop/conf,/var/run/hadoop,/var/log/hadoop
-rpms=hadoop,openssl,wget,net-snmp,ntpd,ruby,ganglia,nagios
+rpms=glusterfs,openssl,wget,net-snmp,ntpd,ruby,ganglia,nagios,glusterfs
 """
 s = StringIO.StringIO(content)
 config.readfp(s)
@@ -79,6 +82,9 @@ imports = [
 ]
 
 rolesToClass = {
+  'HCFS': 'hdp-hadoop::hcfs',
+  'HCFS_CLIENT': 'hdp-hadoop::hcfs_client',
+  'HCFS_SERVICE_CHECK': 'hdp-hadoop::hcfs_service_check',
   'NAMENODE': 'hdp-hadoop::namenode',
   'DATANODE': 'hdp-hadoop::datanode',
   'SECONDARY_NAMENODE': 'hdp-hadoop::snamenode',
@@ -90,7 +96,7 @@ rolesToClass = {
   'YARN_CLIENT': 'hdp-yarn::yarn_client',
   'HDFS_CLIENT': 'hdp-hadoop::client',
   'MAPREDUCE_CLIENT': 'hdp-hadoop::client',
-  'MAPREDUCEv2_CLIENT': 'hdp-yarn::mapreducev2_client',
+  'MAPREDUCE2_CLIENT': 'hdp-yarn::mapreducev2_client',
   'ZOOKEEPER_SERVER': 'hdp-zookeeper',
   'ZOOKEEPER_CLIENT': 'hdp-zookeeper::client',
   'HBASE_MASTER': 'hdp-hbase::master',
@@ -114,6 +120,7 @@ rolesToClass = {
   'HUE_SERVER': 'hdp-hue::server',
   'HDFS_SERVICE_CHECK': 'hdp-hadoop::hdfs::service_check',
   'MAPREDUCE_SERVICE_CHECK': 'hdp-hadoop::mapred::service_check',
+  'MAPREDUCE2_SERVICE_CHECK': 'hdp-yarn::mapred2::service_check',
   'ZOOKEEPER_SERVICE_CHECK': 'hdp-zookeeper::zookeeper::service_check',
   'ZOOKEEPER_QUORUM_SERVICE_CHECK': 'hdp-zookeeper::quorum::service_check',
   'HBASE_SERVICE_CHECK': 'hdp-hbase::hbase::service_check',
@@ -129,6 +136,10 @@ rolesToClass = {
   'RESOURCEMANAGER_SERVICE_CHECK': 'hdp-yarn::resourcemanager::service_check',
   'HISTORYSERVER_SERVICE_CHECK': 'hdp-yarn::historyserver::service_check',
   'TEZ_CLIENT': 'hdp-tez::tez_client',
+  'YARN_SERVICE_CHECK': 'hdp-yarn::yarn::service_check',
+  'FLUME_SERVER': 'hdp-flume',
+  'JOURNALNODE': 'hdp-hadoop::journalnode',
+  'ZKFC': 'hdp-hadoop::zkfc',
   #Cosmos specific
   'USER_MASTER_MANAGER': 'cosmos_user::user_master_manager',
   'USER_SLAVE_MANAGER': 'cosmos_user::user_slave_manager'
@@ -141,6 +152,7 @@ serviceStates = {
 }
 
 servicesToPidNames = {
+  'HCFS' : 'glusterd.pid$',    
   'NAMENODE': 'hadoop-{USER}-namenode.pid$',
   'SECONDARY_NAMENODE': 'hadoop-{USER}-secondarynamenode.pid$',
   'DATANODE': 'hadoop-{USER}-datanode.pid$',
@@ -149,8 +161,11 @@ servicesToPidNames = {
   'RESOURCEMANAGER': 'yarn-{USER}-resourcemanager.pid$',
   'NODEMANAGER': 'yarn-{USER}-nodemanager.pid$',
   'HISTORYSERVER': 'mapred-{USER}-historyserver.pid$',
+  'JOURNALNODE': 'hadoop-{USER}-journalnode.pid$',
+  'ZKFC': 'hadoop-{USER}-zkfc.pid$',
   'OOZIE_SERVER': 'oozie.pid',
   'ZOOKEEPER_SERVER': 'zookeeper_server.pid',
+  'FLUME_SERVER': 'flume-node.pid',
   'TEMPLETON_SERVER': 'templeton.pid',
   'NAGIOS_SERVER': 'nagios.pid',
   'GANGLIA_SERVER': 'gmetad.pid',
@@ -166,9 +181,25 @@ servicesToPidNames = {
   'WEBHCAT_SERVER': 'webhcat.pid',
 }
 
-linuxUserPattern = '[A-Za-z0-9_-]*[$]?'
+#Each service, which's pid depends on user should provide user mapping
+servicesToLinuxUser = {
+  'NAMENODE': 'hdfs_user',
+  'SECONDARY_NAMENODE': 'hdfs_user',
+  'DATANODE': 'hdfs_user',
+  'JOURNALNODE': 'hdfs_user',
+  'ZKFC': 'hdfs_user',
+  'JOBTRACKER': 'mapred_user',
+  'TASKTRACKER': 'mapred_user',
+  'RESOURCEMANAGER': 'yarn_user',
+  'NODEMANAGER': 'yarn_user',
+  'HISTORYSERVER': 'mapred_user',
+  'HBASE_MASTER': 'hbase_user',
+  'HBASE_REGIONSERVER': 'hbase_user',
+}
 
 pidPathesVars = [
+  {'var' : 'hcfs_pid_dir_prefix',
+   'defaultValue' : '/var/run'},      
   {'var' : 'hadoop_pid_dir_prefix',
    'defaultValue' : '/var/run/hadoop'},
   {'var' : 'hadoop_pid_dir_prefix',
@@ -189,8 +220,12 @@ pidPathesVars = [
    'defaultValue' : '/var/run/hive'},                      
   {'var' : 'mysqld_pid_dir',
    'defaultValue' : '/var/run/mysqld'},
-  {'var' : 'webhcat_pid_dir',
+  {'var' : 'hcat_pid_dir',
    'defaultValue' : '/var/run/webhcat'},                      
+  {'var' : 'yarn_pid_dir_prefix',
+   'defaultValue' : '/var/run/hadoop-yarn'},
+  {'var' : 'mapred_pid_dir_prefix',
+   'defaultValue' : '/var/run/hadoop-mapreduce'},
 ]
 
 class AmbariConfig:

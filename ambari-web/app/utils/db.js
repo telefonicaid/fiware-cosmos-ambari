@@ -21,21 +21,21 @@ App.db = {};
 if (typeof Storage !== 'undefined') {
   Storage.prototype.setObject = function (key, value) {
     this.setItem(key, JSON.stringify(value));
-  }
+  };
 
   Storage.prototype.getObject = function (key) {
     var value = this.getItem(key);
     return value && JSON.parse(value);
-  }
+  };
 } else {
   // stub for unit testing purposes
   window.localStorage = {};
   localStorage.setItem = function (key, val) {
     this[key] = val;
-  }
+  };
   localStorage.getItem = function (key) {
     return this[key];
-  }
+  };
   window.localStorage.setObject = function (key, value) {
     this[key] = value;
   };
@@ -49,7 +49,13 @@ App.db.cleanUp = function () {
   App.db.data = {
     'app': {
       'loginName': '',
-      'authenticated': false
+      'authenticated': false,
+      'tables': {
+        'filterConditions': {},
+        'displayLength': {},
+        'startIndex': {},
+        'sortingConditions': {}
+      }
     },
 
     'Installer' : {},
@@ -57,13 +63,23 @@ App.db.cleanUp = function () {
     'AddService' : {},
     'StackUpgrade' : {},
     'ReassignMaster' : {},
-    'AddSecurity': {}
+    'AddSecurity': {},
+    'HighAvailabilityWizard': {}
 
   };
   console.log("In cleanup./..");
   localStorage.setObject('ambari', App.db.data);
 };
 
+App.db.updateStorage = function() {
+  App.db.data = localStorage.getObject('ambari');
+  if (App.db.data && App.db.data.app && App.db.data.app.tables) {
+    return true;
+  }
+  console.warn("local storage is deprecated!");
+  App.db.cleanUp();
+  return false;
+};
 // called whenever user logs in
 if (localStorage.getObject('ambari') == null) {
   console.log('doing a cleanup');
@@ -109,6 +125,46 @@ App.db.setAuthenticated = function (authenticated) {
   localStorage.setObject('ambari', App.db.data);
   App.db.data = localStorage.getObject('ambari');
   console.log('Now present value of authentication is: ' + App.db.data.app.authenticated);
+};
+
+App.db.setFilterConditions = function(name, filterConditions) {
+  console.log('TRACE: Entering db:setFilterConditions function');
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.app.tables.filterConditions) {
+    App.db.data.app.tables.filterConditions = {};
+  }
+  App.db.data.app.tables.filterConditions[name] = filterConditions;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setDisplayLength = function(name, displayLength) {
+  console.log('TRACE: Entering db:setDisplayLength function');
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.app.tables.displayLength) {
+    App.db.data.app.tables.displayLength = {};
+  }
+  App.db.data.app.tables.displayLength[name] = displayLength;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setStartIndex = function(name, startIndex) {
+  console.log('TRACE: Entering db:setStartIndex function');
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.app.tables.startIndex) {
+    App.db.data.app.tables.startIndex = {};
+  }
+  App.db.data.app.tables.startIndex[name] = startIndex;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setSortingStatuses = function(name, sortingConditions) {
+  console.log('TRACE: Entering db:setSortingConditions function');
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.app.tables.sortingConditions) {
+    App.db.data.app.tables.sortingConditions = {};
+  }
+  App.db.data.app.tables.sortingConditions[name] = sortingConditions;
+  localStorage.setObject('ambari', App.db.data);
 };
 
 App.db.setAllHostNames = function (hostNames) {
@@ -186,12 +242,6 @@ App.db.setSlaveComponentHosts = function (slaveComponentHosts) {
   localStorage.setObject('ambari', App.db.data);
 };
 
-App.db.setSlaveProperties = function (slaveProperties) {
-  App.db.data = localStorage.getObject('ambari');
-  App.db.data.Installer.slaveProperties = slaveProperties;
-  localStorage.setObject('ambari', App.db.data);
-};
-
 App.db.setServiceConfigs = function (serviceConfigs) {
   App.db.data = localStorage.getObject('ambari');
   App.db.data.Installer.serviceConfigs = serviceConfigs;
@@ -236,6 +286,12 @@ App.db.setReassignTasksStatuses = function (tasksStatuses) {
   localStorage.setObject('ambari', App.db.data);
 };
 
+App.db.setStacks = function (stacks) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.app.stacksVersions = stacks;
+  localStorage.setObject('ambari', App.db.data);
+};
+
 /**
  * Set current step value for specified Wizard Type
  * @param wizardType
@@ -258,12 +314,70 @@ App.db.setSecurityWizardStatus = function (status) {
   localStorage.setObject('ambari', App.db.data);
 };
 
-App.db.setSecurityStage = function (securityStage) {
+App.db.setDisableSecurityStatus = function (status) {
   App.db.data = localStorage.getObject('ambari');
-  App.db.data.AddSecurity.securityStage = securityStage;
+  if (!App.db.data.AddSecurity) {
+    App.db.data.AddSecurity = {};
+  }
+  App.db.data.AddSecurity.disableSecurityStatus = status;
   localStorage.setObject('ambari', App.db.data);
 };
 
+App.db.setSecurityDeployStages = function (securityStages) {
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.AddSecurity) {
+    App.db.data.AddSecurity = {};
+  }
+  App.db.data.AddSecurity.securityDeployStages = securityStages;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setSecureConfigProperties  = function (secureConfigs) {
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.AddSecurity) {
+    App.db.data.AddSecurity = {};
+  }
+  App.db.data.AddSecurity.secureConfigProperties = secureConfigs;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setIsNameNodeHa = function (haStatus) {
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.AddSecurity) {
+    App.db.data.AddSecurity = {};
+  }
+  App.db.data.AddSecurity.haStatus = haStatus;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setHighAvailabilityWizardConfigTag = function (tag) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.HighAvailabilityWizard[tag.name] = tag.value;
+  localStorage.setObject('ambari', App.db.data);
+};
+App.db.setHighAvailabilityWizardFailedTask = function (task) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.HighAvailabilityWizard.failedTask = task;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setHighAvailabilityWizardTasksStatuses = function (tasksStatuses) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.HighAvailabilityWizard.tasksStatuses = tasksStatuses;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setHighAvailabilityWizardRequestIds = function (requestIds) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.HighAvailabilityWizard.requestIds = requestIds;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setHighAvailabilityWizardNameServiceId = function (nameServiceId) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.HighAvailabilityWizard.nameServiceId = nameServiceId;
+  localStorage.setObject('ambari', App.db.data);
+};
 
 /*
  *  getter methods
@@ -295,6 +409,42 @@ App.db.getAmbariStacks = function () {
   console.log('TRACE: Entering db:setAmbariStacks function');
   App.db.data = localStorage.getObject('ambari');
   return App.db.data.app.stacks;
+};
+
+App.db.getFilterConditions = function(name) {
+  console.log('TRACE: Entering db:getFilterConditions function');
+  App.db.data = localStorage.getObject('ambari');
+  if (App.db.data.app.tables.filterConditions[name]) {
+    return App.db.data.app.tables.filterConditions[name];
+  }
+  return null;
+};
+
+App.db.getDisplayLength = function(name) {
+  console.log('TRACE: Entering db:getDisplayLength function');
+  App.db.data = localStorage.getObject('ambari');
+  if (App.db.data.app.tables.displayLength[name]) {
+    return App.db.data.app.tables.displayLength[name];
+  }
+  return null;
+};
+
+App.db.getStartIndex = function(name) {
+  console.log('TRACE: Entering db:getStartIndex function');
+  App.db.data = localStorage.getObject('ambari');
+  if (App.db.data.app.tables.startIndex[name]) {
+    return App.db.data.app.tables.startIndex[name];
+  }
+  return null;
+};
+
+App.db.getSortingStatuses = function(name) {
+  console.log('TRACE: Entering db:getSortingConditions function');
+  App.db.data = localStorage.getObject('ambari');
+  if (App.db.data.app.tables.sortingConditions[name]) {
+    return App.db.data.app.tables.sortingConditions[name];
+  }
+  return null;
 };
 
 /**
@@ -384,11 +534,6 @@ App.db.getServiceConfigProperties = function () {
   return App.db.data.Installer.configProperties;
 };
 
-App.db.getSlaveProperties = function () {
-  App.db.data = localStorage.getObject('ambari');
-  return App.db.data.Installer.slaveProperties;
-};
-
 App.db.getCluster = function () {
   console.log('TRACE: Entering db:getClusterStatus function');
   App.db.data = localStorage.getObject('ambari');
@@ -409,7 +554,7 @@ App.db.getUpgradeOptions = function () {
   console.log('TRACE: Entering db:getUpgradeOptions function');
   App.db.data = localStorage.getObject('ambari');
   return App.db.data.StackUpgrade.upgradeOptions;
-}
+};
 
 App.db.getSecurityWizardStatus = function () {
   App.db.data = localStorage.getObject('ambari');
@@ -419,10 +564,52 @@ App.db.getSecurityWizardStatus = function () {
   return App.db.data.AddSecurity.status;
 };
 
-App.db.getSecurityStage = function () {
+App.db.getDisableSecurityStatus = function () {
   App.db.data = localStorage.getObject('ambari');
-  return App.db.data.AddSecurity.securityStage;
+  if (!App.db.data.AddSecurity) {
+    App.db.data.AddSecurity = {};
+  }
+  return App.db.data.AddSecurity.disableSecurityStatus;
+};
 
+App.db.getSecurityDeployStages = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.AddSecurity.securityDeployStages;
+};
+
+App.db.getSecureConfigProperties = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.AddSecurity.secureConfigProperties;
+};
+
+App.db.getIsNameNodeHa = function (haStatus) {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.AddSecurity.haStatus;
+};
+
+App.db.getStacks = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.app.stacksVersions;
+};
+
+App.db.getHighAvailabilityWizardTasksStatuses = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.HighAvailabilityWizard.tasksStatuses;
+};
+
+App.db.getHighAvailabilityWizardFailedTask = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.HighAvailabilityWizard.failedTask;
+};
+
+App.db.getHighAvailabilityWizardRequestIds = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.HighAvailabilityWizard.requestIds;
+};
+
+App.db.getHighAvailabilityWizardNameServiceId = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.HighAvailabilityWizard.nameServiceId;
 };
 
 module.exports = App.db;

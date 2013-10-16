@@ -123,31 +123,6 @@ String.prototype.highlight = function (words, highlightTemplate) {
   return self;
 };
 
-/**
- * Convert byte size to other metrics.
- * @param {Number} precision  Number to adjust precision of return value. Default is 0.
- * @param {String} parseType  JS method name for parse string to number. Default is "parseInt".
- * @remarks The parseType argument can be "parseInt" or "parseFloat".
- * @return {String) Returns converted value with abbreviation.
- */
-Number.prototype.bytesToSize = function (precision, parseType/* = 'parseInt' */) {
-  if (arguments[1] === undefined) {
-    parseType = 'parseInt';
-  }
-
-  var value = this;
-  var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  var posttxt = 0;
-  if (this == 0) return 'n/a';
-  while (value >= 1024) {
-    posttxt++;
-    value = value / 1024;
-  }
-  var parsedValue = window[parseType](value);
-
-  return parsedValue.toFixed(precision) + " " + sizes[posttxt];
-}
-
 Number.prototype.toDaysHoursMinutes = function () {
   var formatted = {},
     dateDiff = this,
@@ -203,6 +178,8 @@ Number.prototype.long2ip = function () {
  * @param {String} testUrl  URL to be used if app is not in test mode (!App.testMode)
  * @return {String} Formatted URL
  */
+App = require('app');
+
 App.formatUrl = function (urlTemplate, substitutes, testUrl) {
   var formatted = urlTemplate;
   if (urlTemplate) {
@@ -250,6 +227,8 @@ App.format = {
         return 'NameNode Check';
       case 'DATANODE':
         return 'DataNode';
+      case 'JOURNALNODE':
+        return 'JournalNode';
       case 'HDFS_SERVICE_CHECK':
         return 'HDFS Check';
       case 'SECONDARY_NAMENODE':
@@ -268,6 +247,18 @@ App.format = {
         return 'TaskTracker';
       case 'MAPREDUCE_CLIENT':
         return 'MapReduce Client';
+      case 'HISTORYSERVER':
+        return 'History Server';
+      case 'NODEMANAGER':
+        return 'NodeManager';
+      case 'RESOURCEMANAGER':
+        return 'ResourceManager';
+      case 'TEZ_CLIENT':
+        return 'Tez Client';
+      case 'MAPREDUCE2_CLIENT':
+        return 'MapReduce2 Client';
+      case 'YARN_CLIENT':
+        return 'YARN Client';
       case 'JAVA_JCE':
         return 'Java JCE';
       case 'KERBEROS_SERVER':
@@ -312,6 +303,10 @@ App.format = {
         return 'Pig';
       case 'PIG_SERVICE_CHECK':
         return 'Pig Check';
+      case 'MAPREDUCE2_SERVICE_CHECK':
+        return 'MapReduce2 Check';
+      case 'YARN_SERVICE_CHECK':
+        return 'YARN Check';
       case 'SQOOP':
         return 'Sqoop';
       case 'SQOOP_SERVICE_CHECK':
@@ -334,6 +329,14 @@ App.format = {
         return 'Update Exclude File';
       case 'HUE_SERVER':
         return 'Hue Server';
+      case 'HCFS_CLIENT':
+        return 'HCFS Client';
+      case 'HCFS_SERVICE_CHECK':
+        return 'HCFS Service Check';
+      case 'FLUME_SERVER':
+        return 'Flume Agent';
+      case 'ZKFC':
+        return 'ZKFailoverController';
     }
   },
 
@@ -351,10 +354,15 @@ App.format = {
   }
 };
 
-Array.prototype.removeAll = function(array){
-  var temp = array;
-  for(var i = 0 ; i < array.length ; i++ ){
-    temp = temp.without(array[i]);
-  }
-  return temp;
-};
+/**
+ * wrapper to bootstrap popover
+ * fix issue when popover stuck on view routing
+ * @param self
+ * @param options
+ */
+App.popover = function(self, options) {
+  self.popover(options);
+  self.on("remove", function () {
+    $(this).trigger('mouseleave');
+  });
+}

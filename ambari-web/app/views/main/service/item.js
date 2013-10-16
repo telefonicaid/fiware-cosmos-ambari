@@ -54,6 +54,8 @@ App.MainServiceItemView = Em.View.extend({
       case 'HUE':
         options.push({action: 'runSmokeTest', 'label': Em.I18n.t('services.service.actions.run.smoke')});
         break;
+      case 'FLUME':
+        break;
       default:
         var components = this.get('controller.content.hostComponents');
         options.push({action: 'runSmokeTest', 'label': Em.I18n.t('services.service.actions.run.smoke')});
@@ -70,5 +72,9 @@ App.MainServiceItemView = Em.View.extend({
   }.property('maintenance'),
   hasConfigTab: function(){
     return this.get("controller.content.isConfigurable");
-  }.property('controller.content.isConfigurable')
+  }.property('controller.content.isConfigurable'),
+
+  didInsertElement: function () {
+    this.get('controller').setStartStopState();
+  }
 });

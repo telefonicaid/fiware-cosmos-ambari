@@ -83,6 +83,7 @@ class hdp-hbase::params() inherits hdp::params
 
   $regionserver_memstore_upperlimit = hdp_default("hbase-site/regionserver.memstore.upperlimit","0.4")
 
+  $keytab_path = hdp_default("keytab_path","/etc/security/keytabs")
   $hbase_client_jaas_config_file = hdp_default("hbase_client_jaas_config_file", "${conf_dir}/hbase_client_jaas.conf")
   $hbase_master_jaas_config_file = hdp_default("hbase_master_jaas_config_file", "${conf_dir}/hbase_master_jaas.conf")
   $hbase_regionserver_jaas_config_file = hdp_default("hbase_regionserver_jaas_config_file", "${conf_dir}/hbase_regionserver_jaas.conf")
@@ -95,10 +96,17 @@ class hdp-hbase::params() inherits hdp::params
   $hbase_primary_name = hdp_default("hbase_primary_name", "hbase")
   $hostname = $hdp::params::hostname
   if ($use_hostname_in_principal) {
-    $hbase_jaas_princ = "${hbase_primary_name}/${hostname}@${kerberos_domain}"
+    $hbase_master_jaas_princ = "${hbase_master_primary_name}/${hostname}@${kerberos_domain}"
+    $hbase_regionserver_jaas_princ = "${hbase_regionserver_primary_name}/${hostname}@${kerberos_domain}"
   } else {
-    $hbase_jaas_princ = "${hbase_primary_name}@${kerberos_domain}"
+    $hbase_master_jaas_princ = "${hbase_master_principal_name}@${kerberos_domain}"
+    $hbase_regionserver_jaas_princ = "${hbase_regionserver_primary_name}@${kerberos_domain}"
   }
 
+  if (hdp_get_major_stack_version($hdp::params::stack_version) >= 2) {
+    $metric-prop-file-name = "hadoop-metrics2-hbase.properties"
+  } else {
+    $metric-prop-file-name = "hadoop-metrics.properties"
+  }
   $smokeuser_permissions = hdp_default("smokeuser_permissions", "RWXCA")
 }

@@ -37,6 +37,7 @@ from Unregister import Unregister
 from ActionQueue import ActionQueue
 import security
 from NetUtil import NetUtil
+import ssl
 
 
 logger = logging.getLogger()
@@ -60,14 +61,12 @@ class Controller(threading.Thread):
     self.repeatRegistration = False
     self.cachedconnect = None
     self.range = range
-
-  def start(self):
+    self.hasMappedComponents = True
     self.actionQueue = ActionQueue(self.config)
     self.actionQueue.start()
     self.register = Register(self.config)
     self.unregister = Unregister(self.config)
-    self.heartbeat = Heartbeat(self.actionQueue)
-    pass
+    self.heartbeat = Heartbeat(self.actionQueue, self.config)
   
   def __del__(self):
     logger.info("Server connection disconnected.")
@@ -76,8 +75,13 @@ class Controller(threading.Thread):
   def unregisterWithServer(self):
     id = -1
     ret = self.retriedRequest(self.unregisterUrl, lambda: self.unregister.build(id))
-    logger.info("Unregistered with the server")
-    print("Unregistered with the server")
+    if ret["response"] == "OK":
+        logger.info("Unregistered with the server")
+        print("Unregistered with the server")
+    else:
+        logMsg = "Error while unregistering with server: %s" % ret["errorMessage"]
+        logger.info(logMsg)
+        print(logMsg)
     return ret
   
   def registerWithServer(self):
@@ -106,7 +110,12 @@ class Controller(threading.Thread):
           logger.info("Got status commands on registration " + pprint.pformat(ret['statusCommands']) )
           self.addToQueue(ret['statusCommands'])
           pass
+        else:
+          self.hasMappedComponents = False
         pass
+      except ssl.SSLError:
+        self.repeatRegistration=False
+        return
       except Exception, err:
         # try a reconnect only after a certain amount of random time
         delay = randint(0, self.range)
@@ -137,7 +146,7 @@ class Controller(threading.Thread):
   # For testing purposes
   DEBUG_HEARTBEAT_RETRIES = 0
   DEBUG_SUCCESSFULL_HEARTBEATS = 0
-  DEBUG_STOP_HEARTBITTING = False
+  DEBUG_STOP_HEARTBEATING = False
 
   def heartbeatWithServer(self):
     self.DEBUG_HEARTBEAT_RETRIES = 0
@@ -150,10 +159,12 @@ class Controller(threading.Thread):
 
     #TODO make sure the response id is monotonically increasing
     id = 0
-    while not self.DEBUG_STOP_HEARTBITTING:
+    while not self.DEBUG_STOP_HEARTBEATING:
       try:
         if not retry:
-          data = json.dumps(self.heartbeat.build(self.responseId, int(hb_interval)))
+          data = json.dumps(
+              self.heartbeat.build(self.responseId, int(hb_interval), self.hasMappedComponents))
+          logger.debug("Sending request: " + data)
           pass
         else:
           self.DEBUG_HEARTBEAT_RETRIES += 1
@@ -163,6 +174,9 @@ class Controller(threading.Thread):
         logger.debug('Got server response: ' + pprint.pformat(response))
         
         serverId=int(response['responseId'])
+
+        if 'hasMappedComponents' in response.keys():
+          self.hasMappedComponents = response['hasMappedComponents'] != False
 
         if 'registrationCommand' in response.keys():
           # check if the registration command is None. If none skip
@@ -197,6 +211,9 @@ class Controller(threading.Thread):
         certVerifFailed = False
         self.DEBUG_SUCCESSFULL_HEARTBEATS += 1
         self.DEBUG_HEARTBEAT_RETRIES = 0
+      except ssl.SSLError:
+        self.repeatRegistration=False
+        return
       except Exception, err:
         #randomize the heartbeat
         delay = randint(0, self.range)
