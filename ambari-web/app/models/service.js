@@ -39,78 +39,8 @@ App.Service = DS.Model.extend({
   // the computed property too many times and freezes the UI without this hack.
   // See http://stackoverflow.com/questions/12467345/ember-js-collapsing-deferring-expensive-observers-or-computed-properties
   healthStatus: '',
-
-  updateHealthStatus: function () {
-    // console.log('model:service.healthStatus ' + this.get('serviceName'));
-    var components = this.get('hostComponents').filterProperty('isMaster', true);
-    var isGreen = this.get('serviceName') === 'HBASE' && App.supports.multipleHBaseMasters ?
-      components.someProperty('workStatus', App.HostComponentStatus.started) :
-      components.every(function (_component) {
-        return ([App.HostComponentStatus.started, App.HostComponentStatus.maintenance].contains(_component.get('workStatus')));
-      }, this);
-
-    if (isGreen) {
-      this.set('healthStatus', 'green');
-    } else if (components.someProperty('workStatus', App.HostComponentStatus.unknown)) {
-      this.set('healthStatus', 'yellow');
-    } else if (components.someProperty('workStatus', App.HostComponentStatus.starting)) {
-      this.set('healthStatus', 'green-blinking');
-    } else if (components.someProperty('workStatus', App.HostComponentStatus.stopped)) {
-      this.set('healthStatus', 'red');
-    } else {
-      this.set('healthStatus', 'red-blinking');
-    }
-
-    if (this.get('serviceName') === 'HBASE' && App.supports.multipleHBaseMasters) {
-      var active = this.get('hostComponents').findProperty('haStatus', 'active');
-      if (!active) {
-        this.set('healthStatus', 'red');
-      }
-    }
-  },
-
-  /**
-   * Every time when changes workStatus of any component we schedule recalculating values related from them
-   */
-  _updateHealthStatus: (function() {
-    Ember.run.once(this, 'updateHealthStatus');
-    Ember.run.once(this, 'updateIsStopped');
-    Ember.run.once(this, 'updateIsStarted');
-  }).observes('hostComponents.@each.workStatus'),
-
   isStopped: false,
   isStarted: false,
-
-  updateIsStopped: function () {
-    var components = this.get('hostComponents');
-    var flag = true;
-    var runningHCs = [];
-    var unknownHCs = [];
-
-    components.forEach(function (_component) {
-      if (
-        _component.get('workStatus') !== App.HostComponentStatus.stopped &&
-        _component.get('workStatus') !== App.HostComponentStatus.install_failed &&
-        _component.get('workStatus') !== App.HostComponentStatus.unknown &&
-        _component.get('workStatus') !== App.HostComponentStatus.maintenance
-      ) {
-        flag = false;
-        runningHCs.addObject(_component);
-      } else if (_component.get('workStatus') == App.HostComponentStatus.unknown) {
-        unknownHCs.addObject(_component);
-      }
-    }, this);
-    this.set('runningHostComponents', runningHCs);
-    this.set('unknownHostComponents', unknownHCs);
-    this.set('isStopped', flag);
-  },
-
-  updateIsStarted: function () {
-    var components = this.get('hostComponents').filterProperty('isMaster', true);
-    this.set('isStarted',
-      components.everyProperty('workStatus', App.HostComponentStatus.started)
-    );
-  },
 
   isConfigurable: function () {
     var configurableServices = [

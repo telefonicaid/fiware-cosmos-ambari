@@ -16,13 +16,17 @@
  * limitations under the License.
  */
 
+var App = require('app');
 var configs = [
-  /**********************************************core-site***************************************/
+/**********************************************core-site***************************************/
   {
     "name": "fs.defaultFS",
     "templateName": ["namenode_host"],
     "foreignKey": null,
     "value": "hdfs://<templateName[0]>:8020",
+    "precondition": function () {
+      return (App.HDFSService.find('HDFS') && App.HDFSService.find('HDFS').get('snameNode'));
+    },
     "filename": "core-site.xml"
   },
   {
@@ -30,14 +34,14 @@ var configs = [
     "templateName": ["dfs_namenode_checkpoint_dir"],
     "foreignKey": null,
     "value": "<templateName[0]>",
-    "filename": "core-site.xml"
+    "filename": "hdfs-site.xml"
   },
   {
     "name": "dfs.namenode.checkpoint.period",
     "templateName": ["dfs_namenode_checkpoint_period"],
     "foreignKey": null,
     "value": "<templateName[0]>",
-    "filename": "core-site.xml"
+    "filename": "hdfs-site.xml"
   },
   {
     "name": "fs.checkpoint.size",
@@ -47,19 +51,12 @@ var configs = [
     "filename": "core-site.xml"
   },
   {
-    "name": "fs.checkpoint.edits.dir",
-    "templateName": ["dfs_namenode_checkpoint_dir"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "core-site.xml"
-  },
-  {
     "name": "hadoop.proxyuser.<foreignKey[0]>.groups",
     "templateName": ["proxyuser_group"],
     "foreignKey": ["hive_user"],
     "value": "<templateName[0]>",
     "filename": "core-site.xml",
-    "isOverridable" : true
+    "isOverridable": true
   },
   {
     "name": "hadoop.proxyuser.<foreignKey[0]>.hosts",
@@ -67,7 +64,7 @@ var configs = [
     "foreignKey": ["hive_user"],
     "value": "<templateName[0]>",
     "filename": "core-site.xml",
-    "isOverridable" : true
+    "isOverridable": true
   },
   {
     "name": "hadoop.proxyuser.<foreignKey[0]>.groups",
@@ -75,7 +72,7 @@ var configs = [
     "foreignKey": ["oozie_user"],
     "value": "<templateName[0]>",
     "filename": "core-site.xml",
-    "isOverridable" : true
+    "isOverridable": true
   },
   {
     "name": "hadoop.proxyuser.<foreignKey[0]>.hosts",
@@ -83,7 +80,7 @@ var configs = [
     "foreignKey": ["oozie_user"],
     "value": "<templateName[0]>",
     "filename": "core-site.xml",
-    "isOverridable" : true
+    "isOverridable": true
   },
   {
     "name": "hadoop.proxyuser.<foreignKey[0]>.groups",
@@ -91,7 +88,7 @@ var configs = [
     "foreignKey": ["webhcat_user"],
     "value": "<templateName[0]>",
     "filename": "core-site.xml",
-    "isOverridable" : true
+    "isOverridable": true
   },
   {
     "name": "hadoop.proxyuser.<foreignKey[0]>.hosts",
@@ -99,9 +96,9 @@ var configs = [
     "foreignKey": ["webhcat_user"],
     "value": "<templateName[0]>",
     "filename": "core-site.xml",
-    "isOverridable" : true
+    "isOverridable": true
   },
-  /**********************************************hdfs-site***************************************/
+/**********************************************hdfs-site***************************************/
   {
     "name": "dfs.namenode.name.dir",
     "templateName": ["dfs_namenode_name_dir"],
@@ -119,13 +116,6 @@ var configs = [
   {
     "name": "dfs.datanode.failed.volumes.tolerated",
     "templateName": ["dfs_datanode_failed_volume_tolerated"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "hdfs-site.xml"
-  },
-  {
-    "name": "dfs.block.local-path-access.user",
-    "templateName": ["dfs_block_local_path_access_user"],
     "foreignKey": null,
     "value": "<templateName[0]>",
     "filename": "hdfs-site.xml"
@@ -188,7 +178,7 @@ var configs = [
     "filename": "hdfs-site.xml"
   },
   {
-    "name": "dfs.https.namenode.https-address",
+    "name": "dfs.namenode.https-address",
     "templateName": ["namenode_host"],
     "foreignKey": null,
     "value": "<templateName[0]>:50470",
@@ -201,7 +191,7 @@ var configs = [
     "value": "<templateName[0]>",
     "filename": "hdfs-site.xml"
   },
-  /**********************************************oozie-site***************************************/
+/**********************************************oozie-site***************************************/
   {
     "name": "oozie.base.url",
     "templateName": ["oozieserver_host"],
@@ -251,7 +241,7 @@ var configs = [
     "value": "<templateName[0]>",
     "filename": "oozie-site.xml"
   },
-  /**********************************************hive-site***************************************/
+/**********************************************hive-site***************************************/
   {
     "name": "javax.jdo.option.ConnectionDriverName",
     "templateName": [],
@@ -337,13 +327,7 @@ var configs = [
     "value": "http://<templateName[0]>:19888/jobhistory/logs",
     "filename": "yarn-site.xml"
   },
-  {
-    "name": "yarn.nodemanager.local-dirs",
-    "templateName": ["yarn_nodemanager_local-dirs"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "yarn-site.xml"
-  },
+
 /**********************************************mapred-site***************************************/
   {
     "name": "mapreduce.jobhistory.webapp.address",
@@ -359,97 +343,16 @@ var configs = [
     "value": "<templateName[0]>:10020",
     "filename": "mapred-site.xml"
   },
-  {
-    "name": "mapreduce.map.memory.mb",
-    "templateName": ["mapreduce_map_memory_mb"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapreduce.reduce.memory.mb",
-    "templateName": ["mapreduce_reduce_memory_mb"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapreduce.task.io.sort.mb",
-    "templateName": ["mapreduce_task_io_sort_mb"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapreduce.jobtracker.system.dir",
-    "templateName": ["mapreduce_jobtracker_system_dir"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapred.hosts",
-    "templateName": ["hadoop_conf_dir", "mapred_hosts_include"],
-    "foreignKey": null,
-    "value": "<templateName[0]>/<templateName[1]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapred.jobtracker.maxtasks.per.job",
-    "templateName": ["maxtasks_per_job"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapred.userlog.retain.hours",
-    "templateName": ["mapreduce_userlog_retainhours"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapred.task.tracker.task-controller",
-    "templateName": ["task_controller"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapreduce.tasktracker.map.tasks.maximum",
-    "templateName": ["mapreduce_tasktracker_map_tasks_maximum"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapred.hosts.exclude",
-    "templateName": ["hadoop_conf_dir", "mapred_hosts_exclude"],
-    "foreignKey": null,
-    "value": "<templateName[0]>/<templateName[1]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapred.jobtracker.taskScheduler",
-    "templateName": ["scheduler_name"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
-  {
-    "name": "mapreduce.tasktracker.healthchecker.script.path",
-    "templateName": ["mapred_jobstatus_dir"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "mapred-site.xml"
-  },
 
-  /**********************************************hbase-site***************************************/
+/**********************************************hbase-site***************************************/
   {
     "name": "hbase.rootdir",
     "templateName": ["namenode_host", "hbase_hdfs_root_dir"],
     "foreignKey": null,
     "value": "hdfs://<templateName[0]>:8020<templateName[1]>",
+    "precondition": function () {
+      return (App.HDFSService.find('HDFS') && App.HDFSService.find('HDFS').get('snameNode'));
+    },
     "filename": "hbase-site.xml"
   },
   {
@@ -579,39 +482,11 @@ var configs = [
     "filename": "hbase-site.xml"
   },
   {
-    "name": "dfs.support.append",
-    "templateName": ["hdfs_support_append"],
-    "foreignKey": null,
-    "value": "<templateName[0]>",
-    "filename": "hbase-site.xml"
-  },
-  {
     "name": "dfs.client.read.shortcircuit",
     "templateName": ["hdfs_enable_shortcircuit_read"],
     "foreignKey": null,
     "value": "<templateName[0]>",
     "filename": "hdfs-site.xml"
-  },
-  {
-    "name": "hbase.security.authentication",
-    "templateName": [],
-    "foreignKey": null,
-    "value": "simple",
-    "filename": "hbase-site.xml"
-  },
-  {
-    "name": "hbase.rpc.engine",
-    "templateName": [],
-    "foreignKey": null,
-    "value": "org.apache.hadoop.hbase.ipc.WritableRpcEngine",
-    "filename": "hbase-site.xml"
-  },
-  {
-    "name": "hbase.security.authorization",
-    "templateName": [],
-    "foreignKey": null,
-    "value": "false",
-    "filename": "hbase-site.xml"
   },
   {
     "name": "hbase.zookeeper.quorum",
@@ -620,21 +495,7 @@ var configs = [
     "value": "<templateName[0]>",
     "filename": "hbase-site.xml"
   },
-  {
-    "name": "zookeeper.znode.parent",
-    "templateName": [],
-    "foreignKey": null,
-    "value": "/hbase-unsecure",
-    "filename": "hbase-site.xml"
-  },
-  /**********************************************webhcat-site***************************************/
-  {
-    "name": "templeton.hive.properties",
-    "templateName": ["hivemetastore_host"],
-    "foreignKey": null,
-    "value": "hive.metastore.local=false,hive.metastore.uris=thrift://<templateName[0]>:9083,hive.metastore.sasl.enabled=yes,hive.metastore.execute.setugi=true",
-    "filename": "webhcat-site.xml"
-  },
+/**********************************************webhcat-site***************************************/
   {
     "name": "templeton.zookeeper.hosts",
     "templateName": ["zookeeperserver_hosts"],
@@ -651,13 +512,31 @@ var configs = [
  * @type {Object}
  */
 module.exports = {
-  all : function(){
-    return configs.slice(0);
+
+  checkPrecondition: function () {
+    return configs.filter(function (config) {
+      return ((!config.precondition) || (config.precondition()));
+    });
   },
-  overridable: function(){
-    return configs.filterProperty('foreignKey');
+  all: function (skipPreconditionCheck) {
+    if (skipPreconditionCheck) {
+      return configs.slice(0);
+    } else {
+      return this.checkPrecondition().slice(0);
+    }
   },
-  computed: function(){
-    return configs.filterProperty('foreignKey', null);
+  overridable: function (skipPreconditionCheck) {
+    if (skipPreconditionCheck) {
+      return configs.filterProperty('foreignKey');
+    } else {
+      return this.checkPrecondition().filterProperty('foreignKey');
+    }
+  },
+  computed: function (skipPreconditionCheck) {
+    if (skipPreconditionCheck) {
+      return configs.filterProperty('foreignKey', null);
+    } else {
+      return this.checkPrecondition().filterProperty('foreignKey', null);
+    }
   }
 };

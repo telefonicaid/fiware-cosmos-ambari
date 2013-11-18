@@ -169,6 +169,24 @@ App.HighAvailabilityWizardController = App.WizardController.extend({
     this.set('content.'+[tag.name], tag.value);
   },
 
+  saveHdfsClientHosts: function(hostNames){
+    App.db.setHighAvailabilityWizardHdfsClientHosts(hostNames);
+    this.set('content.hdfsClientHostNames', hostNames);
+  },
+
+  loadHdfsClientHosts: function(){
+    var hostNames = App.db.getHighAvailabilityWizardHdfsClientHosts();
+    if (!(hostNames instanceof Array)) {
+      hostNames = [hostNames];
+    }
+    this.set('content.hdfsClientHostNames', hostNames);
+  },
+
+  loadConfigTag: function(tag){
+    var tagVal = App.db.getHighAvailabilityWizardConfigTag(tag);
+    this.set('content.'+tag, tagVal);
+  },
+
   loadTasksStatuses: function(){
     var statuses = App.db.getHighAvailabilityWizardTasksStatuses();
     this.set('content.tasksStatuses', statuses);
@@ -179,9 +197,19 @@ App.HighAvailabilityWizardController = App.WizardController.extend({
     this.set('content.requestIds', requestIds);
   },
 
+  saveLogs: function(logs){
+    App.db.setHighAvailabilityWizardLogs(logs);
+    this.set('content.logs', logs);
+  },
+
   loadRequestIds: function(){
     var requestIds = App.db.getHighAvailabilityWizardRequestIds();
     this.set('content.requestIds', requestIds);
+  },
+
+  loadLogs: function(){
+    var logs = App.db.getHighAvailabilityWizardLogs();
+    this.set('content.logs', logs);
   },
 
   saveNameServiceId: function(nameServiceId){
@@ -208,6 +236,7 @@ App.HighAvailabilityWizardController = App.WizardController.extend({
         this.loadNameServiceId();
         this.loadTasksStatuses();
         this.loadRequestIds();
+        this.loadLogs();
       case '4':
       case '3':
       case '2':
@@ -229,14 +258,18 @@ App.HighAvailabilityWizardController = App.WizardController.extend({
     this.set('content.cluster', this.getCluster());
   },
 
+  clearTasksData: function () {
+    this.saveTasksStatuses(undefined);
+    this.saveRequestIds(undefined);
+    this.saveLogs(undefined);
+  },
+
   /**
    * Clear all temporary data
    */
   finish: function () {
     this.setCurrentStep('1');
     this.clearAllSteps();
-    this.clearStorageData();
     App.router.get('updateController').updateAll();
   }
-
 });

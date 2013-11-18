@@ -56,6 +56,7 @@ Em.I18n.translations = {
   'common.addComponent':'Add Component',
   'common.remove':'Remove',
   'common.retry':'Retry',
+  'common.skip':'Skip',
   'common.rollBack':'Rollback',
   'common.show':'Show',
   'common.hide':'Hide',
@@ -97,6 +98,7 @@ Em.I18n.translations = {
   'common.clients':'Clients',
   'common.user': 'User',
   'common.users': 'Users',
+  'common.issues': 'Issues',
   'common.os':'OS',
   'common.memory':'Memory',
   'common.maximum':'Maximum',
@@ -146,6 +148,7 @@ Em.I18n.translations = {
   'common.persist.error' : 'Error in persisting web client state at ambari server:',
   'common.update.error' : 'Error in retrieving web client state from ambari server',
   'common.tags': 'Tags',
+  'common.important': 'Important',
   'requestInfo.installComponents':'Install Components',
   'requestInfo.installServices':'Install Services',
   'requestInfo.startServices':'Start Services',
@@ -343,8 +346,11 @@ Em.I18n.translations = {
   'installer.step3.hostWarningsPopup.report.user': '<br><br>######################################<br># Users<br>#<br># A space delimited list of users who should not exist.<br># Provided so that administrators can easily copy paths into scripts, email etc.<br># Example: userdel hdfs<br>######################################<br>USERS<br>',
   'installer.step3.hostWarningsPopup.report.folder': '\\ /folder',
   'installer.step3.hostWarningsPopup.checks': 'Host Checks found',
-  'installer.step3.hostWarningsPopup.notice':'After manually resolving the issues, click <b>Rerun Checks</b>.<br>To manually resolve issues on <b>each host</b> run the HostCleanup script:<br><div class="code-snippet">python /usr/lib/python2.6/site-packages/ambari_agent/HostCleanup.py</div>',
+  'installer.step3.hostWarningsPopup.notice':'After manually resolving the issues, click <b>Rerun Checks</b>.<br>To manually resolve issues on <b>each host</b> run the HostCleanup script (Python 2.6 or greater is required):<br><div class="code-snippet">python /usr/lib/python2.6/site-packages/ambari_agent/HostCleanup.py</div>',
   'installer.step3.hostWarningsPopup.summary':'{0} on {1}',
+  'installer.step3.hostWarningsPopup.firewall':'Firewall Issues',
+  'installer.step3.hostWarningsPopup.firewall.message':'Firewall is running on the following hosts. Please configure the firewall to allow communications on the ports documented in the <i>Configuring Ports</i> section of  the <a target=\"_blank\" href=\"http://incubator.apache.org/ambari/current/installing-hadoop-using-ambari/content/\">Ambari documentation</a>',
+  'installer.step3.hostWarningsPopup.firewall.name':'<i>iptables</i> Running',
   'installer.step3.hostWarningsPopup.process':'Process Issues',
   'installer.step3.hostWarningsPopup.processes.message':'The following processes should not be running',
   'installer.step3.hostWarningsPopup.fileAndFolder':'File and Folder Issues',
@@ -367,6 +373,7 @@ Em.I18n.translations = {
   'installer.step3.hostWarningsPopup.empty.users':'unwanted users',
   'installer.step3.hostWarningsPopup.empty.services':'unwanted services',
   'installer.step3.hostWarningsPopup.empty.misc':'issues',
+  'installer.step3.hostWarningsPopup.empty.firewall':'firewalls running',
   'installer.step3.hostWarningsPopup.action.exists':'Exists on',
   'installer.step3.hostWarningsPopup.action.notRunning':'Not running on',
   'installer.step3.hostWarningsPopup.action.installed':'Installed on',
@@ -407,13 +414,17 @@ Em.I18n.translations = {
   'installer.step4.header':'Choose Services',
   'installer.step4.body':'Choose which services you want to install on your cluster.',
   'installer.step4.hdfsCheck.popup.header':'Hadoop File System Needed',
-  'installer.step4.hdfsCheck.popup.body':'You did not select HDFS or HCFS, but one is required.  We will automatically add HDFS.  Is this OK?',
+  'installer.step4.hdfsCheck.popup.body':'You did not select HDFS or HCFS, but one is required. We will automatically add HDFS. Is this OK?',
   'installer.step4.multipleDFS.popup.header':'Multiple File Systems Selected',
-  'installer.step4.multipleDFS.popup.body':'You selected more than one file system.  We will automatically select only HDFS.  Is this OK?',
+  'installer.step4.multipleDFS.popup.body':'You selected more than one file system. We will automatically select only HDFS. Is this OK?',
   'installer.step4.mapreduceCheck.popup.header':'MapReduce Needed',
-  'installer.step4.mapreduceCheck.popup.body':'You did not select MapReduce, but it is needed by other services you selected.  We will automatically add MapReduce.  Is this OK?',
+  'installer.step4.mapreduceCheck.popup.body':'You did not select MapReduce, but it is needed by other services you selected. We will automatically add MapReduce. Is this OK?',
+  'installer.step4.yarnCheck.popup.header':'YARN+MapReduce2 Needed',
+  'installer.step4.yarnCheck.popup.body':'You did not select YARN+MapReduce2, but it is needed by other services you selected. We will automatically add YARN+MapReduce2. Is this OK?',
+  'installer.step4.zooKeeperCheck.popup.header':'ZooKeeper Needed',
+  'installer.step4.zooKeeperCheck.popup.body':'You did not select ZooKeeper, but it is needed by other services you selected. We will automatically add ZooKeeper. Is this OK?',
   'installer.step4.monitoringCheck.popup.header':'Limited Functionality Warning',
-  'installer.step4.monitoringCheck.popup.body':'You did not select Nagios and/or Ganglia.  If both are not selected, monitoring and alerts will not function properly.  Is this OK?',
+  'installer.step4.monitoringCheck.popup.body':'You did not select Nagios and/or Ganglia. If both are not selected, monitoring and alerts will not function properly. Is this OK?',
 
   'installer.step5.header':'Assign Masters',
   'installer.step5.reassign.header':'Select Target Host',
@@ -510,7 +521,7 @@ Em.I18n.translations = {
 
   'installer.step10.header':'Summary',
   'installer.step10.body':'Here is the summary of the install process.',
-  'installer.step10.nagiosRestartRequired':'<b>Important!</b> Restarting Nagios service is required for the alerts and notifications to work properly.  After clicking on the Complete button to dismiss this wizard, go to Services -> Nagios to restart the Nagios service.',
+  'installer.step10.nagiosRestartRequired':'<b>Important!</b> Restarting Nagios service is required for alerts and notifications to work properly.  After clicking on the Complete button to dismiss this wizard, go to Services -> Nagios to restart the Nagios service.',
   'installer.step10.hostsSummary':'The cluster consists of {0} hosts',
   'installer.step10.servicesSummary':'Installed and started services successfully on {0} new ',
   'installer.step10.warnings':' warnings',
@@ -646,6 +657,7 @@ Em.I18n.translations = {
   'admin.highAvailability.enabled':'NameNode HA is enabled',
   'admin.highAvailability.confirmRollbackHeader':'Confirm Rollback',
   'admin.highAvailability.confirmRollbackBody':'This will rollback all operations that were done in HA wizard',
+  'admin.highAvailability.confirmManualRollbackBody':'You are in the process of enabling NameNode HA. If you exit now, you must follow manual instructions to revert back to the non-HA setup as documented in the Ambari User Guide\'s <i>Rolling Back NameNode HA</i> section.  Are you sure you want to exit the wizard?',
   'admin.highAvailability.error.hostsNum':'You must have at least 3 hosts in your cluster to enable NameNode HA.',
   'admin.highAvailability.error.namenodeStarted':'NameNode must be running before you enable NameNode HA.',
   'admin.highAvailability.error.zooKeeperNum':'You must have at least 3 ZooKeeper Servers in your cluster to enable NameNode HA.',
@@ -659,6 +671,7 @@ Em.I18n.translations = {
   'admin.highAvailability.wizard.step1.nameserviceid.tooltip.title':'Nameservice ID',
   'admin.highAvailability.wizard.step1.nameserviceid.tooltip.content':'This will be the ID for the NameNode HA cluster. For example, if you set Nameservice ID to <b>mycluster</b>, the logical URI for HDFS will be <b>hdfs://mycluster</b>.',
   'admin.highAvailability.wizard.step1.nameserviceid':'Nameservice ID',
+  'admin.highAvailability.wizard.step1.nameserviceid.error':'Must consist of letters, numbers, and hyphens. Cannot begin or end with a hyphen.',
   'admin.highAvailability.wizard.step2.header':'Select Hosts',
   'admin.highAvailability.wizard.step3.header':'Review',
   'admin.highAvailability.wizard.step4.header':'Create Checkpoint',
@@ -671,6 +684,15 @@ Em.I18n.translations = {
   'admin.highAvailability.wizard.step6.bodyHeader':'Manual Steps Required: Initialize JournalNodes',
   'admin.highAvailability.wizard.step8.bodyHeader':'Manual Steps Required: Initialize NameNode HA Metadata',
 
+  'admin.highAvailability.wizard.step5.notice.inProgress':'Please wait while the wizard configures the components.',
+  'admin.highAvailability.wizard.step7.notice.inProgress':'Please wait while the wizard starts the components.',
+  'admin.highAvailability.wizard.step9.notice.inProgress':'Please wait while the wizard finalizes the HA setup.',
+  'admin.highAvailability.wizard.rollback.notice.inProgres':'Reverting Back to Non-HA Setup',
+
+  'admin.highAvailability.wizard.step5.header.title':'Configure Components',
+  'admin.highAvailability.wizard.step7.header.title':'Start Components',
+  'admin.highAvailability.wizard.step9.header.title':'Finalize HA Setup',
+  'admin.highAvailability.wizard.rollback.header.title':'Reverting Back to Non-HA Setup.',
 
   'admin.highAvailability.wizard.step5.task0.title':'Stop All Services',
   'admin.highAvailability.wizard.step5.task1.title':'Install Additional NameNode',
@@ -695,53 +717,62 @@ Em.I18n.translations = {
   'admin.highAvailability.wizard.step3.secNameNode': '<b>Secondary NameNode:</b> ',
   'admin.highAvailability.wizard.step3.journalNode': '<b>JournalNode:</b> ',
   'admin.highAvailability.wizard.step3.toBeInstalled': 'TO BE INSTALLED',
-  'admin.highAvailability.wizard.step3.toBeDisabled': 'TO BE DISABLED',
+  'admin.highAvailability.wizard.step3.toBeDeleted': 'TO BE DELETED',
   'admin.highAvailability.wizard.step4.ckNotCreated':'Checkpoint not created yet',
   'admin.highAvailability.wizard.step4.ckCreated':'Checkpoint created',
   'admin.highAvailability.wizard.step6.jsNoInit':'JournalNodes not initialized yet',
   'admin.highAvailability.wizard.step6.jsInit':'JournalNodes initialized',
   'admin.highAvailability.wizard.step8.metaNoInit':'Metadata not initialized yet',
+  'admin.highAvailability.wizard.step8.confirmPopup.body':'Please confirm that you have run the manual steps before continuing.',
 
   'admin.highAvailability.rollback.header':'Disable NameNode HA Wizard',
-  'admin.highAvailability.rollback.task0.title':'Stop all services',
-  'admin.highAvailability.rollback.task1.title':'Restore HBASE configurations',
-  'admin.highAvailability.rollback.task2.title':'Stop Failover controllers',
-  'admin.highAvailability.rollback.task3.title':'Delete Failover controllers',
-  'admin.highAvailability.rollback.task4.title':'Stop stand by NameNode',
+  'admin.highAvailability.rollback.task0.title':'Stop All Services',
+  'admin.highAvailability.rollback.task1.title':'Restore HBase Configurations',
+  'admin.highAvailability.rollback.task2.title':'Stop Failover Controllers',
+  'admin.highAvailability.rollback.task3.title':'Delete Failover Controllers',
+  'admin.highAvailability.rollback.task4.title':'Stop Additional NameNode',
   'admin.highAvailability.rollback.task5.title':'Stop NameNode',
-  'admin.highAvailability.rollback.task6.title':'Restore HDFS configurations',
+  'admin.highAvailability.rollback.task6.title':'Restore HDFS Configurations',
   'admin.highAvailability.rollback.task7.title':'Enable Secondary NameNode',
   'admin.highAvailability.rollback.task8.title':'Stop JournalNodes',
   'admin.highAvailability.rollback.task9.title':'Delete JournalNodes',
-  'admin.highAvailability.rollback.task10.title':'Delete additional NameNode',
-  'admin.highAvailability.rollback.task11.title':'Start all services',
-  'admin.highAvailability.rollback.notice.inProgress': 'Please wait while NameNode HA is being disabled.',
+  'admin.highAvailability.rollback.task10.title':'Delete Additional NameNode',
+  'admin.highAvailability.rollback.task11.title':'Start All Services',
+  'admin.highAvailability.rollback.notice.inProgress':'Please wait while the wizard reverts back to the non-HA setup.',
 
   'admin.highAvailability.wizard.step8.body':
+    '<div class="alert alert-info">' +
     '<ol>' +
-    '<li>Login to the additional NameNode host <b>{2}</b> as user <b>{0}</b>.</li>' +
-    '<li>Initialize the metadata for the additional NameNode by running:' +
-    '<div class="code-snippet">hdfs namenode -bootstrapStandby</div></li>' +
-    '<li>Login to the NameNode host <b>{1}</b> as user <b>{0}</b>.</li>' +
+    '<li>Login to the NameNode host <b>{1}</b>.</li>' +
     '<li>Initialize the metadata for NameNode automatic failover by running:' +
-    '<div class="code-snippet">hdfs zkfc -formatZK</div></li>' +
-    '<li>You will be able to proceed once Ambari detects that the steps were completed successfully.</li>' +
-    '</ol>',
+    '<div class="code-snippet">sudo su -l {0} -c \'hdfs zkfc -formatZK\'</div></li>' +
+    '</div>' +
+    '<div class="alert alert-info">' +
+    '<ol start="3">' +
+    '<li>Login to the Additional NameNode host <b>{2}</b>.<br>' +
+    '<div class="alert alert-warn"><strong>Important!</strong> Be sure to login to the Additional NameNode host.<br>This is a different host from the Steps 1 and 2 above.</div>' +
+    '</li>' +
+    '<li>Initialize the metadata for the Additional NameNode by running:' +
+    '<div class="code-snippet">sudo su -l {0} -c \'hdfs namenode -bootstrapStandby\'</div></li>' +
+    '</ol>' +
+    '</div>' +
+    'Please proceed once you have completed the steps above.',
   'admin.highAvailability.wizard.step6.body':
     '<ol>' +
-    '<li>Login to the NameNode host <b>{1}</b> as user <b>{0}</b>.</li>' +
+    '<li>Login to the NameNode host <b>{1}</b>.</li>' +
     '<li>Initialize the JournalNodes by running:' +
-    '<div class="code-snippet">hdfs namenode -initializeSharedEdits</div></li>' +
+    '<div class="code-snippet">sudo su -l {0} -c \'hdfs namenode -initializeSharedEdits\'</div></li>' +
     '<li>You will be able to proceed once Ambari detects that the JournalNodes have been initialized successfully.</li>' +
     '</ol>',
   'admin.highAvailability.wizard.step4.body':
     '<ol>' +
-    '<li>Login to the NameNode host <b>{1}</b> as user <b>{0}</b>.</li>' +
-    '<li>Put the NameNode in safe mode (read-only-mode):' +
-    '<div class="code-snippet">hdfs dfsadmin -safemode enter</div></li>' +
-    '<li>Once in Safe Mode, create a checkpoint:' +
-    '<div class="code-snippet">hdfs dfsadmin -saveNamespace</div></li>' +
-    '<li>You will be able to proceed once Ambari detects that the NameNode is in Safe Mode and the checkpoint has been created successfully.</li>' +
+    '<li>Login to the NameNode host <b>{1}</b>.</li>' +
+    '<li>Put the NameNode in Safe Mode (read-only mode):' +
+    '<div class="code-snippet">sudo su -l {0} -c \'hdfs dfsadmin -safemode enter\'</div></li>' +
+    '<li>Once in Safe Mode, create a Checkpoint:' +
+    '<div class="code-snippet">sudo su -l {0} -c \'hdfs dfsadmin -saveNamespace\'</div></li>' +
+    '<li>You will be able to proceed once Ambari detects that the NameNode is in Safe Mode and the Checkpoint has been created successfully.</li>'+
+    '<div class="alert alert-warn">If the <b>Next</b> button is enabled before you run the <b>"Step 3: Create a Checkpoint"</b> command, it means there is a recent Checkpoint already and you may proceed without running the <b>"Step 3: Create a Checkpoint"</b> command.</div>' +
     '</ol>',
   'admin.highAvailability.wizard.step3.body':'Confirm your host selections.',
   'admin.highAvailability.wizard.step2.body':'Select a host that will be running the additional NameNode.<br/> In addition,' +
@@ -752,8 +783,8 @@ Em.I18n.translations = {
     'The process to enable HA involves a combination of <b>automated steps</b> (that will be handled by the wizard) and ' +
     '<b>manual steps</b> (that you must perform in sequence as instructed by the wizard).<br/><br/>' +
     '<b>You should plan a cluster maintanance window and prepare for cluster downtime when enabling NameNode HA.</b>',
-  'admin.highAvailability.wizard.step1.alert':'As part of this process, your current Secondary NameNode will be disabled and new JournalNodes will be introduced into the cluster.',
-  'admin.security.title':'Kerberos Security has not been enabled',
+  'admin.highAvailability.wizard.step1.alert':'If you have HBase running, please exit this wizard and stop HBase first.',
+  'admin.security.title':'Kerberos security has not been enabled',
   'admin.security.enabled': 'Kerberos security is enabled',
   'admin.security.disabled': 'Kerberos security is disabled',
   'admin.security.button.enable':'Enable Security',
@@ -806,8 +837,9 @@ Em.I18n.translations = {
   'admin.addSecurity.enable.onClose': 'You are in the process of enabling security on your cluster. ' +
     'Are you sure you want to quit? If you quit, ' +
     'you may have to re-run the security wizard from the beginning to enable security.',
-  'admin.addSecurity.enable.after.stage2.onClose': 'Services are being started with the Kerberos settings you specified.'+
-    'It is recommended that you wait until all the services are started to ensure that they are set up properly.',
+  'admin.addSecurity.enable.after.stage2.onClose': 'Services are being started with the Kerberos settings you specified. '+
+    'It is recommended that you wait until all the services are started to ensure that they are set up properly. ' +
+    'Are you sure you want to quit?',
   'admin.addSecurity.disable.onClose': 'You are in the process of disabling security on your cluster. ' +
     'Are you sure you want to quit?',
   'admin.removeSecurity.header': 'Disable Security',
@@ -860,6 +892,8 @@ Em.I18n.translations = {
   'services.service.summary.nameNode':'NameNode Web UI',
   'services.service.summary.nameNodeUptime':'NameNode Uptime',
   'services.service.summary.nameNodeHeap':'NameNode Heap',
+  'services.service.summary.nameNode.active':'Active NameNode',
+  'services.service.summary.nameNode.standby':'Standby NameNode',
   'services.service.summary.pendingUpgradeStatus':'Upgrade Status',
   'services.service.summary.pendingUpgradeStatus.pending':'Pending upgrade',
   'services.service.summary.pendingUpgradeStatus.notPending':'No pending upgrade',
@@ -1011,7 +1045,7 @@ Em.I18n.translations = {
   'services.service.info.metrics.yarn.nodemanager.statuses.displayNames.lost':'Lost NodeManagers',
   'services.service.info.metrics.yarn.nodemanager.statuses.displayNames.rebooted':'Rebooted NodeManagers',
   'services.service.info.metrics.yarn.nodemanager.statuses.displayNames.unhealthy':'Unhealthy NodeManagers',
-  'services.service.info.metrics.yarn.queueMemoryResource':'Queue Memory',
+  'services.service.info.metrics.yarn.queueMemoryResource':'Queue Memory Used',
   'services.service.info.metrics.yarn.queueMemoryResource.displayNames.allocated':'Allocated ({0})',
   'services.service.info.metrics.yarn.queueMemoryResource.displayNames.available':'Available ({0})',
   'services.service.info.metrics.yarn.queueMemoryResource.displayName':'Queue: {0}',
@@ -1154,10 +1188,13 @@ Em.I18n.translations = {
   'hosts.host.summary.hostMetrics':'Host Metrics',
 
   'hosts.host.details.deleteHost':'Delete Host',
+  'hosts.host.details.startAllComponents':'Start All Components',
+  'hosts.host.details.stopAllComponents':'Stop All Components',
 
   'host.host.componentFilter.master':'Master Components',
   'host.host.componentFilter.slave':'Slave Components',
   'host.host.componentFilter.client':'Client Components',
+  'hosts.host.addComponent.msg':'Are you sure you want to add {0}?',
   'hosts.host.addComponent.note':'Note: After this component is installed, go to Services -> Nagios to restart the Nagios service.  This is required for the alerts and notifications to work properly.',
   'hosts.host.addComponent.securityNote':'You are running your cluster in secure mode. You must set up the keytab for {0} on {1} before you proceed. Otherwise, the component will not be able to start properly.',
   'hosts.host.datanode.decommission':'Decommission DataNode',
@@ -1175,14 +1212,23 @@ Em.I18n.translations = {
   'hosts.host.healthStatusCategory.orange': "Slave Down",
   'hosts.host.healthStatusCategory.yellow': "No Heartbeat",
   'hosts.host.alerts.label': 'Alerts',
+  'hosts.host.maintainance.stopAllComponents.context': 'Stop All Host Components',
+  'hosts.host.maintainance.startAllComponents.context': 'Start All Host Components',
   'hosts.host.alerts.st':'&nbsp;!&nbsp;',
   'hosts.decommission.popup.body':'Are you sure?',
   'hosts.decommission.popup.header':'Confirmation',
-  'hosts.delete.popup.body':'Are you sure?',
+  'hosts.delete.popup.body':'Are you sure you want to delete host {0}?',
+  'hosts.delete.popup.body.msg1':'This will remove the host from Ambari\'s management. Ambari will ignore any communications from this host.',
+  'hosts.delete.popup.body.msg2':'Installed bits of service components will not be removed from the system. Individual service components should not be restarted later to join the cluster. This will introduce inconsistencies in monitoring data.',
+  'hosts.delete.popup.body.msg3':'Nagios service should be restarted for alerts and notifications to work properly. ZooKeeper service should be restarted if any ZooKeeper components are removed. Go to the <i>Services</i> page to restart services.',
   'hosts.delete.popup.header':'Confirmation',
-  'hosts.cant.do.popup.header':'Operation not allowed',
-  'hosts.cant.do.popup.masterList.body':'You cannot delete this host because it is hosting following master services: {0}.',
-  'hosts.cant.do.popup.workingList.body':'You cannot delete this host because following slave services are not fully stopped or decommissioned: {0}.',
+  'hosts.delete.popup.title':'Delete Host',
+  'hosts.delete.popup.unknownComponents':'Components with unknown status:',
+  'hosts.cant.do.popup.title':'Delete Host Error',
+  'hosts.cant.do.popup.masterList.body':'Host with {0} master components cannot be deleted',
+  'hosts.cant.do.popup.nonDeletableList.body':'Deletion of the following {0} components is not supported. ',
+  'hosts.cant.do.popup.runningList.body':'Host cannot be deleted with the following {0} components running. ',
+  'hosts.cant.do.popup.runningList.body.end':'Stop the components before reattempting to delete host. Some components might need special actions performed before deletion from cluster. For example, DataNode has to be decommissioned before being deleted.',
   'hosts.add.header':'Add Host Wizard',
   'hosts.assignRack':'Assign Rack',
 
@@ -1272,6 +1318,9 @@ Em.I18n.translations = {
   'dashboard.widgets.NameNodeUptime': 'NameNode Uptime',
   'dashboard.widgets.JobTrackerUptime': 'JobTracker Uptime',
   'dashboard.widgets.HDFSLinks': 'HDFS Links',
+  'dashboard.widgets.HDFSLinks.activeNameNode': 'Active NameNode',
+  'dashboard.widgets.HDFSLinks.standbyNameNode': 'Standby NameNode',
+  'dashboard.widgets.HDFSLinks.standbyNameNodes': '2 Standby NameNodes',
   'dashboard.widgets.MapReduceLinks': 'MapReduce Links',
   'dashboard.widgets.HBaseLinks': 'HBase Links',
   'dashboard.widgets.HBaseAverageLoad': 'HBase Ave Load',

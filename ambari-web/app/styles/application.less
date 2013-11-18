@@ -467,15 +467,20 @@ h1 {
         font-size: 20px;
       }
       .not-active-link{
-        text-decoration: none;
-        pointer-events: none;
         color: #999;
-        cursor: default;
+        a{
+          text-decoration: none;
+          pointer-events: none;
+          color: #999;
+          cursor: default;
+        }
       }
       .active-link{
-        pointer-events: auto;
-        color: #0088cc;
-        cursor: pointer;
+        a{
+          pointer-events: auto;
+          color: #0088cc;
+          cursor: pointer;
+        }
       }
       .retry {
         cursor: pointer;
@@ -500,7 +505,7 @@ h1 {
       margin-left: 0;
     }
   }
-  #ha-step1 {
+  #ha-step1, #ha-step4, #ha-step8 {
     .alert.alert-warn {
       margin-top: 10px;
       margin-bottom: 10px;
@@ -516,7 +521,7 @@ h1 {
 
   #ha-step3-review-table {
     td {
-      text-align: center;
+      text-align: left;
       vertical-align: top;
       padding: 5px;
       ul {
@@ -1990,13 +1995,39 @@ width:100%;
     background: #953B39;
   }
 }
-
-.nav-pills.move {
-  float: right;
-  margin-top: -48px;
-  width:105px;
-  &>li {
-    position: absolute;
+.quick-links-wrapper {
+  margin-top: -53px;
+  position: relative;
+  left: 278px;
+  .nav-pills.move {
+    float: right;
+    width:135px;
+    &>li {
+      position: absolute;
+    }
+  }
+  .nav li.dropdown.open {
+    .dropdown-toggle{
+      color: #005580;
+      background-color: #eeeeee;
+      border-color: #eeeeee;
+      -webkit-box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);
+      -moz-box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+    a:hover .caret {
+      border-top-color: #005580;
+      border-bottom-color: #005580;
+    }
+    .caret {
+      border-top-color: #005580;
+      border-bottom-color: #005580;
+    }
+  }
+  .disabled-hdfs-quick-link {
+    pointer-events: none;
+    color: #808080;
+    cursor: default;
   }
 }
 
@@ -2082,7 +2113,6 @@ table.graphs {
 }
 
 /*Dashboard Widgets Start*/
-
 #dashboard-widgets-container{
   h4{
     line-height: 30px;
@@ -2235,6 +2265,11 @@ table.graphs {
       font-size: 35px;
       padding-top: 40px; //svg
       position: relative;
+      .disabled-hdfs-link {
+        pointer-events: none;
+        color: grey;
+        cursor: default;
+      }
       .screensaver{ // graph onload wait
         width: 90%;
         height: 105px;
@@ -2359,7 +2394,13 @@ table.graphs {
       .link-button{
         padding-top: 7px;
         padding-left: 70px;
+        .disabled-hdfs-quick-link {
+        pointer-events: none;
+        color: #808080;
+        cursor: default;
       }
+      }
+
       .widget-content{
         text-align: center;
         font-weight: none;
@@ -2553,6 +2594,9 @@ table.graphs {
   .progress {
     margin-bottom: 0;
   }
+  .width70{
+    width:70%;
+  }
   .table { //margin-bottom: 0;
     thead { //background: #EDF5FC;
     }
@@ -2562,6 +2606,12 @@ table.graphs {
     th, td {
       width: 82px;
       border-left-width: 0;
+    }
+    td.name {
+      min-width: 260px;
+      max-width: 360px;
+      overflow: auto;
+      overflow-wrap: break-word;
     }
     th.first, td.first {
       width: 10px !important;
@@ -3920,6 +3970,16 @@ ul.inline li {
   max-height: 440px;
 }
 
+.log_popup {
+  .bar {
+    -webkit-transition: width 0.0s ease;
+    -moz-transition: width 0.0s ease;
+    -ms-transition: width 0.0s ease;
+    -o-transition: width 0.0s ease;
+    transition: width 0.0s ease;
+  }
+}
+
 #step10-content {
   max-height: 440px;
 }
@@ -4082,6 +4142,10 @@ i.icon-asterisks {
   .navbar-static-top .container,
   .navbar-fixed-top .container,
   .navbar-fixed-bottom .container {
+    width: 1130px;
+  }
+
+  .main-container {
     width: 1170px;
   }
 
@@ -4496,6 +4560,9 @@ i.icon-asterisks {
 
   .add-widget-button{
     margin-left: 9px; //3px for 3 buttons view
+  }
+  .more-options-button{
+    margin-right: 2px;
   }
 
   #dashboard-widgets{

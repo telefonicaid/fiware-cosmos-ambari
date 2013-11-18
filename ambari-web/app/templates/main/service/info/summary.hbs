@@ -18,20 +18,6 @@
 
 <div class="row-fluid service-block">
   <div class="span6">
-    {{#if view.service.quickLinks.length}}
-      {{#view App.QuickViewLinks contentBinding="view.service"}}
-        <ul class="nav nav-pills move">
-          <li class="dropdown">
-            <a class="dropdown-toggle" data-toggle="dropdown" href="#">{{t common.quickLinks}}<b class="caret"></b></a>
-            <ul class="dropdown-menu">
-              {{#each view.quickLinks}}
-                <a {{bindAttr href="url"}} {{bindAttr target="view.linkTarget"}}>{{label}}</a>
-              {{/each}}
-            </ul>
-          </li>
-        </ul>
-      {{/view}}
-    {{/if}}
 
     <div class="box">
       <div class="box-header">
@@ -42,20 +28,6 @@
           <tbody>
             {{#if view.noTemplateService}}
               {{view view.sumMasterComponentView}}
-              {{#each component in view.components}}
-                {{#unless component.isMaster}}
-                  <tr>
-                    <td class="summary-label">{{component.displayName}}{{#if view.hasManyClients}}s{{/if}}</td>
-                    <td>
-                      <span class="green-live">{{view.clients.length}}</span>
-                      {{component.displayName}} {{#if view.hasManyClients}}s{{/if}} {{t common.installed}}
-                      <div class="summary-view-host">
-                        <a {{action filterHosts component}} href="javascript:void(null)>{{view.clientsHostText}}</a>
-                      </div>
-                    </td>
-                  </tr>
-                {{/unless}}
-              {{/each}}
             {{/if}}
             {{#if view.serviceStatus.hdfs}}
               {{view App.MainDashboardServiceHdfsView showOnlyRows=true serviceBinding="view.service"}}
@@ -100,7 +72,9 @@
       <div class="box-header">
         <h4>{{t services.alerts.headingOfList}}</h4>
         <div class="btn-group">
-          <a class="btn" target="_blank" rel="tooltip" title="Go to Nagios" {{bindAttr href="controller.nagiosUrl"}}><i class="icon-link"></i></a>
+          {{#if controller.isNagiosInstalled}}
+            <a class="btn" target="_blank" rel="tooltip" title="Go to Nagios" {{bindAttr href="controller.nagiosUrl"}}><i class="icon-link"></i></a>
+          {{/if}}
         </div>
       </div>
       <ul id='summary-alerts-list' class="alerts">
@@ -130,7 +104,9 @@
       <div class="box-header">
         <h4>{{controller.content.label}} {{t common.metrics}}</h4>
         <div class="btn-group">
-          <a class="btn" target="_blank" rel="tooltip" title="Go to Ganglia" {{bindAttr href="view.gangliaUrl"}}><i class="icon-link"></i></a>
+          {{#if controller.isGangliaInstalled}}
+            <a class="btn" target="_blank" rel="tooltip" title="Go to Ganglia" {{bindAttr href="view.gangliaUrl"}}><i class="icon-link"></i></a>
+          {{/if}}
         </div>
       </div>
       

@@ -88,7 +88,7 @@
   </property>
   <property>
     <name>datanode_du_reserved</name>
-    <value>1</value>
+    <value>1073741824</value>
     <description>Reserved space for HDFS</description>
   </property>
   <property>
@@ -182,6 +182,11 @@
     <name>hdfs_user</name>
     <value>hdfs</value>
     <description>User and Groups.</description>
+  </property>
+  <property>
+    <name>lzo_enabled</name>
+    <value>true</value>
+    <description>LZO compression enabled</description>
   </property>
   
 </configuration>

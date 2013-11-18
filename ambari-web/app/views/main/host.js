@@ -31,6 +31,22 @@ App.MainHostView = App.TableView.extend({
     this._super();
   },
 
+  clearFiltersObs: function() {
+    var self = this;
+    Em.run.next(function() {
+      if (self.get('controller.clearFilters')) {
+        self.clearFilters();
+        self.clearDisplayLength();
+        self.clearStartIndex();
+      }
+    });
+  },
+
+  didInsertElement: function() {
+    this.addObserver('controller.clearFilters', this, this.clearFiltersObs);
+    this.clearFiltersObs();
+  },
+
   sortView: sort.wrapperView,
   nameSort: sort.fieldView.extend({
     name:'publicHostName',
@@ -205,7 +221,7 @@ App.MainHostView = App.TableView.extend({
    */
   nameFilterView: filters.createTextView({
     column: 1,
-    fieldType: 'input-xlarge',
+    fieldType: 'width70',
     onChangeValue: function(){
       this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'string');
     }
@@ -217,7 +233,7 @@ App.MainHostView = App.TableView.extend({
    */
   ipFilterView: filters.createTextView({
     column: 2,
-    fieldType: 'input-small',
+    fieldType: 'width70',
     onChangeValue: function(){
       this.get('parentView').updateFilter(this.get('column'), this.get('value'), 'string');
     }
@@ -228,7 +244,7 @@ App.MainHostView = App.TableView.extend({
    * Based on <code>filters</code> library
    */
   cpuFilterView: filters.createTextView({
-    fieldType: 'input-mini',
+    fieldType: 'width70',
     fieldId: 'cpu_filter',
     column: 3,
     onChangeValue: function(){
@@ -241,7 +257,7 @@ App.MainHostView = App.TableView.extend({
    * Based on <code>filters</code> library
    */
   loadAvgFilterView: filters.createTextView({
-    fieldType: 'input-mini',
+    fieldType: 'width70',
     fieldId: 'load_avg_filter',
     column: 5,
     onChangeValue: function(){
@@ -254,7 +270,7 @@ App.MainHostView = App.TableView.extend({
    * Based on <code>filters</code> library
    */
   ramFilterView: filters.createTextView({
-    fieldType: 'input-mini',
+    fieldType: 'width70',
     fieldId: 'ram_filter',
     column: 4,
     onChangeValue: function(){

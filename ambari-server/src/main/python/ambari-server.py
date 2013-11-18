@@ -61,8 +61,10 @@ LDAP_SETUP_ACTION = "setup-ldap"
 SETUP_GANGLIA_HTTPS_ACTION = "setup-ganglia-https"
 SETUP_NAGIOS_HTTPS_ACTION  = "setup-nagios-https"
 ENCRYPT_PASSWORDS_ACTION = "encrypt-passwords"
+SETUP_SECURITY_ACTION = "setup-security"
 
-ACTION_REQUIRE_RESTART = [RESET_ACTION, UPGRADE_ACTION, UPGRADE_STACK_ACTION, SETUP_HTTPS_ACTION, LDAP_SETUP_ACTION]
+ACTION_REQUIRE_RESTART = [RESET_ACTION, UPGRADE_ACTION, UPGRADE_STACK_ACTION,
+                          SETUP_SECURITY_ACTION, LDAP_SETUP_ACTION]
 
 # selinux commands
 GET_SE_LINUX_ST_CMD = "/usr/sbin/sestatus"
@@ -73,11 +75,8 @@ SE_MODE_ENFORCING = "enforcing"
 SE_MODE_PERMISSIVE = "permissive"
 
 # iptables commands
-IP_TBLS_ST_CMD = "/sbin/service iptables status"
-IP_TBLS_STOP_CMD = "/sbin/service iptables stop"
-IP_TBLS_ENABLED = "Firewall is running"
-IP_TBLS_DISABLED = "Firewall is stopped.\n"
-IP_TBLS_SRVC_NT_FND = "iptables: unrecognized service"
+IP_TBLS_STATUS_CMD = "/sbin/service iptables status"
+IP_TBLS_IS_NOT_RUNNING = "iptables: Firewall is not running."
 
 # server commands
 ambari_provider_module_option = ""
@@ -181,6 +180,7 @@ SECURITY_KEY_IS_PERSISTED = "security.master.key.ispersisted"
 SECURITY_KEY_ENV_VAR_NAME = "AMBARI_SECURITY_MASTER_KEY"
 SECURITY_MASTER_KEY_FILENAME = "master"
 SECURITY_IS_ENCRYPTION_ENABLED = "security.passwords.encryption.enabled"
+SECURITY_KERBEROS_JASS_FILENAME = "krb5JAASLogin.conf"
 
 SSL_KEY_DIR = 'security.server.keys_dir'
 SSL_API_PORT = 'client.api.ssl.port'
@@ -290,6 +290,9 @@ DATABASE_CONNECTION_STRINGS_ALT = [
                   "jdbc:postgresql://{0}:{1}/{2}",
                   "jdbc:oracle:thin:@{0}:{1}:{2}",
                   "jdbc:mysql://{0}:{1}/{2}"]
+ORACLE_SID_PATTERN = "jdbc:oracle:thin:@.+:.+/.+"
+ORACLE_SNAME_PATTERN = "jdbc:oracle:thin:@.+:.+:.+"
+
 DATABASE_CLI_TOOLS = [["psql"], ["sqlplus", "sqlplus64"], ["mysql"]]
 DATABASE_CLI_TOOLS_DESC = ["psql", "sqlplus", "mysql"]
 DATABASE_CLI_TOOLS_USAGE = ['su -postgres --command=psql -f {0} -v username=\'"{1}"\' -v password="\'{2}\'"',
@@ -302,6 +305,12 @@ DATABASE_INIT_SCRIPTS = ['/var/lib/ambari-server/resources/Ambari-DDL-Postgres-R
 DATABASE_DROP_SCRIPTS = ['/var/lib/ambari-server/resources/Ambari-DDL-Postgres-REMOTE-DROP.sql',
                          '/var/lib/ambari-server/resources/Ambari-DDL-Oracle-DROP.sql',
                          '/var/lib/ambari-server/resources/Ambari-DDL-MySQL-DROP.sql']
+DATABASE_UPGRADE_SCRIPTS = ['/var/lib/ambari-server/resources/upgrade/ddl/Ambari-DDL-Postgres-REMOTE-UPGRADE.sql',
+                            '/var/lib/ambari-server/resources/upgrade/ddl/Ambari-DDL-Oracle-UPGRADE.sql',
+                            '/var/lib/ambari-server/resources/upgrade/ddl/Ambari-DDL-MySQL-UPGRADE.sql']
+DATABASE_STACK_UPGRADE_SCRIPTS = ['/var/lib/ambari-server/resources/upgrade/dml/Ambari-DML-Postgres-REMOTE-UPGRADE_STACK.sql',
+                                  '/var/lib/ambari-server/resources/upgrade/dml/Ambari-DML-Oracle-UPGRADE_STACK.sql',
+                                  '/var/lib/ambari-server/resources/upgrade/dml/Ambari-DML-MySQL-UPGRADE_STACK.sql']
 
 JDBC_PROPERTIES_PREFIX = "server.jdbc.properties."
 DATABASE_JDBC_PROPERTIES = [
@@ -320,10 +329,13 @@ REGEX_HOSTNAME_PORT = "^(.*:[0-9]{1,5}$)"
 REGEX_TRUE_FALSE = "^(true|false)?$"
 REGEX_ANYTHING = ".*"
 
+
 POSTGRES_EXEC_ARGS = "-h {0} -p {1} -d {2} -U {3} -f {4} -v username='\"{3}\"'"
-ORACLE_EXEC_ARGS = "-S '{0}/{1}@(description=(address=(protocol=TCP)(host={2})(port={3}))(connect_data=(sid={4})))' @{5} {0}"
+ORACLE_EXEC_ARGS = "-S -L '{0}/{1}@(description=(address=(protocol=TCP)(host={2})(port={3}))(connect_data=({6}={4})))' @{5} {0}"
 MYSQL_EXEC_ARGS = "--host={0} --port={1} --user={2} --password={3} {4} " \
                  "-e\"set @schema=\'{4}\'; set @username=\'{2}\'; source {5};\""
+
+ORACLE_UPGRADE_STACK_ARGS = "-S '{0}/{1}@(description=(address=(protocol=TCP)(host={2})(port={3}))(connect_data=({6}={4})))' @{5} {7} {8}"
 
 JDBC_PATTERNS = {"oracle":"*ojdbc*.jar", "mysql":"*mysql*.jar"}
 DATABASE_FULL_NAMES = {"oracle":"Oracle", "mysql":"MySQL", "postgres":"PostgreSQL"}
@@ -753,24 +765,17 @@ def check_ambari_user():
 # Checks iptables
 #
 def check_iptables():
-  # not used
-  # retcode, out, err = run_os_command(IP_TBLS_ST_CMD)
-  ''' This check doesn't work on CentOS 6.2 if firewall AND
-  iptables service are running if out == IP_TBLS_ENABLED:
-    print 'iptables is enabled now'
-    print 'Stopping iptables service'
-  '''
-  retcode, out, err = run_os_command(IP_TBLS_STOP_CMD)
-  print 'iptables is disabled now. please reenable later.'
+  retcode, out, err = run_os_command(IP_TBLS_STATUS_CMD)
 
-  if not retcode == 0 and err and len(err) > 0:
+  if err and len(err) > 0:
     print err
 
-  if err.strip() == IP_TBLS_SRVC_NT_FND:
-    return 0
-  else:
-    return retcode, out
-
+  if out and len(out) > 0 and not out.strip() == IP_TBLS_IS_NOT_RUNNING:
+    print_warning_msg("iptables is running. Confirm the necessary Ambari ports are accessible. " +
+      "Refer to the Ambari documentation for more details on ports.")
+    ok = get_YN_input("OK to continue [y/n] (y)? ", True)
+    if not ok:
+      raise FatalException(1, None)
 
 
 ### Postgres ###
@@ -1086,9 +1091,12 @@ def prompt_db_properties(args):
     ok = get_YN_input("Enter advanced database configuration [y/n] (n)? ", False)
     if ok:
 
+      print "=============================================================================="
+      print "Choose one of the following options:"
+
       database_num = str(DATABASE_INDEX + 1)
       database_num = get_validated_string_input(
-        "Select database:\n1 - PostgreSQL (Embedded)\n2 - Oracle\n(" + database_num + "): ",
+        "[1] - PostgreSQL (Embedded)\n[2] - Oracle\n==============================================================================\nEnter choice (" + database_num + "): ",
         database_num,
         "^[12]$",
         "Invalid number.",
@@ -1264,6 +1272,39 @@ def get_db_cli_tool(args):
   return None
 
 
+def remote_stack_upgrade(args, scriptPath, stackId):
+  tool = get_db_cli_tool(args)
+  if not tool:
+    args.warnings.append('{0} not found. Please, run DDL script manually'.format(DATABASE_CLI_TOOLS[DATABASE_INDEX]))
+    if VERBOSE:
+      print_warning_msg('{0} not found'.format(DATABASE_CLI_TOOLS[DATABASE_INDEX]))
+    return -1, "Client wasn't found", "Client wasn't found"
+
+  #TODO add support of other databases with scripts
+  if args.database == "oracle":
+    sid_or_sname = "sid"
+    if (hasattr(args, 'sid_or_sname') and args.sid_or_sname == "sname") or \
+        (hasattr(args, 'jdbc_url') and args.jdbc_url and re.match(ORACLE_SNAME_PATTERN, args.jdbc_url)):
+      print_info_msg("using SERVICE_NAME instead of SID for Oracle")
+      sid_or_sname = "service_name"
+
+    stack_name, stack_version = stackId.split(STACK_NAME_VER_SEP)
+    retcode, out, err = run_in_shell('{0} {1}'.format(tool, ORACLE_UPGRADE_STACK_ARGS.format(
+      args.database_username,
+      args.database_password,
+      args.database_host,
+      args.database_port,
+      args.database_name,
+      scriptPath,
+      sid_or_sname,
+      stack_name,
+      stack_version
+    )))
+    return retcode, out, err
+
+  return -2, "Wrong database", "Wrong database"
+  pass
+
 #execute SQL script on remote database
 def execute_remote_script(args, scriptPath):
   tool = get_db_cli_tool(args)
@@ -1285,16 +1326,23 @@ def execute_remote_script(args, scriptPath):
     )))
     return retcode, out, err
   elif args.database == "oracle":
+    sid_or_sname = "sid"
+    if (hasattr(args, 'sid_or_sname') and args.sid_or_sname == "sname") or \
+        (hasattr(args, 'jdbc_url') and args.jdbc_url and re.match(ORACLE_SNAME_PATTERN, args.jdbc_url)):
+      print_info_msg("using SERVICE_NAME instead of SID for Oracle")
+      sid_or_sname = "service_name"
+
     retcode, out, err = run_in_shell('{0} {1}'.format(tool, ORACLE_EXEC_ARGS.format(
       args.database_username,
       args.database_password,
       args.database_host,
       args.database_port,
       args.database_name,
-      scriptPath
+      scriptPath,
+      sid_or_sname
     )))
     return retcode, out, err
-  elif args.database=="mysql":
+  elif args.database == "mysql":
     retcode, out, err = run_in_shell('{0} {1}'.format(tool, MYSQL_EXEC_ARGS.format(
       args.database_host,
       args.database_port,
@@ -1438,6 +1486,7 @@ def parse_properties_file(args):
     return -1
 
   args.persistence_type = properties[PERSISTENCE_TYPE_PROPERTY]
+  args.jdbc_url = properties[JDBC_URL_PROPERTY]
 
   if not args.persistence_type:
     args.persistence_type = "local"
@@ -1452,9 +1501,11 @@ def parse_properties_file(args):
       DATABASE_INDEX = DATABASE_NAMES.index(args.database)
     except ValueError:
       pass
+  else:
+    #TODO incorrect property used!! leads to bunch of troubles. Workaround for now
+    args.database_name = properties[JDBC_DATABASE_PROPERTY]
 
   args.database_username = properties[JDBC_USER_NAME_PROPERTY]
-  args.database_name = properties[JDBC_DATABASE_PROPERTY]
   args.database_password_file = properties[JDBC_PASSWORD_PROPERTY]
   if args.database_password_file:
     if not is_alias_string(args.database_password_file):
@@ -1550,18 +1601,30 @@ def install_jce_manualy(args):
   if properties == -1:
     err = "Error getting ambari properties"
     raise FatalException(-1, err)
-  if args.jce_policy and os.path.exists(args.jce_policy):
-    jce_destination = os.path.join(properties[RESOURCES_DIR_PROPERTY], JCE_POLICY_FILENAME)
-    shutil.copy(args.jce_policy, jce_destination)
-    print "JCE policy copied from " + args.jce_policy + " to " + jce_destination
-    return 0
+  if args.jce_policy:
+    if os.path.exists(args.jce_policy):
+      if os.path.isdir(args.jce_policy):
+        err = "JCE Policy path is a directory: " + args.jce_policy
+        raise FatalException(-1, err)
+      jce_destination = os.path.join(properties[RESOURCES_DIR_PROPERTY], JCE_POLICY_FILENAME)
+      try:
+        shutil.copy(args.jce_policy, jce_destination)
+      except Exception, e:
+        err = "Can not copy file {0} to {1} due to: {2}. Please check file " \
+              "permissions and free disk space.".format(args.jce_policy, jce_destination, e.message)
+        raise FatalException(-1, err)
+      print "JCE policy copied from " + args.jce_policy + " to " + jce_destination
+      return 0
+    else:
+      err = "JCE Policy path " + args.jce_policy + " doesn't exists."
+      raise FatalException(-1, err)
   else:
     return 1
+
 #
 # Downloads the JDK
 #
 def download_jdk(args):
-  jce_installed = install_jce_manualy(args)
   properties = get_ambari_properties()
   if properties == -1:
     err = "Error getting ambari properties"
@@ -1574,6 +1637,12 @@ def download_jdk(args):
     print_warning_msg("JAVA_HOME " + args.java_home
                     + " must be valid on ALL hosts")
     write_property(JAVA_HOME_PROPERTY, args.java_home)
+    
+    warn = "JCE Policy files are required for configuring Kerberos security. If you plan to use Kerberos," \
+            "please make sure JCE Unlimited Strength Jurisdiction Policy Files are valid on all hosts."
+    print_warning_msg(warn)
+
+    return 0
   else:
     try:
       jdk_url = properties[JDK_URL_PROPERTY]
@@ -1594,6 +1663,16 @@ def download_jdk(args):
                                                         dest_file, e.message)
         raise FatalException(1, err)
     else:
+      ok = get_YN_input("To download the Oracle JDK you must accept the "
+                        "license terms found at "
+                        "http://www.oracle.com/technetwork/java/javase/"
+                        "terms/license/index.html and not accepting will "
+                        "cancel the Ambari Server setup.\nDo you accept the "
+                        "Oracle Binary Code License Agreement [y/n] (y)? ", True)
+      if not ok:
+        print 'Exiting...'
+        sys.exit(1)
+
       print 'Downloading JDK from ' + jdk_url + ' to ' + dest_file
       jdk_download_fail_msg = " Failed to download JDK: {0}. Please check that Oracle " \
         "JDK is available at {1}. Also you may specify JDK file " \
@@ -1632,7 +1711,7 @@ def download_jdk(args):
         raise FatalException(1, err)
 
     try:
-       out, ok = install_jdk(dest_file)
+       out = install_jdk(dest_file)
        jdk_version = re.search('Creating (jdk.*)/jre', out).group(1)
     except Exception, e:
        print "Installation of JDK has failed: %s\n" % e.message
@@ -1648,7 +1727,7 @@ def download_jdk(args):
              track_jdk(JDK_LOCAL_FILENAME, jdk_url, dest_file)
              print 'Successfully re-downloaded JDK distribution to ' + dest_file
              try:
-                 out, ok = install_jdk(dest_file)
+                 out = install_jdk(dest_file)
                  jdk_version = re.search('Creating (jdk.*)/jre', out).group(1)
              except Exception, e:
                print "Installation of JDK was failed: %s\n" % e.message
@@ -1666,16 +1745,15 @@ def download_jdk(args):
     write_property(JAVA_HOME_PROPERTY, "{0}/{1}".
         format(JDK_INSTALL_DIR, jdk_version))
 
-  if jce_installed != 0:
-    try:
-      download_jce_policy(properties, ok)
-    except FatalException as e:
-      print "JCE Policy files are required for secure HDP setup. Please ensure " \
-              " all hosts have the JCE unlimited strength policy 6, files."
-      print_error_msg("Failed to download JCE policy files:")
-      if e.reason is not None:
-        print_error_msg("Reason: {0}".format(e.reason))
-      # TODO: We don't fail installation if download_jce_policy fails. Is it OK?
+  try:
+    download_jce_policy(properties, ok)
+  except FatalException as e:
+    print "JCE Policy files are required for secure HDP setup. Please ensure " \
+            " all hosts have the JCE unlimited strength policy 6, files."
+    print_error_msg("Failed to download JCE policy files:")
+    if e.reason is not None:
+      print_error_msg("Reason: {0}".format(e.reason))
+    # TODO: We don't fail installation if download_jce_policy fails. Is it OK?
   return 0
 
 
@@ -1722,12 +1800,12 @@ def download_jce_policy(properties, accpeted_bcl):
           else:
             raise FatalException(1, err)
         else:
-          ok = get_YN_input("To download the JCE Policy archive you must "
+          ok = get_YN_input("To download the JCE Policy files you must "
                             "accept the license terms found at "
                             "http://www.oracle.com/technetwork/java/javase"
                             "/terms/license/index.html"
-                            "Not accepting might result in failure when "
-                            "setting up HDP security. \nDo you accept the "
+                            "Not accepting will result in errors when "
+                            "configuring Kerberos security. \nDo you accept the "
                             "Oracle Binary Code License Agreement [y/n] (y)? ", True)
           if ok:
             retcode, out, err = run_os_command(jce_download_cmd)
@@ -1752,16 +1830,6 @@ def download_jce_policy(properties, accpeted_bcl):
 class RetCodeException(Exception): pass
 
 def install_jdk(dest_file):
-  ok = get_YN_input("To install the Oracle JDK you must accept the "
-                    "license terms found at "
-                    "http://www.oracle.com/technetwork/java/javase/"
-                  "downloads/jdk-6u21-license-159167.txt. Not accepting will "
-                  "cancel the Ambari Server setup.\nDo you accept the "
-                  "Oracle Binary Code License Agreement [y/n] (y)? ", True)
-  if not ok:
-    print 'Exiting...'
-    sys.exit(1)
-
   print "Installing JDK to {0}".format(JDK_INSTALL_DIR)
   retcode, out, err = run_os_command(CREATE_JDK_DIR_CMD)
   savedPath = os.getcwd()
@@ -1772,7 +1840,7 @@ def install_jdk(dest_file):
   if retcode != 0:
     err = "Installation of JDK returned exit code %s" % retcode
     raise FatalException(retcode, err)
-  return out, ok
+  return out
 
 #
 # Configures the OS settings in ambari properties.
@@ -1815,6 +1883,7 @@ def get_JAVA_HOME():
     return None
     
   java_home = properties[JAVA_HOME_PROPERTY]
+  
   if (not 0 == len(java_home)) and (os.path.exists(java_home)):
     return java_home
 
@@ -1967,10 +2036,7 @@ def setup(args):
     raise FatalException(retcode, err)
 
   print 'Checking iptables...'
-  retcode, out = check_iptables()
-  if not retcode == 0 and out == IP_TBLS_ENABLED:
-    err = 'Failed to stop iptables. Exiting.'
-    raise FatalException(retcode, err)
+  check_iptables()
 
   print 'Checking JDK...'
   try:
@@ -2042,6 +2108,13 @@ def setup(args):
 # Resets the Ambari Server.
 #
 def reset(args):
+  #force reset if silent option provided
+  global SILENT
+  if SILENT:
+    default = "yes"
+  else:
+    default = "no"
+
   if not is_root():
     err = 'Ambari-server reset should be run with ' \
           'root-level privileges'
@@ -2052,14 +2125,14 @@ def reset(args):
                      "You will be required to re-configure the Ambari server "
                      "and re-run the cluster wizard. \n"
                      "Are you SURE you want to perform the reset "
-                     "[yes/no]? ", True)
+                     "[yes/no] ({0})? ".format(default), SILENT)
   okToRun = choice
 
   if not okToRun:
     err =  "Ambari Server 'reset' cancelled"
     raise FatalException(1, err)
 
-  okToRun = get_YN_input("Confirm server reset [yes/no]? ", True)
+  okToRun = get_YN_input("Confirm server reset [yes/no]({0})? ".format(default), SILENT)
 
   if not okToRun:
     err =  "Ambari Server 'reset' cancelled"
@@ -2082,7 +2155,7 @@ def reset(args):
       retcode, out, err = execute_remote_script(args, DATABASE_DROP_SCRIPTS[DATABASE_INDEX])
       if not retcode == 0:
         if retcode == -1:
-          print_warning_msg('Cannot find ' + client_desc + 
+          print_warning_msg('Cannot find ' + client_desc +
                             ' client in the path to reset the Ambari Server ' +
                             'schema. To reset Ambari Server schema ' +
                             'you must run the following DDL against the database ' +
@@ -2091,7 +2164,8 @@ def reset(args):
                             + 'against the database to create the schema: ' + os.linesep
                              + client_usage_cmd_init + os.linesep )
         raise NonFatalException(err)
-
+      if err:
+        print_warning_msg(err)
       retcode, out, err = execute_remote_script(args, DATABASE_INIT_SCRIPTS[DATABASE_INDEX])
       if not retcode == 0:
         if retcode == -1:
@@ -2103,7 +2177,8 @@ def reset(args):
                             'against the database to create the schema: ' + os.linesep + 
                             client_usage_cmd_init + os.linesep )
         raise NonFatalException(err)
-
+      if err:
+        print_warning_msg(err)
     else:
       err = 'Cannot find ' + client_desc + ' client in the path to reset the Ambari ' +\
       'Server schema. To reset Ambari Server schema ' + \
@@ -2123,7 +2198,8 @@ def reset(args):
     retcode, outdata, errdata = run_os_command(command)
     if not retcode == 0:
       raise FatalException(1, errdata)
-
+    if errdata:
+      print_warning_msg(errdata)
     print_info_msg ("About to run database setup")
     setup_db(args)
 
@@ -2145,16 +2221,13 @@ def start(args):
 
   check_database_name_property()
   parse_properties_file(args)
-  if os.path.exists(PID_DIR + os.sep + PID_NAME):
-    f = open(PID_DIR + os.sep + PID_NAME, "r")
-    pid = int(f.readline())
-    f.close()
-    try:
-      os.kill(pid, 0)
+  
+  status, pid = is_server_runing()
+  if status:
       err = "Ambari Server is already running."
-      raise FatalException(0, err)
-    except OSError as e:
-      print_info_msg("Ambari Server is not running...")
+      raise FatalException(1, err)
+    
+  print_info_msg("Ambari Server is not running...")
 
   conf_dir = get_conf_dir()
   jdk_path = find_jdk()
@@ -2175,11 +2248,6 @@ def start(args):
         err = "Unable to start PostgreSQL server. Exiting"
         raise FatalException(retcode, err)
 
-    print 'Checking iptables...'
-    retcode, out = check_iptables()
-    if not retcode == 0 and out == IP_TBLS_ENABLED:
-      err = "Failed to stop iptables. Exiting"
-      raise FatalException(retcode, err)
   else: # Skipping actions that require root permissions
     print "Unable to check iptables status when starting "\
       "without root privileges."
@@ -2257,16 +2325,17 @@ def start(args):
 def stop(args):
   if (args != None):
     args.exit_message = None
-  if os.path.exists(PID_DIR + os.sep + PID_NAME):
-    f = open(PID_DIR + os.sep + PID_NAME, "r")
-    pid = int(f.readline())
+    
+  status, pid = is_server_runing()
+  
+  if status:
     try:
       os.killpg(os.getpgid(pid), signal.SIGKILL)
     except OSError, e:
       print_info_msg( "Unable to stop Ambari Server - " + str(e) )
-      return -1
-    f.close()
-    os.remove(f.name)
+      return
+    pid_file_path = PID_DIR + os.sep + PID_NAME
+    os.remove(pid_file_path)
     print "Ambari Server stopped"
     return 0
   else:
@@ -2283,17 +2352,44 @@ def upgrade_stack(args, stack_id):
           'root-level privileges'
     raise FatalException(4, err)
   check_database_name_property()
-  #password access to ambari-server and mapred
-  configure_database_username_password(args)
-  dbname = args.database_name
-  file = args.upgrade_stack_script_file
-  stack_name, stack_version = stack_id.split(STACK_NAME_VER_SEP)
-  command = UPGRADE_STACK_CMD[:]
-  command[-1] = command[-1].format(file, stack_name, stack_version, dbname)
-  retcode, outdata, errdata = run_os_command(command)
-  if not retcode == 0:
-    raise FatalException(retcode, errdata)
-  return retcode
+
+  parse_properties_file(args)
+  if args.persistence_type == "remote":
+    client_desc = DATABASE_NAMES[DATABASE_INDEX] + ' ' + DATABASE_CLI_TOOLS_DESC[DATABASE_INDEX]
+    client_usage_cmd = DATABASE_CLI_TOOLS_USAGE[DATABASE_INDEX].format(DATABASE_STACK_UPGRADE_SCRIPTS[DATABASE_INDEX], args.database_username,
+                                                                       BLIND_PASSWORD, args.database_name)
+    #TODO temporarty code
+    if not args.database == "oracle":
+      raise FatalException(-20, "Upgrade for remote database only supports Oracle.")
+
+    if get_db_cli_tool(args):
+      retcode, out, err = remote_stack_upgrade(args, DATABASE_STACK_UPGRADE_SCRIPTS[DATABASE_INDEX], stack_id)
+      if not retcode == 0:
+        raise NonFatalException(err)
+
+    else:
+      err = 'Cannot find ' + client_desc + ' client in the path to upgrade the Ambari ' + \
+            'Server stack. To upgrade stack of Ambari Server ' + \
+            'you must run the following DML against the database:' + \
+            os.linesep + client_usage_cmd
+      raise NonFatalException(err)
+
+
+    pass
+  else:
+    #password access to ambari-server and mapred
+    configure_database_username_password(args)
+    dbname = args.database_name
+    file = args.upgrade_stack_script_file
+    stack_name, stack_version = stack_id.split(STACK_NAME_VER_SEP)
+    command = UPGRADE_STACK_CMD[:]
+    command[-1] = command[-1].format(file, stack_name, stack_version, dbname)
+    retcode, outdata, errdata = run_os_command(command)
+    if not retcode == 0:
+      raise FatalException(retcode, errdata)
+    if errdata:
+      print_warning_msg(errdata)
+    return retcode
 
 
 #
@@ -2318,16 +2414,38 @@ def upgrade(args):
     if properties == -1:
       print_error_msg ("Error getting ambari properties")
       return -1
+    print_warning_msg(JDBC_DATABASE_PROPERTY + " property isn't set in " +
+    AMBARI_PROPERTIES_FILE + ". Setting it to default value - " + DEFAULT_DB_NAME)
     properties.process_pair(JDBC_DATABASE_PROPERTY, DEFAULT_DB_NAME)
     conf_file = find_properties_file()
     try:
       properties.store(open(conf_file, "w"))
     except Exception, e:
       print_error_msg('Could not write ambari config file "%s": %s' % (conf_file, e))
-    return -1
+      return -1
 
   parse_properties_file(args)
   if args.persistence_type == "remote":
+    client_desc = DATABASE_NAMES[DATABASE_INDEX] + ' ' + DATABASE_CLI_TOOLS_DESC[DATABASE_INDEX]
+    client_usage_cmd = DATABASE_CLI_TOOLS_USAGE[DATABASE_INDEX].format(DATABASE_UPGRADE_SCRIPTS[DATABASE_INDEX], args.database_username,
+                                                                            BLIND_PASSWORD, args.database_name)
+
+    #TODO temporarty code
+    if not args.database == "oracle":
+      raise FatalException(-20, "Upgrade for remote database only supports Oracle.")
+
+    if get_db_cli_tool(args):
+      retcode, out, err = execute_remote_script(args, DATABASE_UPGRADE_SCRIPTS[DATABASE_INDEX])
+      if not retcode == 0:
+        raise NonFatalException(err)
+
+    else:
+      err = 'Cannot find ' + client_desc + ' client in the path to upgrade the Ambari ' + \
+            'Server schema. To upgrade Ambari Server schema ' + \
+            'you must run the following DDL against the database:' + \
+            os.linesep + client_usage_cmd
+      raise NonFatalException(err)
+
     pass
   else:
     print 'Checking PostgreSQL...'
@@ -3120,13 +3238,26 @@ def setup_https(args):
 
 
 def is_server_runing():
-  if os.path.exists(PID_DIR + os.sep + PID_NAME):
-    f = open(PID_DIR + os.sep + PID_NAME, "r")
-    pid = int(f.readline())
+  pid_file_path = PID_DIR + os.sep + PID_NAME
+  
+  if os.path.exists(pid_file_path):
+    try:
+      f = open(pid_file_path, "r")
+    except IOError, ex:
+      raise FatalException(1, str(ex))
+    
+    pid = f.readline().strip()
+    
+    if not pid.isdigit():
+      err = "%s is corrupt. Removing" % (pid_file_path)
+      f.close()
+      run_os_command("rm -f " + pid_file_path)
+      raise NonFatalException(err)
+    
     f.close()
-    retcode, out, err = run_os_command("ps -p " + str(pid))
+    retcode, out, err = run_os_command("ps -p " + pid)
     if retcode == 0:
-      return True, pid
+      return True, int(pid)
     else:
       return False, None
   else:
@@ -3508,6 +3639,66 @@ def get_fqdn():
   except Exception, e:
     return socket.getfqdn()
 
+
+def is_valid_filepath(filepath):
+  if not filepath or not os.path.exists(filepath):
+    print 'Invalid path, please provide the absolute file path.'
+    return False
+  else:
+    return True
+
+def setup_ambari_krb5_jaas():
+  jaas_conf_file = search_file(SECURITY_KERBEROS_JASS_FILENAME, get_conf_dir())
+  if os.path.exists(jaas_conf_file):
+    print 'Setting up Ambari kerberos JAAS configuration to access ' +\
+          'secured Hadoop daemons...'
+    principal = get_validated_string_input('Enter ambari server\'s kerberos '
+                  'principal name: ', 'ambari@EXAMPLE.COM', '.*', '', False,
+                  False)
+    keytab = get_validated_string_input('Enter keytab path for ambari '
+                  'server\'s kerberos principal: ',
+                  '/etc/security/keytabs/ambari.keytab', '.*', False, False,
+                  validatorFunction = is_valid_filepath)
+
+    for line in fileinput.FileInput(jaas_conf_file, inplace=1):
+      line = re.sub('keyTab=.*$', 'keyTab="' + keytab + '"', line)
+      line = re.sub('principal=.*$', 'principal="' + principal + '"', line)
+      print line,
+
+  else:
+    raise NonFatalException('No jaas config file found at location: ' +
+                            jaas_conf_file)
+
+def setup_security(args):
+  need_restart = True
+  #Print menu options
+  print '=' * 75
+  print 'Choose one of the following options: '
+  print '  [1] Enable HTTPS for Ambari server.'
+  print '  [2] Enable HTTPS for Ganglia service.'
+  print '  [3] Enable HTTPS for Nagios service.'
+  print '  [4] Encrypt passwords stored in ambari.properties file.'
+  print '  [5] Setup Ambari kerberos JAAS configuration.'
+  print '=' * 75
+  choice = get_validated_string_input('Enter choice, (1-5): ', '0', '[1-5]',
+                                      'Invalid choice', False, False)
+
+  if choice == '1':
+    need_restart = setup_https(args)
+  elif choice == '2':
+    setup_component_https("Ganglia", "setup-ganglia-https", GANGLIA_HTTPS,
+                         "ganglia_cert")
+  elif choice == '3':
+    setup_component_https("Nagios", "setup-nagios-https", NAGIOS_HTTPS,
+                          "nagios_cert")
+  elif choice == '4':
+    setup_master_key()
+  elif choice == '5':
+    setup_ambari_krb5_jaas()
+  else:
+    raise FatalException('Unknown option for setup-security command.')
+
+  return need_restart
 #
 # Main.
 #
@@ -3534,8 +3725,8 @@ def main():
                   help="Use specified java_home.  Must be valid on all hosts")
   parser.add_option('-i', '--jdk-location', dest="jdk_location", default=None,
                     help="Use specified JDK file in local filesystem instead of downloading")
-  parser.add_option('-c', '--jce-policy', default=None,
-                  help="Use specified jce_policy.  Must be valid on all hosts", dest="jce_policy") 
+  #parser.add_option('-c', '--jce-policy', default=None,
+  #                help="Use specified jce_policy.  Must be valid on all hosts", dest="jce_policy") 
   parser.add_option("-v", "--verbose",
                   action="store_true", dest="verbose", default=False,
                   help="Print verbose status messages")
@@ -3661,16 +3852,10 @@ def main():
       upgrade_stack(options, stack_id)
     elif action == LDAP_SETUP_ACTION:
       setup_ldap()
-    elif action == ENCRYPT_PASSWORDS_ACTION:
-      setup_master_key()
     elif action == UPDATE_METAINFO_ACTION:
       update_metainfo(options)
-    elif action == SETUP_HTTPS_ACTION:
-      need_restart = setup_https(options)
-    elif action == SETUP_GANGLIA_HTTPS_ACTION:
-      setup_component_https("Ganglia", "setup-ganglia-https", GANGLIA_HTTPS, "ganglia_cert")
-    elif action == SETUP_NAGIOS_HTTPS_ACTION:
-      setup_component_https("Nagios", "setup-nagios-https", NAGIOS_HTTPS, "nagios_cert")
+    elif action == SETUP_SECURITY_ACTION:
+      need_restart = setup_security(options)
     else:
       parser.error("Invalid action")
 
