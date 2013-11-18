@@ -31,15 +31,36 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
     # authorized keys for master
     cosmos_user::authorized_keys{ "${params_for_user['username']}_master_authorized_keys":
       content => $params_for_user['ssh_master_authorized_keys'],
-      service_state => $service_state,
+      service_state => $params_for_user['ssh_enabled'] ? {
+        'true' => $service_state,
+        default => 'uninstalled'
+      },
       params_hash => $params_for_user,
     }
 
-    # Create HDFS user home directory
-    hdp-hadoop::hdfs::directory{ $params_for_user['hdfs_user_dir']:
-      mode            => $cosmos_user::params::hdfs_user_dir_mode,
-      owner           => $params_for_user['username'],
-      recursive_chmod => true
+    # HDFS configuration
+    $hdfs_service_state = $params_for_user['hdfs_enabled'] ? {
+      'true' => $service_state,
+      default => 'uninstalled'
+    }
+
+    case $hdfs_service_state {
+      'uninstalled': {
+        # Disable HDFS user home directory
+        hdp-hadoop::hdfs::directory{ $params_for_user['hdfs_user_dir']:
+          mode            => $cosmos_user::params::hdfs_disabled_dir_mode,
+          owner           => $cosmos_user::params::hdfs_disabled_dir_owner,
+          recursive_chmod => true
+        }
+      }
+      default: {
+        # Create HDFS user home directory
+        hdp-hadoop::hdfs::directory{ $params_for_user['hdfs_user_dir']:
+          mode            => $cosmos_user::params::hdfs_user_dir_mode,
+          owner           => $params_for_user['username'],
+          recursive_chmod => true
+        }
+      }
     }
   }
 }

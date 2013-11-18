@@ -22,9 +22,15 @@ class cosmos_user($service_state) {
   define initialized_user {
     $params_for_user = cosmos_user_params_for_user($name, $cosmos_user_config)
     notice("Initializing user: ${params_for_user['username']}")
+
+    $ssh_service_state = $params_for_user['ssh_enabled'] ? {
+      'true' => $service_state,
+      default => 'uninstalled'
+    }
+
     # Create user
     system_user{ $params_for_user['username']:
-      service_state => $service_state,
+      service_state => $ssh_service_state,
     }
 
     # Force deletion on uninstall. This variable is used by hdp::directory.
