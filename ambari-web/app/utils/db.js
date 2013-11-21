@@ -341,6 +341,15 @@ App.db.setSecureConfigProperties  = function (secureConfigs) {
   localStorage.setObject('ambari', App.db.data);
 };
 
+App.db.setSecureUserInfo  = function (userInfo) {
+  App.db.data = localStorage.getObject('ambari');
+  if (!App.db.data.AddSecurity) {
+    App.db.data.AddSecurity = {};
+  }
+  App.db.data.AddSecurity.secureUserInfo = userInfo;
+  localStorage.setObject('ambari', App.db.data);
+};
+
 App.db.setIsNameNodeHa = function (haStatus) {
   App.db.data = localStorage.getObject('ambari');
   if (!App.db.data.AddSecurity) {
@@ -355,9 +364,15 @@ App.db.setHighAvailabilityWizardConfigTag = function (tag) {
   App.db.data.HighAvailabilityWizard[tag.name] = tag.value;
   localStorage.setObject('ambari', App.db.data);
 };
+
 App.db.setHighAvailabilityWizardFailedTask = function (task) {
   App.db.data = localStorage.getObject('ambari');
   App.db.data.HighAvailabilityWizard.failedTask = task;
+  localStorage.setObject('ambari', App.db.data);
+};
+App.db.setHighAvailabilityWizardHdfsClientHosts = function (hostNames) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.HighAvailabilityWizard.hdfsClientHostNames = hostNames;
   localStorage.setObject('ambari', App.db.data);
 };
 
@@ -370,6 +385,12 @@ App.db.setHighAvailabilityWizardTasksStatuses = function (tasksStatuses) {
 App.db.setHighAvailabilityWizardRequestIds = function (requestIds) {
   App.db.data = localStorage.getObject('ambari');
   App.db.data.HighAvailabilityWizard.requestIds = requestIds;
+  localStorage.setObject('ambari', App.db.data);
+};
+
+App.db.setHighAvailabilityWizardLogs = function (logs) {
+  App.db.data = localStorage.getObject('ambari');
+  App.db.data.HighAvailabilityWizard.logs = logs;
   localStorage.setObject('ambari', App.db.data);
 };
 
@@ -582,6 +603,11 @@ App.db.getSecureConfigProperties = function () {
   return App.db.data.AddSecurity.secureConfigProperties;
 };
 
+App.db.getSecureUserInfo  = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.AddSecurity.secureUserInfo;
+};
+
 App.db.getIsNameNodeHa = function (haStatus) {
   App.db.data = localStorage.getObject('ambari');
   return App.db.data.AddSecurity.haStatus;
@@ -602,9 +628,24 @@ App.db.getHighAvailabilityWizardFailedTask = function () {
   return App.db.data.HighAvailabilityWizard.failedTask;
 };
 
+App.db.getHighAvailabilityWizardHdfsClientHosts = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.HighAvailabilityWizard.hdfsClientHostNames;
+};
+
+App.db.getHighAvailabilityWizardConfigTag = function (tag) {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.HighAvailabilityWizard[tag];
+};
+
 App.db.getHighAvailabilityWizardRequestIds = function () {
   App.db.data = localStorage.getObject('ambari');
   return App.db.data.HighAvailabilityWizard.requestIds;
+};
+
+App.db.getHighAvailabilityWizardLogs = function () {
+  App.db.data = localStorage.getObject('ambari');
+  return App.db.data.HighAvailabilityWizard.logs;
 };
 
 App.db.getHighAvailabilityWizardNameServiceId = function () {

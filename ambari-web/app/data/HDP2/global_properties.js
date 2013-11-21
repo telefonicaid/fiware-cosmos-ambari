@@ -79,11 +79,11 @@ module.exports =
     {
       "id": "puppet var",
       "name": "namenode_host",
-      "displayName": "NameNode host",
+      "displayName": "NameNode hosts",
       "value": "",
       "defaultValue": "",
-      "description": "The host that has been assigned to run NameNode",
-      "displayType": "masterHost",
+      "description": "The hosts that has been assigned to run NameNode",
+      "displayType": "masterHosts",
       "isOverridable": false,
       "isVisible": true,
       "domain": "global",
@@ -254,9 +254,9 @@ module.exports =
       "name": "datanode_du_reserved",
       "displayName": "Reserved space for HDFS",
       "description": "Reserved space in GB per volume",
-      "defaultValue": "1",
+      "defaultValue": "1073741824",
       "displayType": "int",
-      "unit": "GB",
+      "unit": "bytes",
       "isVisible": true,
       "domain": "global",
       "serviceName": "HDFS",
@@ -272,7 +272,7 @@ module.exports =
       "unit": "seconds",
       "isVisible": true,
       "domain": "global",
-      "filename": "core-site.xml",
+      "filename": "hdfs-site.xml",
       "serviceName": "HDFS",
       "index": 3
     },
@@ -360,19 +360,6 @@ module.exports =
     },
     {
       "id": "puppet var",
-      "name": "dfs_block_local_path_access_user",
-      "displayName": "dfs.block.local-path-access.user",
-      "description": "the user who is allowed to perform short circuit reads",
-      "displayType": "advanced",
-      "defaultValue": "hbase",
-      "isVisible": true,
-      "filename": "hdfs-site.xml",
-      "domain": "global",
-      "serviceName": "HDFS",
-      "category": "Advanced"
-    },
-    {
-      "id": "puppet var",
       "name": "dfs_datanode_data_dir_perm",
       "displayName": "dfs_datanode_data_dir_perm",
       "description": "",
@@ -440,6 +427,18 @@ module.exports =
       "serviceName": "HDFS",
       "category": "Advanced"
     },
+    {
+      "id": "puppet var",
+      "name": "lzo_enabled",
+      "displayName": "LZO compression",
+      "description": "LZO compression enabled",
+      "defaultValue": true,
+      "displayType": "checkbox",
+      "isOverridable": false,
+      "isVisible": false,
+      "domain": "global",
+      "serviceName": "HDFS"
+    },
 
   /**********************************************MAPREDUCE2***************************************/
     {
@@ -455,100 +454,6 @@ module.exports =
       "serviceName": "MAPREDUCE2",
       "category": "HistoryServer",
       "index": 0
-    },
-    {
-      "id": "puppet var",
-      "name": "mapreduce_tasktracker_map_tasks_maximum",
-      "displayName": "Number of Map slots per node",
-      "description": "Number of slots that Map tasks that run simultaneously can occupy on a TaskTracker",
-      "defaultValue": "4",
-      "displayType": "int",
-      "isVisible": true,
-      "domain": "global",
-      "serviceName": "MAPREDUCE2"
-    },
-    {
-      "id": "puppet var",
-      "name": "mapreduce_map_memory_mb",
-      "displayName": "Default virtual memory for a job's map-task",
-      "description": "Virtual memory for single Map task",
-      "defaultValue": "1536",
-      "displayType": "int",
-      "unit": "MB",
-      "isVisible": true,
-      "domain": "global",
-      "serviceName": "MAPREDUCE2"
-    },
-    {
-      "id": "puppet var",
-      "name": "mapreduce_reduce_memory_mb",
-      "displayName": "Default virtual memory for a job's reduce-task",
-      "description": "Virtual memory for single Reduce task",
-      "defaultValue": "2048",
-      "displayType": "int",
-      "unit": "MB",
-      "isVisible": true,
-      "domain": "global",
-      "serviceName": "MAPREDUCE2"
-    },
-    {
-      "id": "puppet var",
-      "name": "mapreduce_task_io_sort_mb",
-      "displayName": "Map-side sort buffer memory",
-      "description": "The total amount of Map-side buffer memory to use while sorting files (Expert-only configuration)",
-      "defaultValue": "200",
-      "displayType": "int",
-      "unit": "MB",
-      "isVisible": true,
-      "domain": "global",
-      "serviceName": "MAPREDUCE2"
-    },
-    {
-      "id": "puppet var",
-      "name": "mapreduce_userlog_retainhours",
-      "displayName": "Job log retention (hours)",
-      "description": "The maximum time, in hours, for which the user-logs are to be retained after the job completion.",
-      "defaultValue": "24",
-      "displayType": "int",
-      "unit": "hours",
-      "isVisible": true,
-      "domain": "global",
-      "serviceName": "MAPREDUCE2"
-    },
-    {
-      "id": "puppet var",
-      "name": "maxtasks_per_job",
-      "displayName": "Maximum number tasks for a Job",
-      "description": "Maximum number of tasks for a single Job",
-      "defaultValue": "-1",
-      "displayType": "int",
-      "isVisible": true,
-      "domain": "global",
-      "serviceName": "MAPREDUCE2"
-    },
-    {
-      "id": "puppet var",
-      "name": "scheduler_name",
-      "displayName": "MapReduce Capacity Scheduler",
-      "description": "The scheduler to use for scheduling of MapReduce jobs",
-      "defaultValue": "org.apache.hadoop.mapred.CapacityTaskScheduler",
-      "displayType": "advanced",
-      "isOverridable": false,
-      "isVisible": true,
-      "serviceName": "MAPREDUCE2"
-    },
-    {
-      "id": "puppet var",
-      "name": "mapreduce_jobtracker_system_dir",
-      "displayName": "MapReduce system directories",
-      "description": "",
-      "defaultValue": "/mapred/system",
-      "displayType": "directories",
-      "isReconfigurable": true,
-      "isVisible": true,
-      "domain": "global",
-      "serviceName": "MAPREDUCE2",
-      "category": "Advanced"
     },
     {
       "id": "puppet var",
@@ -576,60 +481,12 @@ module.exports =
       "serviceName": "MAPREDUCE2",
       "category": "Advanced"
     },
-    {
-      "id": "puppet var",
-      "name": "mapred_hosts_include",
-      "displayName": "Include hosts",
-      "description": "Include enetered hosts",
-      "defaultValue": "mapred.include",
-      "displayType": "directories",
-      "isVisible": false,
-      "serviceName": "MAPREDUCE2",
-      "domain": "global",
-      "category": "Advanced"
-    },
-    {
-      "id": "puppet var",
-      "name": "task_controller",
-      "displayName": "task_controller",
-      "description": "",
-      "defaultValue": "org.apache.hadoop.mapred.DefaultTaskController",
-      "displayType": "advanced",
-      "isVisible": false,
-      "serviceName": "MAPREDUCE2",
-      "domain": "global",
-      "category": "Advanced"
-    },
-    {
-      "id": "puppet var",
-      "name": "mapred_hosts_exclude",
-      "displayName": "Exclude hosts",
-      "description": "Exclude entered hosts",
-      "defaultValue": "mapred.exclude",
-      "displayType": "directories",
-      "isVisible": false,
-      "serviceName": "MAPREDUCE2",
-      "domain": "global",
-      "category": "Advanced"
-    },
-    {
-      "id": "puppet var",
-      "name": "mapred_jobstatus_dir",
-      "displayName": "Job Status directory",
-      "description": "Directory path to view job status",
-      "defaultValue": "file:////mapred/jobstatus",
-      "displayType": "advanced",
-      "isVisible": false,
-      "serviceName": "MAPREDUCE2",
-      "domain": "global",
-      "category": "Advanced"
-    },
 
   /**********************************************YARN***************************************/
     {
       "id": "puppet var",
       "name": "yarn_heapsize",
-      "displayName": "Yarn Java heap size",
+      "displayName": "YARN Java heap size",
       "description": "Max heapsize for all YARN components",
       "defaultValue": "1024",
       "isOverridable": false,
@@ -725,18 +582,6 @@ module.exports =
       "serviceName": "YARN",
       "category": "Advanced"
     },
-    {
-      "id": "puppet var",
-      "name": "yarn_nodemanager_local-dirs",
-      "displayName": "YARN local directories",
-      "defaultValue": "",
-      "defaultDirectory": "/hadoop/yarn",
-      "displayType": "directories",
-      "isReconfigurable": true,
-      "isVisible": true,
-      "serviceName": "YARN",
-      "category": "Advanced"
-    },
   /**********************************************HBASE***************************************/
     {
       "id": "puppet var",
@@ -816,7 +661,7 @@ module.exports =
       "name": "hregion_majorcompaction",
       "displayName": "HBase Region Major Compaction",
       "description": "The time between major compactions of all HStoreFiles in a region. Set to 0 to disable automated major compactions.",
-      "defaultValue": "86400000",
+      "defaultValue": "604800000",
       "displayType": "int",
       "unit": "ms",
       "isVisible": true,
@@ -907,7 +752,7 @@ module.exports =
       "name": "zookeeper_sessiontimeout",
       "displayName": "Zookeeper timeout for HBase Session",
       "description": "HBase passes this to the zk quorum as suggested maximum time for a session",
-      "defaultValue": "60000",
+      "defaultValue": "30000",
       "displayType": "int",
       "unit": "ms",
       "isVisible": true,
@@ -972,26 +817,12 @@ module.exports =
     {
       "id": "puppet var",
       "name": "hbase_tmp_dir",
-      "displayName": "Hbase temp directory",
-      "description": "",
-      "defaultValue": "/var/log/hbase",
-      "isRequired": false,
-      "displayType": "advanced",
-      "isVisible": false,
-      "domain": "global",
-      "serviceName": "HBASE",
-      "category": "Advanced"
-    },
-    {
-      "id": "puppet var",
-      "name": "hdfs_support_append",
-      "displayName": "HDFS append support",
-      "description": "HDFS append support",
-      "defaultValue": true,
-      "isRequired": false,
-      "displayType": "checkbox",
+      "displayName": "HBase local directory",
+      "description": "Temporary directory on the local filesystem",
+      "defaultDirectory": "/hadoop/hbase",
+      "defaultValue": "",
+      "displayType": "directory",
       "isVisible": true,
-      "domain": "global",
       "serviceName": "HBASE",
       "category": "Advanced"
     },
@@ -1002,7 +833,7 @@ module.exports =
       "description": "If more than this number of StoreFiles in any one Store (one StoreFile is written per flush of " +
         "MemStore) then updates are blocked for this HRegion until a compaction is completed, or until " +
         "hbase.hstore.blockingWaitTime has been exceeded.",
-      "defaultValue": 7,
+      "defaultValue": 10,
       "isRequired": true,
       "displayType": "init",
       "isVisible": true,

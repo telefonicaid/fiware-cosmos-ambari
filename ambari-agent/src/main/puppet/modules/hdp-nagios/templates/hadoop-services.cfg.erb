@@ -63,7 +63,9 @@ define service {
         retry_check_interval    0.25
         max_check_attempts      3
 }
-<% if scope.function_hdp_nagios_members_exist('namenode') && (scope.function_hdp_get_major_stack_version([scope.function_hdp_template_var("stack_version")]) >= 2)%>
+<% if scope.function_hdp_nagios_members_exist('namenode') &&
+        (scope.function_hdp_get_major_stack_version([scope.function_hdp_template_var("stack_version")]) >= 2) &&
+        (scope.function_hdp_template_var("::hdp::params::dfs_ha_enabled"))%>
 define service {
         hostgroup_name          nagios-server
         use                     hadoop-service
@@ -77,24 +79,13 @@ define service {
 <%end-%>
 
 # AMBARI AGENT Checks
+<%scope.function_hdp_template_var("all_hosts").each_with_index do |hostname, index|-%>
 define service {
-        hostgroup_name          agent-servers
+        host_name	        <%=hostname%>
         use                     hadoop-service
         service_description     AMBARI::Ambari Agent process
         servicegroups           AMBARI
-        check_command           check_ambari_agent_status
-        normal_check_interval   5
-        retry_check_interval    0.5
-        max_check_attempts      2
-}
-
-<%scope.function_hdp_template_var("all_hosts").each_with_index do |hostname, index|-%>
-define service {
-        hostgroup_name          agent-servers
-        use                     hadoop-service
-        service_description     AMBARI::Ambari Agent process on <%=hostname%>
-        servicegroups           AMBARI
-        check_command           check_tcp_on_host!<%=hostname%>!<%=scope.function_hdp_template_var("all_ping_ports")[index]%>!-w 1 -c 1
+        check_command           check_tcp!<%=scope.function_hdp_template_var("::all_ping_ports")[index]%>!-w 1 -c 1
         normal_check_interval   1
         retry_check_interval    0.25
         max_check_attempts      4
@@ -207,19 +198,6 @@ define service {
 }
 <%end-%>
 
-<%if scope.function_hdp_nagios_members_exist('nodemanagers')-%>
-define service {
-        hostgroup_name          ganglia-server
-        use                     hadoop-service
-        service_description     GANGLIA::Ganglia Monitor process for NodeManager
-        servicegroups           GANGLIA
-        check_command           check_tcp!<%=scope.function_hdp_template_var("::hdp::ganglia_collector_nm_port")%>!-w 1 -c 1
-        normal_check_interval   0.25
-        retry_check_interval    0.25
-        max_check_attempts      4
-}
-<%end-%>
-
 <%if scope.function_hdp_nagios_members_exist('historyserver2')-%>
 define service {
         hostgroup_name          ganglia-server
@@ -250,10 +228,36 @@ define service {
 <%end-%>
 <%if scope.function_hdp_nagios_members_exist('namenode')-%>
 # HDFS Checks
+<% @namenodes = scope.function_hdp_template_var("::hdp::params::namenode_host"); @namenodes.each do |namenode| -%>
+
 define service {
-        hostgroup_name          namenode
+        host_name               <%= namenode %>
         use                     hadoop-service
-        service_description     NAMENODE::NameNode Web UI
+        service_description     NAMENODE::NameNode edit logs directory status on <%= namenode %>
+        servicegroups           HDFS
+        check_command           check_name_dir_status!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
+        normal_check_interval   0.5
+        retry_check_interval    0.5
+        max_check_attempts      3
+}
+
+<% if scope.function_hdp_template_var("hdp_os_type") != "suse"%>
+define service {
+        host_name               <%= namenode %>
+        use                     hadoop-service
+        service_description     NAMENODE::NameNode host CPU utilization on <%= namenode %>
+        servicegroups           HDFS
+        check_command           check_cpu!200%!250%
+        normal_check_interval   5
+        retry_check_interval    2
+        max_check_attempts      5
+}
+<% end %>
+
+define service {
+        host_name               <%= namenode %>
+        use                     hadoop-service
+        service_description     NAMENODE::NameNode Web UI on <%= namenode %>
         servicegroups           HDFS
         check_command           check_webui!namenode!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>
         normal_check_interval   1
@@ -262,32 +266,9 @@ define service {
 }
 
 define service {
-        hostgroup_name          namenode
+        host_name               <%= namenode %>
         use                     hadoop-service
-        service_description     NAMENODE::NameNode edit logs directory status
-        servicegroups           HDFS
-        check_command           check_name_dir_status!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>
-        normal_check_interval   0.5
-        retry_check_interval    0.5
-        max_check_attempts      3
-}
-<% if scope.function_hdp_template_var("hdp_os_type") != "suse"%>
-define service {        
-        hostgroup_name          namenode        
-        use                     hadoop-service
-        service_description     NAMENODE::NameNode host CPU utilization
-        servicegroups           HDFS
-        check_command           check_cpu!200%!250%
-        normal_check_interval   5
-        retry_check_interval    2 
-        max_check_attempts      5
-}
-<% end %>
-
-define service {
-        hostgroup_name          namenode
-        use                     hadoop-service
-        service_description     NAMENODE::NameNode process
+        service_description     NAMENODE::NameNode process on <%= namenode %>
         servicegroups           HDFS
         check_command           check_tcp!<%=scope.function_hdp_template_var("::hdp::namenode_metadata_port")%>!-w 1 -c 1
         normal_check_interval   0.5
@@ -296,37 +277,40 @@ define service {
 }
 
 define service {
-        hostgroup_name          namenode
+        host_name               <%= namenode %>
+        use                     hadoop-service
+        service_description     HDFS::NameNode RPC latency on <%= namenode %>
+        servicegroups           HDFS
+        check_command           check_rpcq_latency!NameNode!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>!3000!5000!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
+        normal_check_interval   5
+        retry_check_interval    1
+        max_check_attempts      5
+}
+
+  <% end -%>
+
+define service {
+        hostgroup_name          nagios-server
         use                     hadoop-service
         service_description     HDFS::Blocks health
         servicegroups           HDFS
-        check_command           check_hdfs_blocks!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>!0%!0%!<%=scope.function_hdp_template_var("::hdp-nagios::params::nn_metrics_property")%>
+        check_command           check_hdfs_blocks!$HOSTGROUPMEMBERS:namenode$!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>!0%!0%!<%=scope.function_hdp_template_var("::hdp-nagios::params::nn_metrics_property")%>!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
         normal_check_interval   2
         retry_check_interval    1 
         max_check_attempts      1
 }
 
 define service {
-        hostgroup_name          namenode
+        hostgroup_name          nagios-server
         use                     hadoop-service
         service_description     HDFS::HDFS capacity utilization
         servicegroups           HDFS
-        check_command           check_hdfs_capacity!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>!80%!90%
+        check_command           check_hdfs_capacity!$HOSTGROUPMEMBERS:namenode$!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>!80%!90%!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
         normal_check_interval   10
         retry_check_interval    1 
         max_check_attempts      1
 }
 
-define service {
-        hostgroup_name          namenode
-        use                     hadoop-service
-        service_description     HDFS::NameNode RPC latency
-        servicegroups           HDFS
-        check_command           check_rpcq_latency!NameNode!<%=scope.function_hdp_template_var("::hdp::namenode_port")%>!3000!5000
-        normal_check_interval   5
-        retry_check_interval    1 
-        max_check_attempts      5
-}
 <%end-%>
 
 # MAPREDUCE Checks
@@ -352,7 +336,7 @@ define service {
         retry_check_interval    1
         max_check_attempts      3
 }
- <% if scope.function_hdp_template_var("hdp_os_type") != "suse"%>
+<% if scope.function_hdp_template_var("hdp_os_type") != "suse"%>
 define service {
         hostgroup_name          jobtracker
         use                     hadoop-service
@@ -382,7 +366,7 @@ define service {
         use                     hadoop-service
         service_description     MAPREDUCE::JobTracker RPC latency
         servicegroups           MAPREDUCE
-        check_command           check_rpcq_latency!JobTracker!<%=scope.function_hdp_template_var("::hdp::jtnode_port")%>!3000!5000
+        check_command           check_rpcq_latency!JobTracker!<%=scope.function_hdp_template_var("::hdp::jtnode_port")%>!3000!5000!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
         normal_check_interval   5
         retry_check_interval    1 
         max_check_attempts      5
@@ -390,7 +374,7 @@ define service {
 
 <%end-%>
 
-<%if scope.function_hdp_nagios_members_exist('tasktracker')-%>
+<%if scope.function_hdp_nagios_members_exist('tasktracker-servers')-%>
 define service {
         hostgroup_name          nagios-server
         use                     hadoop-service
@@ -442,6 +426,7 @@ define service {
         max_check_attempts      3
 }
 
+<% if scope.function_hdp_template_var("hdp_os_type") != "suse"%>
 define service {
         hostgroup_name          resourcemanager
         use                     hadoop-service
@@ -452,38 +437,17 @@ define service {
         retry_check_interval    2 
         max_check_attempts      5
 }
+<% end %>
 
 define service {
         hostgroup_name          resourcemanager
         use                     hadoop-service
         service_description     RESOURCEMANAGER::ResourceManager RPC latency
         servicegroups           YARN
-        check_command           check_rpcq_latency!ResorceManager!<%=scope.function_hdp_template_var("::hdp::rm_port")%>!3000!5000
+        check_command           check_rpcq_latency!ResourceManager!<%=scope.function_hdp_template_var("::hdp::rm_port")%>!3000!5000!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
         normal_check_interval   5
         retry_check_interval    1 
         max_check_attempts      5
-}
-
-define service {
-        hostgroup_name          resourcemanager
-        use                     hadoop-service
-        service_description     RESOURCEMANAGER::Percent NodeManager live
-        servicegroups           YARN
-        check_command           check_resourcemanager_nodes_percentage!<%=scope.function_hdp_template_var("::hdp::rm_port")%>!lost!10!30
-        normal_check_interval   1
-        retry_check_interval    1
-        max_check_attempts      3
-}
-
-define service {
-        hostgroup_name          resourcemanager
-        use                     hadoop-service
-        service_description     RESOURCEMANAGER::Percent NodeManager healthy
-        servicegroups           YARN
-        check_command           check_resourcemanager_nodes_percentage!<%=scope.function_hdp_template_var("::hdp::rm_port")%>!unhealthy!10!30
-        normal_check_interval   1
-        retry_check_interval    1
-        max_check_attempts      3
 }
 
 define service {
@@ -505,7 +469,7 @@ define service {
         use                     hadoop-service
         service_description     NODEMANAGER::NodeManager process
         servicegroups           YARN
-        check_command           check_tcp!<%=scope.function_hdp_template_var("nm_port")%>!-w 1 -c 1
+        check_command           check_tcp!<%=scope.function_hdp_template_var("::hdp::nm_port")%>!-w 1 -c 1
         normal_check_interval   1
         retry_check_interval    0.5
         max_check_attempts      3
@@ -516,9 +480,19 @@ define service {
         use                     hadoop-service
         service_description     NODEMANAGER::NodeManager health
         servicegroups           YARN
-        check_command           check_nodemanager_health!<%=scope.function_hdp_template_var("nm_port")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("kinit_path_local")%>
+        check_command           check_nodemanager_health!<%=scope.function_hdp_template_var("::hdp::nm_port")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("kinit_path_local")%>
         normal_check_interval   1
         retry_check_interval    1
+        max_check_attempts      3
+}
+define service {
+        hostgroup_name          nagios-server
+        use                     hadoop-service
+        service_description     NODEMANAGER::Percent NodeManagers live
+        servicegroups           YARN
+        check_command           check_aggregate!"NODEMANAGER::NodeManager process"!10%!30%
+        normal_check_interval   0.5
+        retry_check_interval    0.25
         max_check_attempts      3
 }
 <% end %>
@@ -536,6 +510,7 @@ define service {
         max_check_attempts      3
 }
 
+<% if scope.function_hdp_template_var("hdp_os_type") != "suse"%>
 define service {
         hostgroup_name          historyserver2
         use                     hadoop-service
@@ -546,34 +521,58 @@ define service {
         retry_check_interval    2 
         max_check_attempts      5
 }
+<% end %>
 
 define service {
         hostgroup_name          historyserver2
         use                     hadoop-service
         service_description     JOBHISTORY::HistoryServer RPC latency
         servicegroups           MAPREDUCE
-        check_command           check_rpcq_latency!JobHistoryServer!<%=scope.function_hdp_template_var("::hdp::hs_port")%>!3000!5000
+        check_command           check_rpcq_latency!JobHistoryServer!<%=scope.function_hdp_template_var("::hdp::hs_port")%>!3000!5000!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
         normal_check_interval   5
         retry_check_interval    1 
         max_check_attempts      5
 }
 
-<% end %>
-
-# Journalnode checks
-<%scope.function_hdp_template_var("::hdp::journalnode_hosts").each do |hostname|-%>
 define service {
-        hostgroup_name          slaves
+        hostgroup_name          historyserver2
         use                     hadoop-service
-        service_description     JOURNALNODE::JournalNode process on <%=hostname%>
-        servicegroups           HDFS
-        check_command           check_tcp_on_host!<%=hostname%>!<%=scope.function_hdp_template_var("::hdp::journalnode_port")%>!-w 1 -c 1
+        service_description     JOBHISTORY::HistoryServer process
+        servicegroups           MAPREDUCE
+        check_command           check_tcp!<%=scope.function_hdp_template_var("::hdp::hs_port")%>!-w 1 -c 1
         normal_check_interval   1
         retry_check_interval    0.5
         max_check_attempts      3
 }
 
 <% end %>
+
+<%if scope.function_hdp_nagios_members_exist('journalnodes')-%>
+# Journalnode checks
+define service {
+        hostgroup_name          journalnodes
+        use                     hadoop-service
+        service_description     JOURNALNODE::JournalNode process
+        servicegroups           HDFS
+        check_command           check_tcp!<%=scope.function_hdp_template_var("::hdp::journalnode_port")%>!-w 1 -c 1
+        normal_check_interval   1
+        retry_check_interval    0.5
+        max_check_attempts      3
+}
+
+<%if scope.function_hdp_template_var("::hdp::params::dfs_ha_enabled")-%>
+define service {
+        hostgroup_name          nagios-server
+        use                     hadoop-service
+        service_description     HDFS::Percent JournalNodes live
+        servicegroups           HDFS
+        check_command           check_aggregate!"JOURNALNODE::JournalNode process"!33%!50%
+        normal_check_interval   0.5
+        retry_check_interval    0.25
+        max_check_attempts      3
+}
+<%end-%>
+<%end-%>
 
 <%if scope.function_hdp_nagios_members_exist('slaves')-%>
 # HDFS::DATANODE Checks
@@ -593,7 +592,7 @@ define service {
         use                     hadoop-service
         service_description     DATANODE::DataNode space
         servicegroups           HDFS
-        check_command           check_datanode_storage!<%=scope.function_hdp_template_var("::hdp::datanode_port")%>!90%!90%
+        check_command           check_datanode_storage!<%=scope.function_hdp_template_var("::hdp::datanode_port")%>!90%!90%!<%=scope.function_hdp_template_var("::hdp::params::hadoop_ssl_enabled")%>!<%=scope.function_hdp_template_var("nagios_keytab_path")%>!<%=scope.function_hdp_template_var("nagios_principal_name")%>!<%=scope.function_hdp_template_var("::hdp::params::kinit_path_local")%>!<%=scope.function_hdp_template_var("::hdp::params::security_enabled")%>
         normal_check_interval   5
         retry_check_interval    1
         max_check_attempts      2

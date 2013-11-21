@@ -68,7 +68,7 @@
   </property>
   <property>
     <name>hstorefile_maxsize</name>
-    <value>1073741824</value>
+    <value>10737418240</value>
     <description>Maximum HStoreFile Size</description>
   </property>
     <property>
@@ -110,11 +110,6 @@
     <name>hbase_hdfs_root_dir</name>
     <value>/apps/hbase/data</value>
     <description>HBase Relative Path to HDFS.</description>
-  </property>
-    <property>
-    <name>hbase_tmp_dir</name>
-    <value>/var/log/hbase</value>
-    <description>Hbase temp directory</description>
   </property>
    <property>
     <name>hbase_conf_dir</name>

@@ -29,7 +29,7 @@ App.WizardStep8Controller = Em.Controller.extend({
   globals: [],
   ajaxQueue: [],
   configMapping: function(){
-    return App.config.get('configMapping').all();
+    return App.config.get('configMapping').all(true);
   }.property('App.config.configMapping'),
 
   slaveComponentConfig: null,
@@ -37,6 +37,7 @@ App.WizardStep8Controller = Em.Controller.extend({
   isBackBtnDisabled: false,
   hasErrorOccurred: false,
   servicesInstalled: false,
+  serviceConfigTags: [],
   securityEnabled: false,
   /**
    * During page save time, we set the host overrides to the server.
@@ -69,6 +70,7 @@ App.WizardStep8Controller = Em.Controller.extend({
     this.get('configs').clear();
     this.get('globals').clear();
     this.get('clusterInfo').clear();
+    this.get('serviceConfigTags').clear();
     this.set('servicesInstalled', false);
   },
 
@@ -78,7 +80,7 @@ App.WizardStep8Controller = Em.Controller.extend({
       this.set('securityEnabled', App.router.get('mainAdminSecurityController').getUpdatedSecurityStatus());
     }
     this.clearStep();
-    this.formatDirectories();
+    this.formatProperties();
     this.loadGlobals();
     this.loadConfigs();
     this.loadClusterInfo();
@@ -89,7 +91,7 @@ App.WizardStep8Controller = Em.Controller.extend({
   /**
    * replace whitespace character with coma between directories
    */
-  formatDirectories: function(){
+  formatProperties: function(){
     this.get('content.serviceConfigProperties').forEach(function(_configProperty){
         _configProperty.value = App.config.trimProperty(_configProperty,false);
     });
@@ -1149,7 +1151,7 @@ App.WizardStep8Controller = Em.Controller.extend({
           var hostNames = _slave.hosts.mapProperty('hostName');
           switch (_client.component_name) {
             case 'HDFS_CLIENT':
-              // install HDFS_CLIENT on HBASE_MASTER, HBASE_REGIONSERVER, WEBHCAT_SERVER, and HISTORYSERVER hosts
+              // install HDFS_CLIENT on HBASE_MASTER, HBASE_REGIONSERVER, WEBHCAT_SERVER, HISTORYSERVER and OOZIE_SERVER hosts
               masterHosts.filterProperty('component', 'HBASE_MASTER').filterProperty('isInstalled', false).forEach(function (_masterHost) {
                 hostNames.pushObject(_masterHost.hostName);
               }, this);
@@ -1160,6 +1162,9 @@ App.WizardStep8Controller = Em.Controller.extend({
                 hostNames.pushObject(_masterHost.hostName);
               }, this);
               masterHosts.filterProperty('component', 'HISTORYSERVER').filterProperty('isInstalled', false).forEach(function (_masterHost) {
+                hostNames.pushObject(_masterHost.hostName);
+              }, this);
+              masterHosts.filterProperty('component', 'OOZIE_SERVER').filterProperty('isInstalled', false).forEach(function (_masterHost) {
                 hostNames.pushObject(_masterHost.hostName);
               }, this);
               break;
@@ -1206,8 +1211,17 @@ App.WizardStep8Controller = Em.Controller.extend({
               }, this);
               break;
             case 'YARN_CLIENT':
-              // install YARN_CLIENT on NAGIOS_SERVER host
+              // install YARN_CLIENT on NAGIOS_SERVER,HIVE_SERVER,OOZIE_SERVER,WEBHCAT_SERVER host
               masterHosts.filterProperty('component', 'NAGIOS_SERVER').filterProperty('isInstalled', false).forEach(function (_masterHost) {
+                hostNames.pushObject(_masterHost.hostName);
+              }, this);
+              masterHosts.filterProperty('component', 'HIVE_SERVER').filterProperty('isInstalled', false).forEach(function (_masterHost) {
+                hostNames.pushObject(_masterHost.hostName);
+              }, this);
+              masterHosts.filterProperty('component', 'OOZIE_SERVER').filterProperty('isInstalled', false).forEach(function (_masterHost) {
+                hostNames.pushObject(_masterHost.hostName);
+              }, this);
+              masterHosts.filterProperty('component', 'WEBHCAT_SERVER').filterProperty('isInstalled', false).forEach(function (_masterHost) {
                 hostNames.pushObject(_masterHost.hostName);
               }, this);
               break;
@@ -1306,57 +1320,69 @@ App.WizardStep8Controller = Em.Controller.extend({
   createConfigurations: function () {
     var selectedServices = this.get('selectedServices');
     if (this.get('content.controllerName') == 'installerController') {
-      this.applyConfigurationToSite(this.createGlobalSiteObj());
-      this.applyConfigurationToSite(this.createCoreSiteObj());
-      this.applyConfigurationToSite(this.createHdfsSiteObj());
+      this.get('serviceConfigTags').pushObject(this.createGlobalSiteObj());
+      this.get('serviceConfigTags').pushObject(this.createCoreSiteObj());
+      this.get('serviceConfigTags').pushObject(this.createHdfsSiteObj());
     }
     if (selectedServices.someProperty('serviceName', 'MAPREDUCE')) {
-      this.applyConfigurationToSite(this.createMrSiteObj());
+      this.get('serviceConfigTags').pushObject(this.createMrSiteObj());
       if (App.supports.capacitySchedulerUi) {
-        this.applyConfigurationToSite(this.createCapacityScheduler());
-        this.applyConfigurationToSite(this.createMapredQueueAcls());
+        this.get('serviceConfigTags').pushObject(this.createCapacityScheduler());
+        this.get('serviceConfigTags').pushObject(this.createMapredQueueAcls());
       }
     }
     if (selectedServices.someProperty('serviceName', 'MAPREDUCE2')) {
-      this.applyConfigurationToSite(this.createMrSiteObj());
-      this.applyConfigurationToSite(this.createMapredQueueAcls());
+      this.get('serviceConfigTags').pushObject(this.createMrSiteObj());
     }
     if (selectedServices.someProperty('serviceName', 'YARN')) {
-      this.applyConfigurationToSite(this.createYarnSiteObj());
-      this.applyConfigurationToSite(this.createCapacityScheduler());
+      this.get('serviceConfigTags').pushObject(this.createYarnSiteObj());
+      this.get('serviceConfigTags').pushObject(this.createCapacityScheduler());
     }
     if (selectedServices.someProperty('serviceName', 'HBASE')) {
-      this.applyConfigurationToSite(this.createHbaseSiteObj());
+      this.get('serviceConfigTags').pushObject(this.createHbaseSiteObj());
     }
     if (selectedServices.someProperty('serviceName', 'OOZIE')) {
-      this.applyConfigurationToSite(this.createOozieSiteObj('OOZIE'));
+      this.get('serviceConfigTags').pushObject(this.createOozieSiteObj('OOZIE'));
     }
     if (selectedServices.someProperty('serviceName', 'HIVE')) {
-      this.applyConfigurationToSite(this.createHiveSiteObj('HIVE'));
+      this.get('serviceConfigTags').pushObject(this.createHiveSiteObj('HIVE'));
     }
     if (selectedServices.someProperty('serviceName', 'WEBHCAT')) {
-      this.applyConfigurationToSite(this.createWebHCatSiteObj('WEBHCAT'));
+      this.get('serviceConfigTags').pushObject(this.createWebHCatSiteObj('WEBHCAT'));
     }
     if (selectedServices.someProperty('serviceName', 'HUE')) {
-      this.applyConfigurationToSite(this.createHueSiteObj('HUE'));
+      this.get('serviceConfigTags').pushObject(this.createHueSiteObj('HUE'));
     }
+    this.applyConfigurationsToCluster();
   },
 
-  applyConfigurationToSite: function (data) {
-    console.log("Inside applyConfigurationToSite");
+  applyConfigurationsToCluster: function() {
     var clusterUrl = App.apiPrefix + '/clusters/' + this.get('clusterName');
-    var clusterData = {
-      Clusters: {
-        desired_configs: data
-      }
+    var configData = [];
+    this.get('serviceConfigTags').forEach(function (_serviceConfig) {
+      var Clusters = {
+        Clusters: {
+          desired_config: {
+            type: _serviceConfig.type,
+            tag: _serviceConfig.tag,
+            properties: _serviceConfig.properties
+          }
+        }
+      };
+      configData.pushObject(JSON.stringify(Clusters));
+    }, this);
+
+    var data = {
+      configData: '[' + configData.toString() + ']'
     };
-    console.debug("applyConfigurationToSite(Step8): Applying to URL", clusterUrl, " Data:", clusterData);
+
+    console.debug("applyConfigurationsToCluster(Step8): Applying to URL", clusterUrl, " Data:", data.configData);
     this.ajax({
       type: 'PUT',
       url: clusterUrl,
-      data: JSON.stringify(clusterData),
+      data: data.configData,
       beforeSend: function () {
-        console.log("BeforeSend: Updating cluster config for " + clusterData.type);
+        console.log("BeforeSend: Updating cluster config");
       }
     });
   },

@@ -99,6 +99,7 @@ var urls = {
   },
   'reassign.create_master': {
     'real': '/clusters/{clusterName}/hosts?Hosts/host_name={hostName}',
+    'mock':'',
     'type': 'POST',
     'format': function (data) {
       return {
@@ -116,6 +117,7 @@ var urls = {
   },
   'reassign.maintenance_mode': {
     'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
+    'mock': '',
     'type': 'PUT',
     'format': function () {
       return {
@@ -169,6 +171,7 @@ var urls = {
   },
   'reassign.remove_component': {
     'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
+    'mock': '',
     'type': 'DELETE'
   },
   'reassign.get_logs': {
@@ -179,6 +182,7 @@ var urls = {
   },
   'reassign.create_configs': {
     'real': '/clusters/{clusterName}/configurations',
+    'mock':'',
     'type': 'POST',
     'format': function (data) {
       return {
@@ -189,10 +193,12 @@ var urls = {
   },
   'reassign.check_configs': {
     'real': '/clusters/{clusterName}/services/{serviceName}',
+    'mock':'',
     'type': 'GET'
   },
   'reassign.apply_configs': {
     'real': '/clusters/{clusterName}/services/{serviceName}',
+    'mock':'',
     'type': 'PUT',
     'format': function (data) {
       return {
@@ -219,8 +225,17 @@ var urls = {
     }
   },
   'config.tags': {
-    'real': '/clusters/{clusterName}',
+    'real': '/clusters/{clusterName}?fields=Clusters/desired_configs',
     'mock': '/data/clusters/cluster.json'
+  },
+  'config.tags.sync': {
+    'real': '/clusters/{clusterName}?fields=Clusters/desired_configs',
+    'mock': '/data/clusters/cluster.json',
+    'format': function (data) {
+      return {
+        async: false
+      };
+    }
   },
   'config.on_site': {
     'real': '/clusters/{clusterName}/configurations?{params}',
@@ -519,6 +534,7 @@ var urls = {
   },
   'host.service_config_hosts_overrides': {
     'real': '/clusters/{clusterName}/configurations?{urlParams}',
+    'mock': '',
     'format': function (data, opt) {
       return {
         async: false,
@@ -528,6 +544,7 @@ var urls = {
   },
   'admin.service_config': {
     'real': '/clusters/{clusterName}/configurations/?type={siteName}&tag={tagName}',
+    'mock': '',
     'format': function (data, opt) {
       return {
         timeout: 10000,
@@ -536,10 +553,10 @@ var urls = {
     }
   },
   'admin.security_status': {
-    'real': '/clusters/{clusterName}',
+    'real': '/clusters/{clusterName}?fields=Clusters/desired_configs',
+    'mock': '',
     'format': function (data, opt) {
       return {
-        async: false,
         timeout: 10000
       };
     }
@@ -556,6 +573,7 @@ var urls = {
   'cluster.state': {
     'type': 'POST',
     'real': '/persist/',
+    'mock': '',
     'format': function (data, opt) {
       return {
         async: false,
@@ -579,7 +597,7 @@ var urls = {
     'format': function (data, opt) {
       return {
         type: 'PUT',
-        data:  JSON.stringify({
+        data: JSON.stringify({
           "RequestInfo": {
             "context": "Stop all services"
           },
@@ -598,7 +616,7 @@ var urls = {
     'format': function (data, opt) {
       return {
         type: 'PUT',
-        data:  JSON.stringify({
+        data: JSON.stringify({
           "RequestInfo": {
             "context": "Start all services"
           },
@@ -623,6 +641,10 @@ var urls = {
   },
   'admin.high_availability.getJnCheckPointStatus': {
     'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/JOURNALNODE?fields=metrics',
+    'mock': ''
+  },
+  'admin.high_availability.getHostComponent': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
     'mock': ''
   },
   'admin.high_availability.create_component': {
@@ -731,6 +753,25 @@ var urls = {
       }
     }
   },
+  'admin.high_availability.stop_component': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
+    'mock': '',
+    'type': 'PUT',
+    'format': function (data) {
+      return {
+        data: JSON.stringify({
+          RequestInfo: {
+            "context": "Stop " + data.displayName
+          },
+          Body: {
+            "HostRoles": {
+              "state": "INSTALLED"
+            }
+          }
+        })
+      }
+    }
+  },
   'admin.high_availability.load_configs': {
     'real': '/clusters/{clusterName}/configurations?(type=core-site&tag={coreSiteTag})|(type=hdfs-site&tag={hdfsSiteTag})',
     'mock': '',
@@ -760,29 +801,48 @@ var urls = {
     'mock': '',
     'type': 'GET'
   },
-  'admin.high_availability.delete_snamenode': {
-    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/SECONDARY_NAMENODE',
+  'admin.high_availability.delete_component': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}/host_components/{componentName}',
     'mock': '',
     'type': 'DELETE'
   },
   'admin.security.cluster_configs': {
     'real': '/clusters/{clusterName}',
+    'mock': '',
     'format': function (data, opt) {
       return {
         timeout: 10000
       };
     }
   },
+  'admin.delete_host': {
+    'real': '/clusters/{clusterName}/hosts/{hostName}',
+    'mock': '',
+    'type': 'DELETE'
+  },
   'admin.security.all_configurations': {
     'real': '/clusters/{clusterName}/configurations?{urlParams}',
+    'mock': '',
     'format': function (data, opt) {
       return {
         timeout: 10000
+      };
+    }
+  },
+  'admin.security.apply_configurations': {
+    'real': '/clusters/{clusterName}',
+    'mock': '',
+    'format': function (data, opt) {
+      return {
+        type: 'PUT',
+        timeout: 10000,
+        data: data.configData
       };
     }
   },
   'admin.security.apply_configuration': {
     'real': '/clusters/{clusterName}',
+    'mock': '',
     'format': function (data, opt) {
       return {
         type: 'PUT',
@@ -793,7 +853,8 @@ var urls = {
     }
   },
   'admin.security.add.cluster_configs': {
-    'real': '/clusters/{clusterName}',
+    'real': '/clusters/{clusterName}' + '?fields=Clusters/desired_configs',
+    'mock': '',
     'format': function (data, opt) {
       return {
         timeout: 10000
@@ -802,6 +863,7 @@ var urls = {
   },
   'admin.stack_upgrade.run_upgrade': {
     'real': '/clusters/{clusterName}',
+    'mock': '',
     'format': function (data, opt) {
       return {
         type: 'PUT',
@@ -812,6 +874,7 @@ var urls = {
   },
   'admin.stack_upgrade.stop_services': {
     'real': '/clusters/{clusterName}/services?ServiceInfo/state=STARTED',
+    'mock': '',
     'format': function (data, opt) {
       return {
         type: 'PUT',
@@ -826,6 +889,7 @@ var urls = {
   },
   'wizard.install_services.add_host_controller.is_retry': {
     'real': '/clusters/{cluster}/host_components',
+    'mock': '',
     'format': function (data, opt) {
       return {
         type: 'PUT',
@@ -836,6 +900,7 @@ var urls = {
   },
   'wizard.install_services.add_host_controller.not_is_retry': {
     'real': '/clusters/{cluster}/host_components',
+    'mock': '',
     'format': function (data, opt) {
       return {
         type: 'PUT',
@@ -904,6 +969,7 @@ var urls = {
   },
   'wizard.step8.delete_cluster': {
     'real': '/clusters/{name}',
+    'mock': '',
     'format': function (data, opt) {
       return {
         type: 'DELETE',
@@ -913,6 +979,7 @@ var urls = {
   },
   'wizard.step8.existing_cluster_names': {
     'real': '/clusters',
+    'mock': '',
     'format': function (data, opt) {
       return {
         async: false
@@ -1016,6 +1083,26 @@ var urls = {
   'ambari.service': {
     'real': '/services/AMBARI/components/AMBARI_SERVER',
     'mock': ''
+  },
+  'dashboard.get.user_pref': {
+    'real': '/persist/{key}',
+    'mock': '',
+    'format': function (data, opt) {
+      return {
+        async: false
+      };
+    }
+  },
+  'dashboard.post.user_pref': {
+    'real': '/persist',
+    'mock': '',
+    'type': 'POST',
+    'format': function (data) {
+      return {
+        async: false,
+        data: JSON.stringify(data.keyValuePair)
+      }
+    }
   }
 };
 /**
@@ -1056,7 +1143,7 @@ var formatRequest = function (data) {
     statusCode: require('data/statusCodes')
   };
   if (App.testMode) {
-    opt.url = formatUrl(this.mock, data);
+    opt.url = formatUrl(this.mock ? this.mock : '', data);
     opt.type = 'GET';
   }
   else {
@@ -1130,7 +1217,7 @@ App.ajax = {
       if (config.error) {
         config.sender[config.error](request, ajaxOptions, error, opt);
       } else {
-       this.defaultErrorHandler(request,opt.url,opt.type);
+        this.defaultErrorHandler(request, opt.url, opt.type);
       }
     };
     opt.complete = function () {
@@ -1141,7 +1228,7 @@ App.ajax = {
     if ($.mocho) {
       opt.url = 'http://' + $.hostName + opt.url;
     }
-    return $.ajax(opt);
+      return $.ajax(opt);
   },
 
   // A single instance of App.ModalPopup view
@@ -1151,8 +1238,9 @@ App.ajax = {
    * @jqXHR {jqXHR Object}
    * @url {string}
    * @method {String} Http method
+   * @showStatus {number} HTTP response code which should be shown. Default is 500.
    */
-  defaultErrorHandler: function(jqXHR,url,method) {
+  defaultErrorHandler: function (jqXHR, url, method, showStatus) {
     method = method || 'GET';
     var self = this;
     var api = " received on " + method + " method for API: " + url;
@@ -1162,12 +1250,14 @@ App.ajax = {
       var message = json.message;
     } catch (err) {
     }
-
+    if (showStatus === null) {
+      showStatus = 500;
+    }
     if (message === undefined) {
       showMessage = false;
     }
     var statusCode = jqXHR.status + " status code";
-    if (jqXHR.status === 500 && !this.modalPopup) {
+    if (jqXHR.status === showStatus && !this.modalPopup) {
       this.modalPopup = App.ModalPopup.show({
         header: jqXHR.statusText,
         secondary: false,

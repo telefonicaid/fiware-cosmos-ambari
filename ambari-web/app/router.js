@@ -271,7 +271,8 @@ App.Router = Em.Router.extend({
     var clusterStatusOnServer = App.clusterStatus.get('value');
     if (!localStorage.getObject('ambari').app.user.admin || clusterStatusOnServer && (clusterStatusOnServer.clusterState === 'CLUSTER_STARTED_5' ||
       clusterStatusOnServer.clusterState === 'ADD_HOSTS_COMPLETED_5' || clusterStatusOnServer.clusterState === 'STACK_UPGRADE_COMPLETED' ||
-      clusterStatusOnServer.clusterState === 'REASSIGN_MASTER_COMPLETED' || clusterStatusOnServer.clusterState === 'SECURITY_COMPLETED' || clusterStatusOnServer.clusterState === 'HIGH_AVAILABILITY_COMPLETED')) {
+      clusterStatusOnServer.clusterState === 'REASSIGN_MASTER_COMPLETED' || clusterStatusOnServer.clusterState === 'SECURITY_COMPLETED' || clusterStatusOnServer.clusterState === 'HIGH_AVAILABILITY_COMPLETED'
+      || clusterStatusOnServer.clusterState === 'HIGH_AVAILABILITY_DISABLED')) {
       return 'main.index';
     } else if (clusterStatusOnServer && clusterStatusOnServer.wizardControllerName === App.router.get('addHostController.name')) {
       // if wizardControllerName == "addHostController", then it means someone closed the browser or the browser was crashed when we were last in Add Hosts wizard
@@ -291,6 +292,9 @@ App.Router = Em.Router.extend({
     } else if (clusterStatusOnServer && clusterStatusOnServer.wizardControllerName === App.router.get('highAvailabilityWizardController.name')) {
       // if wizardControllerName == "highAvailabilityWizardController", then it means someone closed the browser or the browser was crashed when we were last in NameNode High Availability wizard
       return 'main.admin.enableHighAvailability';
+    }else if (clusterStatusOnServer && clusterStatusOnServer.wizardControllerName === App.router.get('highAvailabilityRollbackController.name')) {
+      // if wizardControllerName == "highAvailabilityRollbackController", then it means someone closed the browser or the browser was crashed when we were last in NameNode High Availability Rollback wizard
+      return 'main.admin.highAvailabilityRollback';
     } else {
       // if wizardControllerName == "installerController", then it means someone closed the browser or the browser was crashed when we were last in Installer wizard
       return 'installer';
@@ -336,11 +340,25 @@ App.Router = Em.Router.extend({
     console.log("failed to invoke logout on the server");
   },
 
+  /**
+   * initialize isAdmin if user is administrator
+   */
+  initAdmin: function(){
+    if(App.db && App.db.getUser() && App.db.getUser().admin) {
+      App.set('isAdmin', true);
+      console.log('Administrator logged in');
+    }
+  },
+
   root: Em.Route.extend({
     index: Em.Route.extend({
       route: '/',
       redirectsTo: 'login'
     }),
+
+    enter: function(router){
+      router.initAdmin();
+    },
 
     login: Em.Route.extend({
       route: '/login',
@@ -369,6 +387,18 @@ App.Router = Em.Router.extend({
     installer: require('routes/installer'),
 
     main: require('routes/main'),
+    
+    experimental: Em.Route.extend({
+      route: '/experimental',
+      enter: function (router, context) {
+        
+      },
+      connectOutlets: function (router, context) {
+        $('title').text("Ambari Experimental");
+        console.log('/experimental:connectOutlet');
+        router.get('applicationController').connectOutlet('experimental');
+      }
+    }),
 
     logoff: function (router, context) {
       router.logOff(context);

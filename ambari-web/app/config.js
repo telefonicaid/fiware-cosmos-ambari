@@ -58,7 +58,9 @@ App.supports = {
   hue: false,
   ldapGroupMapping: false,
   localRepositories: false,
-  highAvailability: true
+  highAvailability: true,
+  deleteHost: false,
+  autoRollbackHA: false
 };
 
 if (App.enableExperimental) {
