@@ -28,6 +28,7 @@ define hdp-hadoop::hdfs::directory(
   $recursive_chmod = false
 ) 
 {
+  include hdp-hadoop::params
   $dir_exists = "hadoop fs -ls ${name} >/dev/null 2>&1"
   $namenode_safe_mode_off = "hadoop dfsadmin -safemode get|grep 'Safe mode is OFF'"
 
