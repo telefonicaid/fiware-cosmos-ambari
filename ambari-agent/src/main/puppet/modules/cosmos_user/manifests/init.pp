@@ -44,6 +44,19 @@ class cosmos_user($service_state) {
       owner => $params_for_user['username'],
       group => $cosmos_user::params::group,
     }
+
+    # Configure the sudoers file if the user has sudoer capability; remove it otherwise
+    $sudo_ensure = $params_for_user['is_sudoer'] ? {
+     'true' => present,
+     default => absent,
+    }
+    file { $params_for_user['sudoer_file']:
+        ensure => $sudo_ensure,
+        owner => root,
+        group => root,
+        mode => 700,
+        content => "${params_for_user['username']}        ALL=(ALL) NOPASSWD: ALL"
+    }
   }
 
   # Cosmos system user resource definition

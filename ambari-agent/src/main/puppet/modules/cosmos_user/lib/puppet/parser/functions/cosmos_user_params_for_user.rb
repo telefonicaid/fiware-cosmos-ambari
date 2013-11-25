@@ -24,6 +24,7 @@ module Puppet::Parser::Functions
     thisUserParams['ssh_public_key_file'] = "#{thisUserParams['user_ssh_dir']}/id_rsa.pub"
     thisUserParams['ssh_authorized_keys_file'] = "#{thisUserParams['user_ssh_dir']}/authorized_keys"
     thisUserParams['hdfs_user_dir'] = "/user/#{thisUserParams['username']}"
+    thisUserParams['sudoer_file'] = "/etc/sudoers.d/100_#{thisUserParams['username']}"
     thisUserParams
   end
 end
