@@ -33,12 +33,8 @@ class cosmos_user($service_state) {
       service_state => $ssh_service_state,
     }
 
-    # Force deletion on uninstall. This variable is used by hdp::directory.
-    # It is defined in hdp::params originally.
-    # We employ variable scoping to enforce wipeoff only for this resource, not globally.
-    $wipeoff_data = true
     # .ssh directory
-    $ensure = $service_state ? {
+    $ensure = $ssh_service_state ? {
       'uninstalled' => absent,
       default => directory,
     }
