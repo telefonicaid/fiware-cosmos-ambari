@@ -13,7 +13,7 @@ module Puppet::Parser::Functions
     allUserParams = args[1]
     thisUserParams = Hash[
         Hash[
-            allUserParams.select {|key, _value| key =~ (/user#{userIndex}.*/)}
+            allUserParams.select {|key, _value| key =~ (/user#{userIndex}_.*/)}
         ].map{|key, value| [key.match(/user#{userIndex}_(.*)/)[1], value]}
     ]
 
