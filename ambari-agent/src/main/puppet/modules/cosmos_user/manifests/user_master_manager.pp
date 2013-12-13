@@ -63,7 +63,7 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
           user => 'hdfs',
           unless => $dir_is_present
         }
-        ~> exec { "hadoop fs -chown ${params_for_user['username']} ${params_for_user['hdfs_user_dir']}":,
+        ~> exec { "hadoop fs -chown ${params_for_user['username']}:${cosmos_user::params::group} ${params_for_user['hdfs_user_dir']}":,
           path => $exec_path,
           user => 'hdfs',
           refreshonly => true
