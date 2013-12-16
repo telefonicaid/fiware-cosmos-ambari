@@ -47,26 +47,20 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
     }
 
     $exec_path = ["/bin","/usr/bin", "/usr/sbin"]
+    # Create HDFS user home directory
+    $create_command = "hadoop fs -mkdir ${params_for_user['hdfs_user_dir']}"
     case $hdfs_service_state {
       'uninstalled': {
         # Disable HDFS user home directory
-        exec { "hadoop fs -chown -R ${cosmos_user::params::hdfs_disabled_dir_owner} ${params_for_user['hdfs_user_dir']}":
+        Exec[$create_command] -> exec { "hadoop fs -chown -R ${cosmos_user::params::hdfs_disabled_dir_owner} ${params_for_user['hdfs_user_dir']}":
           path => $exec_path,
-          user => 'hdfs'
+          user => 'hdfs',
         }
       }
       default: {
-        # Create HDFS user home directory
-        $dir_is_present = "hadoop fs -ls /user/ | grep ${params_for_user['username']}$"
-        exec { "hadoop fs -mkdir ${params_for_user['hdfs_user_dir']}":
+        Exec[$create_command] -> exec { "hadoop fs -chown ${params_for_user['username']}:${cosmos_user::params::group} ${params_for_user['hdfs_user_dir']}":,
           path => $exec_path,
           user => 'hdfs',
-          unless => $dir_is_present
-        }
-        ~> exec { "hadoop fs -chown ${params_for_user['username']}:${cosmos_user::params::group} ${params_for_user['hdfs_user_dir']}":,
-          path => $exec_path,
-          user => 'hdfs',
-          refreshonly => true
         }
         ~> exec { "hadoop fs -chmod ${cosmos_user::params::hdfs_user_dir_mode} ${params_for_user['hdfs_user_dir']}":,
           path => $exec_path,
@@ -74,6 +68,12 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
           refreshonly => true
         }
       }
+    }
+    $dir_is_present = "hadoop fs -ls /user/ | grep ${params_for_user['username']}$"
+    exec { $create_command:
+      path => $exec_path,
+      user => 'hdfs',
+      unless => $dir_is_present
     }
   }
 }
