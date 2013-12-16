@@ -69,7 +69,7 @@ class cosmos_user::user_master_manager($service_state) inherits cosmos_user::par
         }
       }
     }
-    $dir_is_present = "hadoop fs -ls /user/ | grep ${params_for_user['username']}$"
+    $dir_is_present = "hadoop fs -test -d ${params_for_user['hdfs_user_dir']}"
     exec { $create_command:
       path => $exec_path,
       user => 'hdfs',
