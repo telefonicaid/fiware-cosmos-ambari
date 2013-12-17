@@ -22,17 +22,19 @@ class cosmos_user($service_state) {
   define initialized_user {
     $params_for_user = cosmos_user_params_for_user($name, $cosmos_user_config)
     notice("Initializing user: ${params_for_user['username']}")
+
     # Create user
     system_user{ $params_for_user['username']:
       service_state => $service_state,
     }
 
-    # Force deletion on uninstall. This variable is used by hdp::directory.
-    # It is defined in hdp::params originally.
-    # We employ variable scoping to enforce wipeoff only for this resource, not globally.
-    $wipeoff_data = true
     # .ssh directory
-    $ensure = $service_state ? {
+    $ssh_service_state = $params_for_user['ssh_enabled'] ? {
+      'true' => $service_state,
+      default => 'uninstalled'
+    }
+
+    $ensure = $ssh_service_state ? {
       'uninstalled' => absent,
       default => directory,
     }
@@ -41,6 +43,19 @@ class cosmos_user($service_state) {
       mode => 700,
       owner => $params_for_user['username'],
       group => $cosmos_user::params::group,
+    }
+
+    # Configure the sudoers file if the user has sudoer capability; remove it otherwise
+    $sudo_ensure = $params_for_user['is_sudoer'] ? {
+     'true' => present,
+     default => absent,
+    }
+    file { $params_for_user['sudoer_file']:
+        ensure => $sudo_ensure,
+        owner => root,
+        group => root,
+        mode => 700,
+        content => "${params_for_user['username']}        ALL=(ALL) NOPASSWD: ALL"
     }
   }
 

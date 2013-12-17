@@ -127,7 +127,7 @@ App.ServiceConfigsByCategoryView = Ember.View.extend({
             }
           );
         }
-      } else if (changedProperty.get("name") == "hbase_user") {
+      } else if (changedProperty.get("name") == "hbase_user" && !App.get('isHadoop2Stack')) {
         curConfigs = stepConfigs.findProperty("serviceName", "HDFS").get("configs");
         if (newValue != curConfigs.findProperty("name", "dfs_block_local_path_access_user").get("value")) {
           this.affectedProperties.push(
@@ -273,9 +273,7 @@ App.ServiceConfigsByCategoryView = Ember.View.extend({
     var configs = this.get('serviceConfigs');
     var canEdit = this.get('canEdit');
     if (!canEdit && configs) {
-      configs.forEach(function (config) {
-        config.set('isEditable', false);
-      });
+      configs.setEach('isEditable', false);
     }
   },
 
@@ -352,11 +350,15 @@ App.ServiceConfigsByCategoryView = Ember.View.extend({
 
   didInsertElement: function () {
     var isCollapsed = (this.get('category.name').indexOf('Advanced') != -1);
+    var self = this;
     this.set('category.isCollapsed', isCollapsed);
     if (isCollapsed) {
       this.$('.accordion-body').hide();
     }
     this.updateReadOnlyFlags();
+    Em.run.next(function() {
+      self.updateReadOnlyFlags();
+    });
   },
   childView: App.ServiceConfigsOverridesView,
   changeFlag: Ember.Object.create({
@@ -368,6 +370,7 @@ App.ServiceConfigsByCategoryView = Ember.View.extend({
   },
   showAddPropertyWindow: function (event) {
     var configsOfFile = this.get('service.configs').filterProperty('filename', this.get('category.siteFileName'));
+    var self =this;
     var serviceConfigObj = Ember.Object.create({
       name: '',
       value: '',
@@ -380,7 +383,7 @@ App.ServiceConfigsByCategoryView = Ember.View.extend({
         var name = this.get('name');
         if (name.trim() != "") {
           if (validator.isValidConfigKey(name)) {
-            var configMappingProperty = App.config.get('configMapping').all().findProperty('name', name);
+            var configMappingProperty = App.config.get('configMapping').all().filterProperty('filename',self.get('category.siteFileName')).findProperty('name', name);
             if ((configMappingProperty == null) && (!configsOfFile.findProperty('name', name))) {
               this.set("isKeyError", false);
               this.set("errorMessage", "");

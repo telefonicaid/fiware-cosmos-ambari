@@ -83,9 +83,13 @@ class hdp-hadoop::params(
 
   $mapred_pid_dir_prefix = hdp_default("mapred_pid_dir_prefix","/var/run/hadoop-mapreduce")
 
+  # Cannot create new dir in directory.pp, reusing existing path
+  $namenode_dirs_created_stub_dir = "${hdfs_log_dir_prefix}/${hdp::params::hdfs_user}"
+  $namenode_dirs_stub_filename = "namenode_dirs_created"
+
   ### JSVC_HOME path is correct for AMD64 only, but can be changed through API
   if ($hdp::params::hdp_os_type == "suse") {
-    $jsvc_path = hdp_default("jsvc_path","/usr/lib/hadoop/sbin/Linux-amd64-64/")
+    $jsvc_path = hdp_default("jsvc_path","/usr/lib/bigtop-utils")
   } else {
     $jsvc_path = hdp_default("jsvc_path","/usr/libexec/bigtop-utils")
   }
@@ -111,7 +115,7 @@ class hdp-hadoop::params(
 
   ### core-site
   if (hdp_get_major_stack_version($stack_version) >= 2) {
-    $fs_checkpoint_dir = hdp_default("core-site/dfs.namenode.checkpoint.dir","/tmp/hadoop-hdfs/dfs/namesecondary")
+    $fs_checkpoint_dir = hdp_default("hdfs-site/dfs.namenode.checkpoint.dir","/tmp/hadoop-hdfs/dfs/namesecondary")
   } else {
     $fs_checkpoint_dir = hdp_default("core-site/fs.checkpoint.dir","/tmp/hadoop-hdfs/dfs/namesecondary")
   }
@@ -119,6 +123,8 @@ class hdp-hadoop::params(
   $proxyuser_group = hdp_default("core-site/proxyuser.group","users")
   
   $hadoop_tmp_dir = hdp_default("core-site/hadoop.tmp.dir","/tmp/hadoop-$hdfs_user")
+  
+  $hadoop_ssl_enabled = hdp_default("core-site/hadoop.ssl.enabled","false")
 
   ### hdfs-site
   $datanode_du_reserved = hdp_default("hdfs-site/datanode.du.reserved",1073741824)
@@ -177,6 +183,8 @@ class hdp-hadoop::params(
   } else {
     $mapred_local_dir = hdp_default("mapred-site/mapred.local.dir","/tmp/hadoop-mapred/mapred/local")
   }
+
+  $mapred_tt_group = hdp_default("mapred-site/mapreduce.tasktracker.group", "hadoop")
    
   $mapreduce_userlog_retainhours = hdp_default("mapred-site/mapreduce.userlog.retainhours",24)
 
@@ -191,10 +199,11 @@ class hdp-hadoop::params(
   $task_bin_exe = hdp_default("task_bin_exe")
 
   $rca_enabled = hdp_default("rca_enabled", false)
+  $rca_disabled_prefix = "###"
   if ($rca_enabled == true) {
     $rca_prefix = ""
   } else {
-    $rca_prefix = "###"
+    $rca_prefix = $rca_disabled_prefix
   }
   # $ambari_db_server_host = hdp_default("ambari_db_server_host", "localhost")
   $ambari_db_rca_url = hdp_default("ambari_db_rca_url", "jdbc:postgresql://localhost/ambarirca")

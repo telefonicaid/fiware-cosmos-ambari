@@ -16,6 +16,12 @@ Vagrant.configure("2") do |config|
   config.vm.box = "CentOS-6.4-x86_64-v20130427"
   config.vm.box_url = "http://cosmos10.hi.inet:8080/vagrant-boxes/CentOS-6.4-x86_64-v20130427.box"
   config.vm.hostname = "linux"
+
+  config.vm.provider :virtualbox do |vb|
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["modifyvm", :id, "--cpus", "2"]
+  end
+
   $repo_path = "/etc/yum.repos.d/EPEL-Repo-PDI.repo"
   $script = <<SCRIPT
   echo installing EPEL-PDI repo

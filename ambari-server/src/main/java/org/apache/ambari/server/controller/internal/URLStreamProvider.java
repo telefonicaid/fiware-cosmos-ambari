@@ -35,12 +35,7 @@ import javax.net.ssl.TrustManagerFactory;
 import org.apache.ambari.server.controller.utilities.StreamProvider;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicHeader;
 
 /**
  * URL based implementation of a stream provider.
@@ -73,15 +68,19 @@ public class URLStreamProvider implements StreamProvider {
 
     this.connTimeout = connectionTimeout;
     this.readTimeout = readTimeout;
-    this.path = path;
-    this.password = password;
-    this.type = type;
+    this.path = path;          // truststroe path
+    this.password = password;  // truststore password
+    this.type = type;          // truststroe type
     appCookieManager = new AppCookieManager();
   }
 
   @Override
   public InputStream readFrom(String spec) throws IOException {
-
+    
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("readFrom spec:" + spec);
+    }
+    
     HttpURLConnection connection = spec.startsWith("https") ? 
         (HttpURLConnection)getSSLConnection(spec)
         : (HttpURLConnection)getConnection(spec);
@@ -166,7 +165,7 @@ public class URLStreamProvider implements StreamProvider {
         .openConnection());
 
     connection.setSSLSocketFactory(sslSocketFactory);
-
+ 
     return connection;
   }
 }

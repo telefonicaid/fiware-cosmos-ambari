@@ -20,15 +20,15 @@ var App = require('app');
 App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
 
   name: 'mainAdminSecurityAddStep4Controller',
-  secureMapping: function() {
-    if(App.get('isHadoop2Stack')) {
+  secureMapping: function () {
+    if (App.get('isHadoop2Stack')) {
       return require('data/HDP2/secure_mapping');
     } else {
       return require('data/secure_mapping');
     }
   }.property(App.isHadoop2Stack),
-  secureProperties: function() {
-    if(App.get('isHadoop2Stack')) {
+  secureProperties: function () {
+    if (App.get('isHadoop2Stack')) {
       return require('data/HDP2/secure_properties').configProperties;
     } else {
       return require('data/secure_properties').configProperties;
@@ -38,6 +38,7 @@ App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
   configs: [],
   noOfWaitingAjaxCalls: 0,
   secureServices: [],
+  serviceUsersBinding: 'App.router.mainAdminSecurityController.serviceUsers',
   serviceConfigTags: [],
   globalProperties: [],
   totalSteps: 3,
@@ -68,7 +69,6 @@ App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
     return installedServices.contains('WEBHCAT');
   },
 
-  serviceUsersBinding: 'App.router.mainAdminSecurityController.serviceUsers',
   hasHostPopup: true,
   services: [],
   serviceTimestamp: null,
@@ -104,7 +104,7 @@ App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
       }, this);
       if (stages.someProperty('isError', true)) {
         this.get('stages').pushObjects(stages);
-        this.addObserver('stages.@each.isSuccess', this.onCompleteStage);
+        this.addObserver('stages.@each.isSuccess', this, 'onCompleteStage');
         return;
       } else if (stages.filterProperty('isStarted', true).someProperty('isCompleted', false)) {
         var runningStage = stages.filterProperty('isStarted', true).findProperty('isCompleted', false);
@@ -123,7 +123,7 @@ App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
         stopStage.set('requestId', stopAllOperation.get('id'));
       }
     }
-    this.addObserver('stages.@each.isSuccess', this.onCompleteStage);
+    this.addObserver('stages.@each.isSuccess', this, 'onCompleteStage');
     this.moveToNextStage();
   },
 
@@ -465,15 +465,12 @@ App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
       serviceUsers.pushObject({id: 'puppet var', name: 'hbase_user', value: 'hbase'});
       serviceUsers.pushObject({id: 'puppet var', name: 'hive_user', value: 'hive'});
     } else {
-      App.router.get('mainAdminSecurityController').setSecurityStatus();
+      App.router.set('mainAdminSecurityController.serviceUsers', App.db.getSecureUserInfo());
     }
   },
 
 
   loadClusterConfigs: function () {
-    var self = this;
-    var url = App.apiPrefix + '/clusters/' + App.router.getClusterName();
-
     App.ajax.send({
       name: 'admin.security.add.cluster_configs',
       sender: this,
@@ -521,36 +518,37 @@ App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
   },
 
   applyConfigurationsToCluster: function () {
-    this.set('noOfWaitingAjaxCalls', this.get('serviceConfigTags').length);
+    var configData = [];
     this.get('serviceConfigTags').forEach(function (_serviceConfig) {
-      this.applyConfigurationToCluster({type: _serviceConfig.siteName, tag: _serviceConfig.newTagName, properties: _serviceConfig.configs});
+      var Clusters = {
+        Clusters: {
+          desired_config: {
+            type: _serviceConfig.siteName,
+            tag: _serviceConfig.newTagName,
+            properties: _serviceConfig.configs
+          }
+        }
+      };
+      configData.pushObject(JSON.stringify(Clusters));
     }, this);
-  },
 
-  applyConfigurationToCluster: function (data) {
-    var clusterData = {
-      Clusters: {
-        desired_config: data
-      }
+    var data = {
+      configData: '[' + configData.toString() + ']'
     };
+
     App.ajax.send({
-      name: 'admin.security.apply_configuration',
+      name: 'admin.security.apply_configurations',
       sender: this,
-      data: {
-        clusterData: clusterData
-      },
+      data: data,
       success: 'applyConfigurationToClusterSuccessCallback',
       error: 'applyConfigurationToClusterErrorCallback'
     });
   },
 
   applyConfigurationToClusterSuccessCallback: function (data) {
-    this.set('noOfWaitingAjaxCalls', this.get('noOfWaitingAjaxCalls') - 1);
-    if (this.get('noOfWaitingAjaxCalls') == 0) {
-      var currentStage = this.get('stages').findProperty('stage', 'stage3');
-      currentStage.set('isSuccess', true);
-      currentStage.set('isError', false);
-    }
+    var currentStage = this.get('stages').findProperty('stage', 'stage3');
+    currentStage.set('isSuccess', true);
+    currentStage.set('isError', false);
   },
 
   applyConfigurationToClusterErrorCallback: function (request, ajaxOptions, error) {
@@ -614,15 +612,15 @@ App.MainAdminSecurityAddStep4Controller = Em.Controller.extend({
   },
 
   /*
-    Iterate over keys of all configurations and escape xml characters in their values
+   Iterate over keys of all configurations and escape xml characters in their values
    */
-  escapeXMLCharacters: function(serviceConfigTags) {
+  escapeXMLCharacters: function (serviceConfigTags) {
     serviceConfigTags.forEach(function (_serviceConfigTags) {
       var configs = _serviceConfigTags.configs;
-        for (var key in configs) {
-          configs[key] =  App.config.escapeXMLCharacters(configs[key]);
-        }
-    },this);
+      for (var key in configs) {
+        configs[key] = App.config.escapeXMLCharacters(configs[key]);
+      }
+    }, this);
   },
 
   addSecureConfigs: function () {

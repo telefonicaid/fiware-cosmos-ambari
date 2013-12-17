@@ -233,11 +233,14 @@ App.ServiceConfigProperty = Ember.Object.extend({
     var isOnlyFirstOneNeeded = true;
     switch (this.get('name')) {
       case 'namenode_host':
-        var temp = masterComponentHostsInDB.findProperty('component', 'NAMENODE');
-        this.set('value', temp.hostName);
+        this.set('value', masterComponentHostsInDB.filterProperty('component', 'NAMENODE').mapProperty('hostName'));
         break;
       case 'snamenode_host':
-        this.set('value', masterComponentHostsInDB.findProperty('component', 'SECONDARY_NAMENODE').hostName);
+        // Secondary NameNode does not exist when NameNode HA is enabled
+        var snn = masterComponentHostsInDB.findProperty('component', 'SECONDARY_NAMENODE');
+        if (snn) {
+          this.set('value', snn.hostName);
+        }
         break;
       case 'datanode_hosts':
         this.set('value', slaveComponentHostsInDB.findProperty('componentName', 'DATANODE').hosts.mapProperty('hostName'));
@@ -288,7 +291,7 @@ App.ServiceConfigProperty = Ember.Object.extend({
       case 'dfs_namenode_name_dir':
       case 'dfs_data_dir':
       case 'dfs_datanode_data_dir':
-      case 'yarn_nodemanager_local-dirs':
+      case 'yarn.nodemanager.local-dirs':
       case 'yarn.nodemanager.log-dirs':
       case 'mapred_local_dir':
       case 'mapreduce_cluster_local_dir':
@@ -298,6 +301,7 @@ App.ServiceConfigProperty = Ember.Object.extend({
       case 'dfs_namenode_checkpoint_dir':
       case 'zk_data_dir':
       case 'oozie_data_dir':
+      case 'hbase_tmp_dir':
         this.unionAllMountPoints(isOnlyFirstOneNeeded, localDB);
         break;
     }
@@ -354,7 +358,7 @@ App.ServiceConfigProperty = Ember.Object.extend({
         }, this);
         break;
       case 'yarn.nodemanager.log-dirs':
-      case 'yarn_nodemanager_local-dirs':
+      case 'yarn.nodemanager.local-dirs':
         temp = slaveComponentHostsInDB.findProperty('componentName', 'NODEMANAGER');
         temp.hosts.forEach(function (host) {
           setOfHostNames.push(host.hostName);
@@ -370,6 +374,12 @@ App.ServiceConfigProperty = Ember.Object.extend({
         var components = masterComponentHostsInDB.filterProperty('component', 'OOZIE_SERVER');
         components.forEach(function (component) {
           setOfHostNames.push(component.hostName);
+        }, this);
+        break;
+      case 'hbase_tmp_dir':
+        var temp = slaveComponentHostsInDB.findProperty('componentName', 'HBASE_REGIONSERVER');
+        temp.hosts.forEach(function (host) {
+          setOfHostNames.push(host.hostName);
         }, this);
         break;
     }

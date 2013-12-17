@@ -23,6 +23,7 @@ import os
 import rrdtool
 import sys
 import time
+import re
 
 # place this script in /var/www/cgi-bin of the Ganglia collector
 # requires 'yum install rrdtool-python' on the Ganglia collector
@@ -138,17 +139,35 @@ if "pt" in queryString:
   pointInTime = True
 else:
   pointInTime = False
+  
+def _walk(*args, **kwargs):
+ 
+  for root,dirs,files in os.walk(*args, **kwargs):
+    for dir in dirs:
+      qualified_dir = os.path.join(root,dir)
+      if os.path.islink(qualified_dir):
+        for x in os.walk(qualified_dir, **kwargs):
+          yield x
+    yield (root, dirs, files)
+    
 
 for cluster in clusterParts:
-  for path, dirs, files in os.walk(rrdPath + cluster,followlinks=True):
+  for path, dirs, files in _walk(rrdPath + cluster):
     pathParts = path.split("/")
     if len(hostParts) == 0 or pathParts[-1] in hostParts:
       for file in files:
         for metric in metricParts:
+          doPrintMetric = False
           if file.endswith(metric + ".rrd"):
+            doPrintMetric = True
+          else:
+            metricRegex = metric + '.rrd$'
+            p = re.compile(metricRegex)
+            if p.match(file):
+              doPrintMetric = True
 
-            printMetric(pathParts[-2], pathParts[-1], file[:-4],
-                os.path.join(path, file), cf, start, end, resolution, pointInTime)
+          if doPrintMetric:
+            printMetric(pathParts[-2], pathParts[-1], file[:-4], os.path.join(path, file), cf, start, end, resolution, pointInTime)
 
 sys.stdout.write("[AMBARI_END]\n")
 # write end time

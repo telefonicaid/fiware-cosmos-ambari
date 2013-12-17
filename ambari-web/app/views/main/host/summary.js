@@ -59,7 +59,11 @@ App.MainHostSummaryView = Em.View.extend({
             success: function (data) {
               if (data && data.items) {
                 var csv = data.items[0].properties.datanodes;
-                self.set('decommissionDataNodeHostNames', csv.split(','));
+                if (csv!==null && csv.length>0) {
+                  self.set('decommissionDataNodeHostNames', csv.split(','));  
+                } else {
+                  self.set('decommissionDataNodeHostNames', null);  
+                }
               }
             },
             error: function (xhr, textStatus, errorThrown) {
@@ -123,13 +127,69 @@ App.MainHostSummaryView = Em.View.extend({
 
   addableComponentObject: Em.Object.extend({
     componentName: '',
+    subComponentNames: null,
     displayName: function () {
+      if (this.get('componentName') === 'CLIENTS') {
+        return this.t('common.clients');
+      }
       return App.format.role(this.get('componentName'));
     }.property('componentName')
   }),
   isAddComponent: function () {
     return this.get('content.healthClass') !== 'health-status-DEAD-YELLOW';
   }.property('content.healthClass'),
+  
+  installableClientComponents: function() {
+    var installableClients = [];
+    if (!App.supports.deleteHost) {
+      return installableClients;
+    }
+    App.Service.find().forEach(function(svc){
+      switch(svc.get('serviceName')){
+        case 'PIG':
+          installableClients.push('PIG');
+          break;
+        case 'SQOOP':
+          installableClients.push('SQOOP');
+          break;
+        case 'HCAT':
+          installableClients.push('HCAT');
+          break;
+        case 'HDFS':
+          installableClients.push('HDFS_CLIENT');
+          break;
+        case 'OOZIE':
+          installableClients.push('OOZIE_CLIENT');
+          break;
+        case 'ZOOKEEPER':
+          installableClients.push('ZOOKEEPER_CLIENT');
+          break;
+        case 'HIVE':
+          installableClients.push('HIVE_CLIENT');
+          break;
+        case 'HBASE':
+          installableClients.push('HBASE_CLIENT');
+          break;
+        case 'YARN':
+          installableClients.push('YARN_CLIENT');
+          break;
+        case 'MAPREDUCE':
+          installableClients.push('MAPREDUCE_CLIENT');
+          break;
+        case 'MAPREDUCE2':
+          installableClients.push('MAPREDUCE2_CLIENT');
+          break;
+      }
+    });
+    this.get('content.hostComponents').forEach(function (component) {
+      var index = installableClients.indexOf(component.get('componentName'));
+      if (index > -1) {
+        installableClients.splice(index, 1);
+      }
+    }, this);
+    return installableClients;
+  }.property('content', 'content.hostComponents.length', 'App.Service', 'App.supports.deleteHost'),
+  
   addableComponents: function () {
     var components = [];
     var services = App.Service.find();
@@ -138,7 +198,9 @@ App.MainHostSummaryView = Em.View.extend({
     var regionServerExists = false;
     var zookeeperServerExists = false;
     var nodeManagerExists = false;
-
+    
+    var installableClients = this.get('installableClientComponents');
+    
     this.get('content.hostComponents').forEach(function (component) {
       switch (component.get('componentName')) {
         case 'DATANODE':
@@ -174,8 +236,11 @@ App.MainHostSummaryView = Em.View.extend({
     if (!nodeManagerExists && services.findProperty('serviceName', 'YARN')) {
       components.pushObject(this.addableComponentObject.create({ 'componentName': 'NODEMANAGER' }));
     }
+    if (installableClients.length > 0) {
+      components.pushObject(this.addableComponentObject.create({ 'componentName': 'CLIENTS', subComponentNames: installableClients }));
+    }
     return components;
-  }.property('content', 'content.hostComponents.length'),
+  }.property('content', 'content.hostComponents.length', 'installableClientComponents'),
 
   ComponentView: Em.View.extend({
     content: null,
@@ -213,9 +278,9 @@ App.MainHostSummaryView = Em.View.extend({
         componentTextStatus = hostComponent.get('componentTextStatus');
         if(this.get("isDataNode"))
           if(this.get('isDataNodeRecommissionAvailable')){
-            if(App.HostComponentStatus.started == workStatus){
+            if(hostComponent.get('isDecommissioning')){
               componentTextStatus = "Decommissioning...";
-            }else if(App.HostComponentStatus.stopped == workStatus){
+            } else {
               componentTextStatus = "Decommissioned";
             }
           }
@@ -270,13 +335,13 @@ App.MainHostSummaryView = Em.View.extend({
       if (!pulsate && this.get('isDataNode')) {
         var dataNodeComponent = this.get('content');
         if (dataNodeComponent && workStatus != "INSTALLED") {
-          pulsate = this.get('isDataNodeRecommissionAvailable');
+          pulsate = this.get('isDecommissioning');
         }
       }
       if (pulsate && !self.get('isBlinking')) {
         self.set('isBlinking', true);
         uiEffects.pulsate(self.$('.components-health'), 1000, function () {
-          !self.get('isDestroyed') && self.set('isBlinking', false);
+          self.set('isBlinking', false);
           self.doBlinking();
         });
       }
@@ -310,7 +375,9 @@ App.MainHostSummaryView = Em.View.extend({
     }.property('workStatus'),
 
     isInProgress: function () {
-      return (this.get('workStatus') === App.HostComponentStatus.stopping || this.get('workStatus') === App.HostComponentStatus.starting) || this.get('isDataNodeRecommissionAvailable');
+      return (this.get('workStatus') === App.HostComponentStatus.stopping || 
+          this.get('workStatus') === App.HostComponentStatus.starting) || 
+          this.get('isDecommissioning');
     }.property('workStatus', 'isDataNodeRecommissionAvailable'),
     /**
      * Shows whether we need to show Decommision/Recomission buttons
@@ -320,8 +387,9 @@ App.MainHostSummaryView = Em.View.extend({
     }.property('content'),
 
     isDecommissioning: function () {
-      return this.get('isDataNode') &&  this.get("isDataNodeRecommissionAvailable");
-    }.property("workStatus", "isDataNodeRecommissionAvailable"),
+      var hostComponentDecommissioning = this.get('hostComponent.isDecommissioning');
+      return this.get('isDataNode') &&  this.get("isDataNodeRecommissionAvailable") && hostComponentDecommissioning;
+    }.property("workStatus", "isDataNodeRecommissionAvailable", "hostComponent.isDecommissioning"),
 
     /**
      * Set in template via binding from parent view

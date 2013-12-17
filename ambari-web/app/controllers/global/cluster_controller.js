@@ -22,6 +22,7 @@ App.ClusterController = Em.Controller.extend({
   name:'clusterController',
   cluster:null,
   isLoaded:false,
+  ambariProperties: null,
   clusterDataLoadedPercent: 'width:0', // 0 to 1
   /**
    * Whether we need to update statuses automatically or not
@@ -58,7 +59,8 @@ App.ClusterController = Em.Controller.extend({
     'alerts':false,
     'users':false,
     'datasets':false,
-    'targetclusters':false
+    'targetclusters':false,
+    'status': false
   }),
 
   /**
@@ -120,14 +122,14 @@ App.ClusterController = Em.Controller.extend({
               if (host) {
                 hostName = host.get('publicHostName');
               }
-              return "http://" + (App.singleNodeInstall ? App.singleNodeAlias + ":42080" : hostName) + "/ganglia";
+              return this.get('gangliaWebProtocol') + "://" + (App.singleNodeInstall ? App.singleNodeAlias + ":42080" : hostName) + "/ganglia";
             }
           }
         }
       }
       return null;
     }
-  }.property('App.router.updateController.isUpdated', 'dataLoadList.hosts'),
+  }.property('App.router.updateController.isUpdated', 'dataLoadList.hosts','gangliaWebProtocol'),
 
   /**
    * Provides the URL to use for NAGIOS server. This URL
@@ -154,17 +156,39 @@ App.ClusterController = Em.Controller.extend({
               if (host) {
                 hostName = host.get('publicHostName');
               }
-              return "http://" + (App.singleNodeInstall ? App.singleNodeAlias + ":42080" : hostName) + "/nagios";
+              return this.get('nagiosWebProtocol') + "://" + (App.singleNodeInstall ? App.singleNodeAlias + ":42080" : hostName) + "/nagios";
             }
           }
         }
       }
       return null;
     }
-  }.property('App.router.updateController.isUpdated', 'dataLoadList.services', 'dataLoadList.hosts'),
+  }.property('App.router.updateController.isUpdated', 'dataLoadList.services', 'dataLoadList.hosts','nagiosWebProtocol'),
+
+  nagiosWebProtocol: function () {
+    var properties = this.get('ambariProperties');
+    if (properties && properties.hasOwnProperty('nagios.https') && properties['nagios.https']) {
+      return "https";
+    } else {
+      return "http";
+    }
+  }.property('ambariProperties'),
+
+  gangliaWebProtocol: function () {
+    var properties = this.get('ambariProperties');
+    if (properties && properties.hasOwnProperty('ganglia.https') && properties['ganglia.https']) {
+      return "https";
+    } else {
+      return "http";
+    }
+  }.property('ambariProperties'),
 
   isNagiosInstalled:function () {
     return !!App.Service.find().findProperty('serviceName', 'NAGIOS');
+  }.property('App.router.updateController.isUpdated', 'dataLoadList.services'),
+
+  isGangliaInstalled:function () {
+    return !!App.Service.find().findProperty('serviceName', 'GANGLIA');
   }.property('App.router.updateController.isUpdated', 'dataLoadList.services'),
 
   /**
@@ -243,7 +267,8 @@ App.ClusterController = Em.Controller.extend({
       return false;
     }
     var testUrl = App.get('isHadoop2Stack') ? '/data/dashboard/HDP2/services.json':'/data/dashboard/services.json';
-    var servicesUrl = this.getUrl(testUrl, '/services?fields=ServiceInfo,components/host_components/HostRoles/desired_state,components/host_components/HostRoles/state');
+    //desired_state property is eliminated since calculateState function is commented out, it become useless
+    var servicesUrl = this.getUrl(testUrl, '/services?fields=ServiceInfo,components/host_components/HostRoles/state,components/host_components/HostRoles/ha_status');
 
     App.HttpClient.get(servicesUrl, App.statusMapper, {
       complete: callback
@@ -278,6 +303,7 @@ App.ClusterController = Em.Controller.extend({
    */
   loadClusterData:function () {
     var self = this;
+    this.loadAmbariProperties();
     if (!this.get('clusterName')) {
       return;
     }
@@ -351,13 +377,35 @@ App.ClusterController = Em.Controller.extend({
     });
 
     App.router.get('updateController').updateServiceMetric(function(){
-        self.updateLoadStatus('services');
+      self.loadUpdatedStatus(function(){
+        self.updateLoadStatus('status');
+      });
+      self.updateLoadStatus('services');
     }, true);
 
     this.loadAlerts(function(){
         self.updateLoadStatus('alerts');
     });
+  },
 
+
+  loadAmbariProperties: function() {
+    App.ajax.send({
+      name: 'ambari.service',
+      sender: this,
+      success: 'loadAmbariPropertiesSuccess',
+      error: 'loadAmbariPropertiesError'
+    });
+    return this.get('ambariProperties');
+  },
+
+  loadAmbariPropertiesSuccess: function(data) {
+    console.log('loading ambari properties');
+    this.set('ambariProperties', data.RootServiceComponents.properties);
+  },
+
+  loadAmbariPropertiesError: function() {
+    console.warn('can\'t get ambari properties');
   },
 
   clusterName:function () {

@@ -57,7 +57,7 @@
           </div>
         </td>
       </tr>
-      <!-- Journal Nodes -->
+      <!-- JournalNodes -->
       {{#if view.showJournalNodes}}
         <tr>
           <td>{{t dashboard.services.hdfs.journalnodes}}</td>
@@ -118,22 +118,14 @@
       <tr>
         <td>{{t services.service.summary.pendingUpgradeStatus}}</td>
         <td>
-          {{#if view.service.upgradeStatus}}
-            {{t services.service.summary.pendingUpgradeStatus.notPending}}
-          {{else}}
-            {{t services.service.summary.pendingUpgradeStatus.pending}}
-          {{/if}}
+          {{view.upgradeStatus}}
         </td>
       </tr>
       <!-- Safe Mode Status -->
       <tr>
         <td>{{t services.service.summary.safeModeStatus}}</td>
         <td>
-          {{#if view.isSafeMode}}
-            {{t services.service.summary.safeModeStatus.inSafeMode}}
-          {{else}}
-            {{t services.service.summary.safeModeStatus.notInSafeMode}}
-          {{/if}}
+          {{view.safeModeStatus}}
         </td>
       </tr>
 
@@ -155,7 +147,11 @@
         </a>
         <ul class="dropdown-menu">
           {{#each view.quickLinks}}
-            <li><a {{bindAttr href="url"}} target="_blank">{{label}}</a></li>
+            {{#if disabled}}
+                <li><a class="disabled-hdfs-quick-link">{{label}}</a></li>
+            {{else}}
+                <li><a {{bindAttr href="url"}} target="_blank">{{label}}</a></li>
+            {{/if}}
           {{/each}}
         </ul>
       </div>

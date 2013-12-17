@@ -58,6 +58,7 @@ App.MainServiceInfoSummaryView = Em.View.extend({
 
   noTemplateService: function () {
     var serviceName = this.get("service.serviceName");
+    //services with only master components
     if(serviceName == "WEBHCAT" || serviceName == "NAGIOS"){
       return true;
     }else{
@@ -266,9 +267,8 @@ App.MainServiceInfoSummaryView = Em.View.extend({
           components.push(obj);
         }
       });
-      if(!this.get('isDestroyed') && !this.get('isDestroying')){
-        this.set('components', components);
-      }
+      this.set('components', components);
+
   },
   
   _hostComponentsUpd: function() {
@@ -431,6 +431,7 @@ App.MainServiceInfoSummaryView = Em.View.extend({
 
   gangliaUrl:function () {
     var gangliaUrl = App.router.get('clusterController.gangliaUrl');
+    if (!gangliaUrl) return null;
     var svcName = this.get('service.serviceName');
     if (svcName) {
       switch (svcName.toLowerCase()) {

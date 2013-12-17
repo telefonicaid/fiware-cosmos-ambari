@@ -16,7 +16,7 @@
   <parent>
     <groupId>es.tid.cosmos.ambari</groupId>
     <artifactId>ambari-project</artifactId>
-    <version>0.13.1</version>
+    <version>0.14.0</version>
     <relativePath>../ambari-project</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
@@ -24,11 +24,12 @@
   <artifactId>ambari-server</artifactId>
   <packaging>jar</packaging>
   <name>Ambari Server</name>
-  <version>0.13.1</version>
+  <version>0.14.0</version>
   <description>Ambari Server</description>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <python.ver>python &gt;= 2.6</python.ver>
+    <hdpUrlForCentos6>http://s3.amazonaws.com/dev.hortonworks.com/HDP-2.0.6.0/repos/centos6</hdpUrlForCentos6>
   </properties>
   <build>
     <plugins>
@@ -94,6 +95,7 @@
           <descriptors>
             <descriptor>src/main/assemblies/server.xml</descriptor>
           </descriptors>
+          <tarLongFileMode>gnu</tarLongFileMode>
         </configuration>
         <executions>
           <execution>
@@ -122,7 +124,10 @@
             <exclude>src/main/resources/db/index.txt</exclude>
             <exclude>conf/unix/ca.config</exclude>
             <exclude>**/*.json</exclude>
-
+            <exclude>.idea/**</exclude>
+            <exclude>conf/unix/krb5JAASLogin.conf</exclude>
+            <exclude>src/test/resources/*.txt</exclude>
+            <exclude>src/test/resources/*.ldif</exclude>
             <!--gitignore content-->
             <exclude>src/main/resources/db/newcerts/**</exclude>
 
@@ -131,24 +136,6 @@
           </excludes>
         </configuration>
       </plugin>
-      <!--<plugin>-->
-        <!-- Will be used for DDL file update on server version update-->
-        <!--<artifactId>maven-antrun-plugin</artifactId>-->
-        <!--<executions>-->
-          <!--<execution>-->
-            <!--<id>Copy-server-version-file</id>-->
-            <!--<phase>process-test-resources</phase>-->
-            <!--<configuration>-->
-              <!--<tasks>-->
-                <!--<copy file="../version" todir="${project.build.directory}/"/>-->
-              <!--</tasks>-->
-            <!--</configuration>-->
-            <!--<goals>-->
-              <!--<goal>run</goal>-->
-            <!--</goals>-->
-          <!--</execution>-->
-        <!--</executions>-->
-      <!--</plugin>-->
       <plugin>
         <!--Static -->
         <artifactId>maven-antrun-plugin</artifactId>
@@ -347,6 +334,9 @@
                 <source>
                   <location>src/main/resources/scripts/distribute_keytabs.py</location>
                 </source>
+                <source>
+                  <location>src/main/python/UpgradeHelper_HDP2.py</location>
+                </source>
               </sources>
             </mapping>
             <mapping>
@@ -364,6 +354,9 @@
                 <source>
                   <location>src/main/resources/upgrade/ddl/Ambari-DDL-Postgres-UPGRADE-1.3.0.Check.sql</location>
                 </source>
+                <source>
+                  <location>target/classes/upgrade/ddl/Ambari-DDL-Oracle-UPGRADE.sql</location>
+                </source>
               </sources>
             </mapping>
             <mapping>
@@ -372,13 +365,16 @@
                 <source>
                   <location>src/main/resources/upgrade/dml/Ambari-DML-Postgres-UPGRADE_STACK.sql</location>
                 </source>
+                <source>
+                  <location>src/main/resources/upgrade/dml/Ambari-DML-Oracle-UPGRADE_STACK.sql</location>
+                </source>
               </sources>
             </mapping>
             <mapping>
               <directory>/var/lib/ambari-server/resources/stacks/HDP</directory>
               <sources>
                 <source>
-                  <location>src/main/resources/stacks/HDP</location>
+                  <location>target/classes/stacks/HDP</location>
                 </source>
               </sources>
             </mapping>
@@ -398,7 +394,7 @@
               <configuration>noreplace</configuration>
               <sources>
                 <source>
-                  <location>src/main/resources/stacks/HDPLocal</location>
+                  <location>target/classes/stacks/HDPLocal</location>
                 </source>
               </sources>
             </mapping>
@@ -512,12 +508,60 @@
                   </goals>
               </execution>
           </executions>
-      </plugin>      
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.7</version>
+        <executions>
+          <execution>
+            <id>set-hdp-url-classes</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target name="ambari-server-compile">
+                <exec dir="${basedir}" executable="bash" failonerror="true">
+                  <arg value="${basedir}/set-hdp-repo-url.sh"/>
+                  <arg value="${hdpUrlForCentos6}"/>
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>set-hdp-url-packages</id>
+            <phase>package</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target name="ambari-server-compile">
+                <exec dir="${basedir}" executable="bash" failonerror="true">
+                  <arg value="${basedir}/set-hdp-repo-url.sh"/>
+                  <arg value="${hdpUrlForCentos6}"/>
+                  <arg value="${project.build.directory}/ambari-server-${project.version}-dist/ambari-server-${project.version}"/>
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
         <filtering>true</filtering>
+        <excludes>
+          <exclude>stacks/**</exclude>
+        </excludes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+        <includes>
+          <include>stacks/**</include>
+        </includes>
       </resource>
     </resources>
   </build>

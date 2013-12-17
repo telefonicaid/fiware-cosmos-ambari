@@ -26,9 +26,14 @@ class cosmos_user::user_slave_manager($service_state) inherits cosmos_user::para
   define user_slave_keys {
     $params_for_user = cosmos_user_params_for_user($name, $cosmos_user_config)
 
+    $ssh_service_state = $params_for_user['ssh_enabled'] ? {
+      'true' => $service_state,
+      default => 'uninstalled'
+    }
+
     cosmos_user::authorized_keys{ "${$params_for_user['username']}_slave_authorized_keys":
       content => $params_for_user['ssh_slave_authorized_keys'],
-      service_state => $service_state,
+      service_state => $ssh_service_state,
       params_hash => $params_for_user,
     }
   }

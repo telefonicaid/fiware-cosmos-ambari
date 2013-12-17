@@ -50,8 +50,8 @@ App.MainDashboardServiceYARNView = App.MainDashboardServiceView.extend({
   }.property(),
 
   hasManyYarnClients: function () {
-    return (this.get('service.yarnClientNodes') > 1);
-  }.property('service.yarnClientNodes'),
+    return (this.get('service.yarnClientNodes.length') > 1);
+  }.property('service.yarnClientNodes.length'),
 
   nodeUptime: function () {
     var uptime = this.get('service').get('resourceManagerStartTime');
@@ -71,7 +71,7 @@ App.MainDashboardServiceYARNView = App.MainDashboardServiceView.extend({
   }.property('service.nodeManagerNodes', 'service.nodeManagerLiveNodes'),
 
   nodeManagerText: function () {
-    if(this.get("service.nodeManagerNodes") > 1){
+    if(this.get("service.nodeManagerNodes.length") > 1){
       return Em.I18n.t('services.service.summary.viewHosts');
     }else{
       return Em.I18n.t('services.service.summary.viewHost');

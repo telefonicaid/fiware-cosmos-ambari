@@ -15,6 +15,9 @@ class cosmos_user::params inherits hdp::params {
     $users_preambles = cosmos_user_range('1', $cosmos_user_config['number_of_users'])
   }
 
+  $master = $cosmos_user_config['master']
   $group = hdp_default('group', 'cosmos')
   $hdfs_user_dir_mode = 700
+  $hdfs_disabled_dir_mode = 700
+  $hdfs_disabled_dir_owner = 'hdfs'
 }
