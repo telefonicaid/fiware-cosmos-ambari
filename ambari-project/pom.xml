@@ -17,11 +17,11 @@
   <parent>
     <groupId>es.tid.cosmos.ambari</groupId>
     <artifactId>ambari</artifactId>
-    <version>0.14.0-SNAPSHOT</version>
+    <version>0.14.0</version>
   </parent>
   <groupId>es.tid.cosmos.ambari</groupId>
   <artifactId>ambari-project</artifactId>
-  <version>0.14.0-SNAPSHOT</version>
+  <version>0.14.0</version>
   <description>Apache Ambari Project POM</description>
   <name>Apache Ambari Project POM</name>
   <packaging>pom</packaging>
