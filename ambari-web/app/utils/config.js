@@ -65,7 +65,7 @@ App.config = Em.Object.create({
   preDefinedServiceConfigs: function(){
     var configs = this.get('preDefinedGlobalProperties');
     var services = [];
-    require('data/service_configs').forEach(function(service){
+    $.extend(true, [], require('data/service_configs')).forEach(function(service){
       service.configs = configs.filterProperty('serviceName', service.serviceName);
       services.push(service);
     });
@@ -73,27 +73,27 @@ App.config = Em.Object.create({
   }.property('preDefinedGlobalProperties'),
   configMapping: function() {
       if (App.get('isHadoop2Stack')) {
-        return require('data/HDP2/config_mapping');
+        return $.extend(true, [],require('data/HDP2/config_mapping'));
       }
-    return require('data/config_mapping');
+    return $.extend(true, [],require('data/config_mapping'));
   }.property('App.isHadoop2Stack'),
   preDefinedGlobalProperties: function() {
     if (App.get('isHadoop2Stack')) {
-      return require('data/HDP2/global_properties').configProperties;
+      return $.extend(true, [], require('data/HDP2/global_properties').configProperties);
     }
-    return require('data/global_properties').configProperties;
+    return $.extend(true, [], require('data/global_properties').configProperties);
   }.property('App.isHadoop2Stack'),
   preDefinedSiteProperties: function() {
     if (App.get('isHadoop2Stack')) {
-      return require('data/HDP2/site_properties').configProperties;
+      return $.extend(true, [], require('data/HDP2/site_properties').configProperties);
     }
-    return require('data/site_properties').configProperties;
+    return $.extend(true, [], require('data/site_properties').configProperties);
   }.property('App.isHadoop2Stack'),
   preDefinedCustomConfigs: function () {
     if (App.get('isHadoop2Stack')) {
-      return require('data/HDP2/custom_configs');
+      return $.extend(true, [], require('data/HDP2/custom_configs'));
     }
-    return require('data/custom_configs');
+    return $.extend(true, [], require('data/custom_configs'));
   }.property('App.isHadoop2Stack'),
   //categories which contain custom configs
   categoriesWithCustom: ['CapacityScheduler'],
@@ -108,6 +108,26 @@ App.config = Em.Object.create({
       return [];
     }
   }.property('App.isHadoop2Stack'),
+
+  /**
+   * Function should be used post-install as precondition check should not be done only after installer wizard
+   * @param siteNames
+   * @returns {Array}
+   */
+  getBySitename: function (siteNames) {
+    var computedConfigs = this.get('configMapping').computed();
+    var siteProperties = [];
+    if (typeof siteNames === "string") {
+      siteProperties = computedConfigs.filterProperty('filename', siteNames);
+    } else if (siteNames instanceof Array) {
+      siteNames.forEach(function (_siteName) {
+        siteProperties = siteProperties.concat(computedConfigs.filterProperty('filename', _siteName));
+      }, this);
+    }
+    return siteProperties;
+  },
+
+
   /**
    * Cache of loaded configurations. This is useful in not loading
    * same configuration multiple times. It is populated in multiple
@@ -253,10 +273,12 @@ App.config = Em.Object.create({
           serviceConfigObj.displayName = configsPropertyDef ? configsPropertyDef.displayName : null;
           serviceConfigObj.options = configsPropertyDef ? configsPropertyDef.options : null;
           globalConfigs.push(serviceConfigObj);
-        } else if (!this.get('configMapping').computed().someProperty('name', index)) {
+        } else if (!this.getBySitename(serviceConfigObj.get('filename')).someProperty('name', index)) {
           isAdvanced = advancedConfigs.someProperty('name', index);
           serviceConfigObj.id = 'site property';
-          serviceConfigObj.displayType = stringUtils.isSingleLine(serviceConfigObj.value) ? 'advanced' : 'multiLine';
+          if (!configsPropertyDef) {
+            serviceConfigObj.displayType = stringUtils.isSingleLine(serviceConfigObj.value) ? 'advanced' : 'multiLine';
+          }
           serviceConfigObj.displayName = configsPropertyDef ? configsPropertyDef.displayName : index;
           this.calculateConfigProperties(serviceConfigObj, isAdvanced, advancedConfigs);
           configs.push(serviceConfigObj);
@@ -340,6 +362,8 @@ App.config = Em.Object.create({
         configData.value = stored.value;
         configData.defaultValue = stored.defaultValue;
         configData.overrides = stored.overrides;
+        configData.filename = stored.filename;
+        configData.description = stored.description;
       } else if (!preDefined && stored) {
         configData = {
           id: stored.id,
@@ -364,6 +388,7 @@ App.config = Em.Object.create({
           configData.value = advanced.value;
           configData.defaultValue = advanced.value;
           configData.filename = advanced.filename;
+          configData.description = advanced.description;
         }
       }
       mergedConfigs.push(configData);
@@ -869,7 +894,7 @@ App.config = Em.Object.create({
       "isVisible": true,
       "serviceName": "YARN",
       "filename": "capacity-scheduler.xml",
-      "category": "ResourceManager"
+      "category": "CapacityScheduler"
     }
   ],
 
@@ -957,17 +982,25 @@ App.config = Em.Object.create({
       case 'host':
         rez = value.trim();
         break;
+      case 'password':
+        break;
       case 'advanced':
         if(name == 'hive_jdbc_connection_url' || name == 'oozie_jdbc_connection_url') {
           rez = value.trim();
         }
-        break;
-      case 'password':
-        break;
       default:
-        rez = (value instanceof String) ? value.replace(/(\s+$)/g, '') : value;
+        rez = (typeof value == 'string') ? value.replace(/(\s+$)/g, '') : value;
     }
     return ((rez == '') || (rez == undefined)) ? value : rez;
+  },
+
+  OnNnHAHideSnn: function(ServiceConfig) {
+    var configCategories = ServiceConfig.get('configCategories');
+    var snCategory = configCategories.findProperty('name', 'SNameNode');
+    var activeNn = App.HDFSService.find('HDFS').get('activeNameNode.hostName');
+    if (snCategory && activeNn) {
+      configCategories.removeObject(snCategory);
+    }
   }
 
 });

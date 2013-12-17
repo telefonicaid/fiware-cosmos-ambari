@@ -30,15 +30,17 @@ define hdp-yarn::service(
   $security_enabled = $hdp::params::security_enabled
   
   if ($name == 'historyserver') {
-    $log_dir = "${hdp-yarn::params::mapred_log_dir_prefix}"
+    $log_dir = "${hdp-yarn::params::mapred_log_dir_prefix}/${user}"
     $pid_dir = "${hdp-yarn::params::mapred_pid_dir_prefix}/${user}"
     $daemon = "${hdp::params::mapred_bin}/mr-jobhistory-daemon.sh"
     $pid_file = "${pid_dir}/mapred-${user}-${name}.pid"
+    $job_summary_log = "${hdp-yarn::params::mapred_log_dir_prefix}/${user}/hadoop-mapreduce.jobsummary.log"
   } else {
-    $log_dir = "${hdp-yarn::params::yarn_log_dir_prefix}"
+    $log_dir = "${hdp-yarn::params::yarn_log_dir_prefix}/${user}"
     $pid_dir = "${hdp-yarn::params::yarn_pid_dir_prefix}/${user}"
     $daemon = "${hdp::params::yarn_bin}/yarn-daemon.sh"
     $pid_file = "${pid_dir}/yarn-${user}-${name}.pid"
+    $job_summary_log = "${hdp-yarn::params::yarn_log_dir_prefix}/${user}/hadoop-mapreduce.jobsummary.log"
   }
   
   $hadoop_libexec_dir = $hdp-yarn::params::hadoop_libexec_dir
@@ -63,12 +65,11 @@ define hdp-yarn::service(
     $daemon_cmd = undef
   }
  
- 
    if ($create_pid_dir == true) {
     hdp::directory_recursive_create { $pid_dir: 
       owner       => $user,
       context_tag => 'yarn_service',
-      service_state => $service_state,
+      service_state => $ensure,
       force => true
     }
   }
@@ -77,8 +78,13 @@ define hdp-yarn::service(
     hdp::directory_recursive_create { $log_dir: 
       owner       => $user,
       context_tag => 'yarn_service',
-      service_state => $service_state,
+      service_state => $ensure,
       force => true
+    }
+
+    file {$job_summary_log:
+      path => $job_summary_log,
+      owner => $user,
     }
   }
  
@@ -93,7 +99,7 @@ define hdp-yarn::service(
   anchor{"hdp-yarn::service::${name}::begin":}
   anchor{"hdp-yarn::service::${name}::end":}
   if ($daemon_cmd != undef) {
-    Anchor["hdp-yarn::service::${name}::begin"] -> Hdp::Directory_recursive_create<|title == $pid_dir or title == $log_dir|> -> Hdp::Exec[$daemon_cmd] -> Anchor["hdp-yarn::service::${name}::end"]
+    Anchor["hdp-yarn::service::${name}::begin"] -> Hdp::Directory_recursive_create<|title == $pid_dir or title == $log_dir|> -> File[$job_summary_log] -> Hdp::Exec[$daemon_cmd] -> Anchor["hdp-yarn::service::${name}::end"]
 
   }
   if ($ensure == 'running') {

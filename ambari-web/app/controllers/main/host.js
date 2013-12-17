@@ -24,6 +24,8 @@ App.MainHostController = Em.ArrayController.extend({
   name:'mainHostController',
   content: App.Host.find(),
 
+  clearFilters: null,
+
   alerts: function () {
     return App.router.get('clusterController.alerts').filterProperty('isOk', false).filterProperty('ignoredForHosts', false);
   }.property('App.router.clusterController.alerts.length'),
@@ -63,21 +65,7 @@ App.MainHostController = Em.ArrayController.extend({
       value: id,
       type: 'multiple'
     };
-
-    var filterConditions = App.db.getFilterConditions(this.get('name'));
-    if (filterConditions) {
-      var component = filterConditions.findProperty('iColumn', column);
-      if (component) {
-        component.value = id;
-      }
-      else {
-        filterConditions.push(filterForComponent);
-      }
-      App.db.setFilterConditions(this.get('name'), filterConditions);
-    }
-    else {
-      App.db.setFilterConditions(this.get('name'), [filterForComponent]);
-    }
+    App.db.setFilterConditions(this.get('name'), [filterForComponent]);
   },
   /**
    * On click callback for delete button

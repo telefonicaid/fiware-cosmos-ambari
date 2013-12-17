@@ -18,8 +18,14 @@
 
 package org.apache.ambari.server.controller.internal;
 
+import org.apache.ambari.server.AmbariException;
+import org.apache.ambari.server.Role;
 import org.apache.ambari.server.configuration.ComponentSSLConfiguration;
 import org.apache.ambari.server.controller.AmbariServer;
+import org.apache.ambari.server.controller.HostRequest;
+import org.apache.ambari.server.controller.HostResponse;
+import org.apache.ambari.server.controller.ServiceComponentHostRequest;
+import org.apache.ambari.server.controller.ServiceComponentHostResponse;
 import org.apache.ambari.server.controller.ganglia.GangliaComponentPropertyProvider;
 import org.apache.ambari.server.controller.ganglia.GangliaHostComponentPropertyProvider;
 import org.apache.ambari.server.controller.ganglia.GangliaHostPropertyProvider;
@@ -34,7 +40,10 @@ import org.apache.ambari.server.controller.AmbariManagementController;
 import com.google.inject.Inject;
 import org.apache.ambari.server.controller.utilities.StreamProvider;
 import org.apache.ambari.server.state.DesiredConfig;
+import org.apache.ambari.server.state.HostState;
 import org.apache.ambari.server.state.Service;
+import org.apache.ambari.server.state.State;
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,12 +71,16 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
     HashMap<Service.Type, Map<String, String>>();
   private static final Map<String, Service.Type> componentServiceMap = new
     HashMap<String, Service.Type>();
-
+  
+  private static final Map<String, Map<String, String>> jmxDesiredProperties = new HashMap<String, Map<String,String>>();
+  private volatile Map<String, String> clusterCoreSiteConfigVersionMap = new HashMap<String, String>();
+  private volatile Map<String, String> clusterJmxProtocolMap = new HashMap<String, String>();
+  
   static {
     serviceConfigTypes.put(Service.Type.HDFS, "hdfs-site");
     serviceConfigTypes.put(Service.Type.MAPREDUCE, "mapred-site");
     serviceConfigTypes.put(Service.Type.HBASE, "hbase-site");
-
+ 
     componentServiceMap.put("NAMENODE", Service.Type.HDFS);
     componentServiceMap.put("DATANODE", Service.Type.HDFS);
     componentServiceMap.put("JOBTRACKER", Service.Type.MAPREDUCE);
@@ -85,6 +98,10 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
     initPropMap = new HashMap<String, String>();
     initPropMap.put("HBASE_MASTER", "hbase.master.info.port");
     serviceDesiredProperties.put(Service.Type.HBASE, initPropMap);
+    
+    initPropMap = new HashMap<String, String>();
+    initPropMap.put("NAMENODE", "hadoop.ssl.enabled");
+    jmxDesiredProperties.put("NAMENODE", initPropMap);
   }
 
   /**
@@ -230,6 +247,69 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
   public String getGangliaCollectorHostName(String clusterName) throws SystemException {
     checkInit();
     return clusterGangliaCollectorMap.get(clusterName);
+  }
+  
+  @Override
+  public boolean isGangliaCollectorHostLive(String clusterName) throws SystemException {
+    
+    HostResponse gangliaCollectorHost = null;
+    
+    try {
+      HostRequest hostRequest = new HostRequest(null, clusterName, Collections.<String, String>emptyMap());
+      Set<HostResponse> hosts = managementController.getHosts(Collections.singleton(hostRequest));
+      
+      final String gangliaCollectorHostName = getGangliaCollectorHostName(clusterName);
+      
+      gangliaCollectorHost = (HostResponse) CollectionUtils.find(hosts, new org.apache.commons.collections.Predicate() {
+        
+        @Override
+        public boolean evaluate(Object hostResponse) {
+          return ((HostResponse) hostResponse).getHostname().equals(gangliaCollectorHostName);
+        }
+      });
+    } catch (AmbariException e) {
+      LOG.debug("Error checking of Ganglia server host live status: ", e);
+      return false;
+    }
+    
+    //Cluster without Ganglia
+    if (gangliaCollectorHost == null)
+      return false;
+
+    return !gangliaCollectorHost.getHostState().equals(HostState.HEARTBEAT_LOST.name());
+  }
+  
+  @Override
+  public boolean isGangliaCollectorComponentLive(String clusterName) throws SystemException {
+
+
+    ServiceComponentHostResponse gangliaCollectorHostComponent = null;
+    
+    try {
+      final String gangliaCollectorHostName = getGangliaCollectorHostName(clusterName);
+      ServiceComponentHostRequest componentRequest = new ServiceComponentHostRequest(clusterName, "GANGLIA",
+                                                                                     Role.GANGLIA_SERVER.name(),
+                                                                                     gangliaCollectorHostName,
+                                                                                     Collections.<String, String>emptyMap(), null);
+      
+      Set<ServiceComponentHostResponse> hostComponents = managementController.getHostComponents(Collections.singleton(componentRequest));
+       gangliaCollectorHostComponent = (ServiceComponentHostResponse) CollectionUtils.find(hostComponents,
+           new org.apache.commons.collections.Predicate() {
+        @Override
+        public boolean evaluate(Object arg0) {
+          return ((ServiceComponentHostResponse) arg0).getHostname().equals(gangliaCollectorHostName);
+        }
+      });
+    } catch (AmbariException e) {
+      LOG.debug("Error checking of Ganglia server host component state: ", e);
+      return false;
+    }
+    
+    //Cluster without Ganglia
+    if (gangliaCollectorHostComponent == null)
+      return false;
+    
+    return gangliaCollectorHostComponent.getLiveState().equals(State.STARTED.name());
   }
 
 
@@ -643,4 +723,50 @@ public abstract class AbstractProviderModule implements ProviderModule, Resource
 
     return new VersioningPropertyProvider(clusterVersionsMap, providers, lastProvider, clusterNamePropertyId);
   }
+  
+  @Override
+  public String getJMXProtocol(String clusterName, String componentName) {
+    String jmxProtocolString = clusterJmxProtocolMap.get(clusterName);
+    try {
+      String newCoreSiteConfigVersion = getDesiredConfigVersion(clusterName, "core-site");
+      String cachedCoreSiteConfigVersion = clusterCoreSiteConfigVersionMap.get(clusterName);
+      if (!newCoreSiteConfigVersion.equals(cachedCoreSiteConfigVersion)) {
+        clusterCoreSiteConfigVersionMap.put(clusterName, newCoreSiteConfigVersion);
+        
+        // Getting protocolMap for NAMENODE as it is the same property hadoop.ssl.enabled for all components
+        Map<String, String> protocolMap = getDesiredConfigMap(
+            clusterName,
+            newCoreSiteConfigVersion, "core-site",
+            jmxDesiredProperties.get("NAMENODE")); 
+        jmxProtocolString = getJMXProtocolString(protocolMap.get("NAMENODE"), componentName);
+        clusterJmxProtocolMap.put(clusterName, jmxProtocolString);
+      }
+
+    } catch (Exception e) {
+      LOG.error("Exception while detecting JMX protocol for clusterName = " + clusterName +
+          ", componentName = " + componentName,  e);
+      LOG.error("Defaulting JMX to HTTP protocol for  for clusterName = " + clusterName +
+          ", componentName = " + componentName +
+          componentName);
+      jmxProtocolString = "http";
+    }
+    if (jmxProtocolString == null) {
+      LOG.error("Detected JMX protocol is null for clusterName = " + clusterName +
+          ", componentName = " + componentName);
+      LOG.error("Defaulting JMX to HTTP protocol for  for clusterName = " + clusterName +
+          ", componentName = " + componentName +
+          componentName);
+      jmxProtocolString = "http";
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("JMXProtocol = " + jmxProtocolString + ", for clusterName=" + clusterName +
+          ", componentName = " + componentName);
+    }
+    return jmxProtocolString;
+  }
+
+  private String getJMXProtocolString(String value, String componentName) {
+    return Boolean.valueOf(value) ? "https" : "http";
+  }
+  
 }

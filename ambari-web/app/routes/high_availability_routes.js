@@ -35,14 +35,47 @@ module.exports = Em.Route.extend({
         showFooter: false,
         secondary: null,
         hideCloseButton: function () {
-          this.set('showCloseButton', App.router.get('highAvailabilityWizardController.currentStep') < 5);
+          var currStep = App.router.get('highAvailabilityWizardController.currentStep');
+          switch (currStep) {
+            case "5" :
+            case "7" :
+            case "9" :
+              if(App.supports.autoRollbackHA){
+                this.set('showCloseButton', false);
+              }else{
+                this.set('showCloseButton', true);
+              }
+              break;
+            default :
+              this.set('showCloseButton', true);
+          }
         }.observes('App.router.highAvailabilityWizardController.currentStep'),
 
         onClose: function () {
-          this.hide();
-          App.router.get('highAvailabilityWizardController').setCurrentStep('1');
-          App.router.get('updateController').set('isWorking', true);
-          App.router.transitionTo('main.admin.adminHighAvailability');
+          var currStep = App.router.get('highAvailabilityWizardController.currentStep');
+          var highAvailabilityProgressPageController = App.router.get('highAvailabilityProgressPageController');
+          if (currStep == "6" && App.supports.autoRollbackHA){
+            highAvailabilityProgressPageController.tasks.push({
+              command: "startZooKeeperServers",
+              status: "FAILED"
+            })
+            highAvailabilityProgressPageController.rollback();
+          }else if(currStep == "8" && App.supports.autoRollbackHA){
+            highAvailabilityProgressPageController.tasks.push({
+              command: "startSecondNameNode",
+              status: "FAILED"
+            })
+            highAvailabilityProgressPageController.rollback();
+          }else{
+            if(parseInt(currStep) > 4 && !App.supports.autoRollbackHA){
+              highAvailabilityProgressPageController.manualRollback();
+            }else {
+              this.hide();
+              App.router.get('highAvailabilityWizardController').setCurrentStep('1');
+              App.router.get('updateController').set('isWorking', true);
+              App.router.transitionTo('main.admin.adminHighAvailability');
+            }
+          }
         },
         didInsertElement: function () {
           this.fitHeight();
@@ -147,6 +180,8 @@ module.exports = Em.Route.extend({
       return false;
     },
     next: function (router) {
+      var controller = router.get('highAvailabilityWizardController');
+      controller.clearTasksData();
       router.transitionTo('step5');
     }
   }),
@@ -166,6 +201,8 @@ module.exports = Em.Route.extend({
       return false;
     },
     next: function (router) {
+      var controller = router.get('highAvailabilityWizardController');
+      controller.clearTasksData();
       router.transitionTo('step6');
     }
   }),
@@ -176,6 +213,12 @@ module.exports = Em.Route.extend({
       var controller = router.get('highAvailabilityWizardController');
       controller.setCurrentStep('6');
       controller.setLowerStepsDisable(6);
+      App.clusterStatus.setClusterStatus({
+        clusterName: this.get('content.cluster.name'),
+        clusterState: 'HIGH_AVAILABILITY_DEPLOY',
+        wizardControllerName: this.get('content.controllerName'),
+        localdb: App.db.data
+      });
       controller.dataLoading().done(function () {
         controller.loadAllPriorSteps();
         controller.connectOutlet('highAvailabilityWizardStep6',  controller.get('content'));
@@ -204,6 +247,8 @@ module.exports = Em.Route.extend({
       return false;
     },
     next: function (router) {
+      var controller = router.get('highAvailabilityWizardController');
+      controller.clearTasksData();
       router.transitionTo('step8');
     }
   }),
@@ -214,6 +259,12 @@ module.exports = Em.Route.extend({
       var controller = router.get('highAvailabilityWizardController');
       controller.setCurrentStep('8');
       controller.setLowerStepsDisable(8);
+      App.clusterStatus.setClusterStatus({
+        clusterName: this.get('content.cluster.name'),
+        clusterState: 'HIGH_AVAILABILITY_DEPLOY',
+        wizardControllerName: this.get('content.controllerName'),
+        localdb: App.db.data
+      });
       controller.dataLoading().done(function () {
         controller.loadAllPriorSteps();
         controller.connectOutlet('highAvailabilityWizardStep8',  controller.get('content'));
@@ -223,7 +274,9 @@ module.exports = Em.Route.extend({
       return false;
     },
     next: function (router) {
-      router.transitionTo('step9');
+      App.showConfirmationPopup(function() {
+        router.transitionTo('step9');
+      }, Em.I18n.t('admin.highAvailability.wizard.step8.confirmPopup.body'));
     }
   }),
 
@@ -243,7 +296,9 @@ module.exports = Em.Route.extend({
     },
     next: function (router) {
       var controller = router.get('highAvailabilityWizardController');
+      controller.clearTasksData();
       controller.finish();
+      controller.clearStorageData();
       controller.get('popup').hide();
       App.clusterStatus.setClusterStatus({
         clusterName: controller.get('content.cluster.name'),
@@ -252,6 +307,7 @@ module.exports = Em.Route.extend({
         localdb: App.db.data
       });
       router.transitionTo('main.index');
+      location.reload();
     }
   }),
 

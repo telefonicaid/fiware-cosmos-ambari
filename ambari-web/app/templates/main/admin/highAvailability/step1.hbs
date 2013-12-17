@@ -25,12 +25,14 @@
     </div>
   </div>
 
-  <div {{bindAttr class=":control-group view.showInputError:error :form-horizontal :nameserviceid-input"}} rel="popover" {{translateAttr title="admin.highAvailability.wizard.step1.nameserviceid.tooltip.title"
-       data-content="admin.highAvailability.wizard.step1.nameserviceid.tooltip.content"}}>
+  <div {{bindAttr class=":control-group view.showInputError:error :form-horizontal :nameserviceid-input"}}>
     <label class="control-label">{{t admin.highAvailability.wizard.step1.nameserviceid}}:</label>
 
     <div class="controls">
       {{view Ember.TextField valueBinding="content.nameServiceId"}}
+      <span  {{bindAttr class=":help-inline view.showInputError::hidden"}}>
+        {{t admin.highAvailability.wizard.step1.nameserviceid.error}}
+      </span>
     </div>
   </div>
   <div class="btn-area">

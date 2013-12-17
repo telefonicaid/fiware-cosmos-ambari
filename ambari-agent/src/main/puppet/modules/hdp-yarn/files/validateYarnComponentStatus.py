@@ -19,7 +19,7 @@ limitations under the License.
 '''
 
 import optparse
-import urllib2, urllib
+import subprocess
 import json
 
 RESOURCEMANAGER = 'rm'
@@ -30,15 +30,22 @@ STARTED_STATE = 'STARTED'
 RUNNING_STATE = 'RUNNING'
 
 #Return reponse for given path and address
-def getResponse(path, address):
+def getResponse(path, address, ssl_enabled):
 
-  try:
+  command = "curl"
+  httpGssnegotiate = "--negotiate"
+  userpswd = "-u:"
+  insecure = "-k"# This is smoke test, no need to check CA of server
+  if ssl_enabled:
+    url = 'https://' + address + path
+  else:
     url = 'http://' + address + path
-    opener = urllib2.build_opener()
-    urllib2.install_opener(opener)
-    request = urllib2.Request(url)
-    handler = urllib2.urlopen(request)
-    response = json.loads(handler.read())
+      
+  command_with_flags = [command,httpGssnegotiate,userpswd,insecure,url]
+  try:
+    proc = subprocess.Popen(command_with_flags, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (stdout, stderr) = proc.communicate()
+    response = json.loads(stdout)
     if response == None:
       print 'There is no response for url: ' + str(url)
       exit(1)
@@ -48,10 +55,10 @@ def getResponse(path, address):
     exit(1)
 
 #Verify that REST api is available for given component
-def validateAvailability(component, path, address):
+def validateAvailability(component, path, address, ssl_enabled):
 
   try:
-    response = getResponse(path, address)
+    response = getResponse(path, address, ssl_enabled)
     is_valid = validateAvailabilityResponse(component, response)
     if not is_valid:
       exit(1)
@@ -89,10 +96,10 @@ def validateAvailabilityResponse(component, response):
     return False
 
 #Verify that component has required resources to work
-def validateAbility(component, path, address):
+def validateAbility(component, path, address, ssl_enabled):
 
   try:
-    response = getResponse(path, address)
+    response = getResponse(path, address, ssl_enabled)
     is_valid = validateAbilityResponse(component, response)
     if not is_valid:
       exit(1)
@@ -131,12 +138,14 @@ def validateAbilityResponse(component, response):
 def main():
   parser = optparse.OptionParser(usage="usage: %prog [options] component ")
   parser.add_option("-p", "--port", dest="address", help="Host:Port for REST API of a desired component")
+  parser.add_option("-s", "--ssl", dest="ssl_enabled", help="Is SSL enabled for UI of component")
 
   (options, args) = parser.parse_args()
 
   component = args[0]
   
   address = options.address
+  ssl_enabled = (options.ssl_enabled) in 'true'
   if component == RESOURCEMANAGER:
     path = '/ws/v1/cluster/info'
   elif component == NODEMANAGER:
@@ -146,11 +155,11 @@ def main():
   else:
     parser.error("Invalid component")
 
-  validateAvailability(component, path, address)
+  validateAvailability(component, path, address, ssl_enabled)
 
   if component == RESOURCEMANAGER:
     path = '/ws/v1/cluster/nodes'
-    validateAbility(component, path, address)
+    validateAbility(component, path, address, ssl_enabled)
 
 if __name__ == "__main__":
   main()

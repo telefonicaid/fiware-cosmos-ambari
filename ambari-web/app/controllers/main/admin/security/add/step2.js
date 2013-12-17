@@ -142,8 +142,7 @@ App.MainAdminSecurityAddStep2Controller = Em.Controller.extend({
         securityUsers.pushObject({id: 'puppet var', name: 'hive_user', value: 'hive'});
         securityUsers.pushObject({id: 'puppet var', name: 'smokeuser', value: 'ambari-qa'});
       } else {
-        App.router.get('mainAdminSecurityController').setSecurityStatus();
-        securityUsers = App.router.get('mainAdminSecurityController').get('serviceUsers');
+        securityUsers = App.db.getSecureUserInfo();
       }
     }
     this.set('securityUsers', securityUsers);
@@ -233,8 +232,8 @@ App.MainAdminSecurityAddStep2Controller = Em.Controller.extend({
       var jnHosts = hdfsService.configs.findProperty('name', 'journalnode_hosts');
       var snComponent = App.Service.find('HDFS').get('hostComponents').findProperty('componentName', 'SECONDARY_NAMENODE');
       var jnComponent = App.Service.find('HDFS').get('hostComponents').findProperty('componentName', 'JOURNALNODE');
-      if (namenodeHost && sNamenodeHost) {
-        namenodeHost.defaultValue = App.Service.find('HDFS').get('hostComponents').findProperty('componentName', 'NAMENODE').get('host.hostName');
+      if (namenodeHost) {
+        namenodeHost.defaultValue = App.Service.find('HDFS').get('hostComponents').filterProperty('componentName', 'NAMENODE').mapProperty('host.hostName');
       }
       if(sNamenodeHost && snComponent) {
         sNamenodeHost.defaultValue = snComponent.get('host.hostName');
@@ -268,35 +267,22 @@ App.MainAdminSecurityAddStep2Controller = Em.Controller.extend({
   changeCategoryOnHa: function (serviceConfigs, stepConfigs) {
     var hdfsService = serviceConfigs.findProperty('serviceName', 'HDFS');
     if (hdfsService) {
-      var hdfsProperties = stepConfigs.findProperty('serviceName','HDFS').get('configs');
+      var hdfsProperties = stepConfigs.findProperty('serviceName', 'HDFS').get('configs');
       var configCategories = hdfsService.configCategories;
-      var dfsHttpPrincipal = hdfsProperties.findProperty('name', 'hadoop_http_principal_name');
-      var dfsHttpKeytab = hdfsProperties.findProperty('name', 'hadoop_http_keytab');
       if ((App.testMode && App.testNameNodeHA) || (this.get('content.isNnHa') === 'true')) {
-        if (dfsHttpPrincipal && dfsHttpKeytab) {
-          dfsHttpPrincipal.set('category','NameNode');
-          dfsHttpKeytab.set('category','NameNode');
-        } else {
-          dfsHttpPrincipal.set('category','General');
-          dfsHttpKeytab.set('category','General');
-        }
-        hdfsProperties.filterProperty('category','SNameNode').forEach(function(_snConfig){
-          _snConfig.set('isVisible',false);
-        },this);
-        var generalCategory = configCategories.findProperty('name','General');
-        var snCategory = configCategories.findProperty('name','SNameNode');
-        if(generalCategory) {
-          configCategories.removeObject(generalCategory);
-        }
-        if(snCategory) {
+        hdfsProperties.filterProperty('category', 'SNameNode').forEach(function (_snConfig) {
+          _snConfig.set('isVisible', false);
+        }, this);
+        var snCategory = configCategories.findProperty('name', 'SNameNode');
+        if (snCategory) {
           configCategories.removeObject(snCategory);
         }
       } else {
-        hdfsProperties.filterProperty('category','JournalNode').forEach(function(_jnConfig){
-          _jnConfig.set('isVisible',false);
-        },this);
-        var jnCategory = configCategories.findProperty('name','JournalNode');
-        if(jnCategory) {
+        hdfsProperties.filterProperty('category', 'JournalNode').forEach(function (_jnConfig) {
+          _jnConfig.set('isVisible', false);
+        }, this);
+        var jnCategory = configCategories.findProperty('name', 'JournalNode');
+        if (jnCategory) {
           configCategories.removeObject(jnCategory);
         }
       }
