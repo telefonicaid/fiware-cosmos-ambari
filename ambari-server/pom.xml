@@ -16,7 +16,7 @@
   <parent>
     <groupId>es.tid.cosmos.ambari</groupId>
     <artifactId>ambari-project</artifactId>
-    <version>0.14.0</version>
+    <version>0.14.1</version>
     <relativePath>../ambari-project</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
@@ -24,7 +24,7 @@
   <artifactId>ambari-server</artifactId>
   <packaging>jar</packaging>
   <name>Ambari Server</name>
-  <version>0.14.0</version>
+  <version>0.14.1</version>
   <description>Ambari Server</description>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
