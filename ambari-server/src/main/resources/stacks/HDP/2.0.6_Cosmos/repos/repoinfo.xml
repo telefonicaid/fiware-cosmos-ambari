@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+  ~ Telefónica Digital - Product Development and Innovation
+  ~
+  ~ THIS CODE AND INFORMATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND,
+  ~ EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
+  ~ WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
+  ~
+  ~ Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
+  ~ All rights reserved.
+  -->
+<reposinfo>
+  <os type="centos6">
+    <repo>
+      <baseurl>http://cosmos10.hi.inet/develenv/rpms/cosmos-deps/hortonworks/HDP-2.0.6.0/</baseurl>
+      <repoid>HDP-2.0.6</repoid>
+      <reponame>HDP</reponame>
+    </repo>
+  </os>
+</reposinfo>
