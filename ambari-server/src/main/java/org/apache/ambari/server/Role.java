@@ -87,5 +87,6 @@ public enum Role {
   ZKFC,
   // Cosmos specific
   USER_MASTER_MANAGER,
-  USER_SLAVE_MANAGER
+  USER_SLAVE_MANAGER,
+  INFINITY_HFS_DRIVER
 }
