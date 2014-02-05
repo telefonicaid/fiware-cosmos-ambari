@@ -15,7 +15,7 @@ class infinityfs_driver($service_state) {
     default => $infinityfs_driver::params::install_ensure,
   }
 
-  package { 'infinitfs':
+  package { 'infinityfs':
     ensure => $ensure
   }
 }
