@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  ~ Telefónica Digital - Product Development and Innovation
+  ~
+  ~ THIS CODE AND INFORMATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND,
+  ~ EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
+  ~ WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
+  ~
+  ~ Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
+  ~ All rights reserved.
+  -->
+<metainfo>
+    <user>root</user>
+    <comment>Infinity HFS Driver</comment>
+    <version>0.1.0</version>
+
+    <components>
+        <component>
+            <name>INFINITY_HFS_DRIVER</name>
+            <category>CLIENT</category>
+        </component>
+    </components>
+</metainfo>

@@ -20,6 +20,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider :virtualbox do |vb|
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
     vb.customize ["modifyvm", :id, "--cpus", "2"]
+    vb.memory = 700
   end
 
   $repo_path = "/etc/yum.repos.d/EPEL-Repo-PDI.repo"

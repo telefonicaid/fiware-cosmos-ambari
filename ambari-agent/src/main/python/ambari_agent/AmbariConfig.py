@@ -78,7 +78,8 @@ imports = [
   "hdp-monitor-webserver/manifests/*.pp",
   "hdp-repos/manifests/*.pp",
   # Cosmos specific
-  "cosmos_user/manifests/*.pp"
+  "cosmos_user/manifests/*.pp",
+  "infinityfs_driver/manifests/*.pp"
 ]
 
 rolesToClass = {
@@ -142,7 +143,8 @@ rolesToClass = {
   'ZKFC': 'hdp-hadoop::zkfc',
   #Cosmos specific
   'USER_MASTER_MANAGER': 'cosmos_user::user_master_manager',
-  'USER_SLAVE_MANAGER': 'cosmos_user::user_slave_manager'
+  'USER_SLAVE_MANAGER': 'cosmos_user::user_slave_manager',
+  'INFINITY_HFS_DRIVER': 'infinityfs_driver'
 }
 
 serviceStates = {
