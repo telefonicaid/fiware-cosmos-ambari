@@ -1,18 +1,28 @@
-require 'pathname'
-dir = Pathname.new(__FILE__).parent
-$LOAD_PATH.unshift(dir, dir + 'lib', dir + '../lib')
+dir = File.expand_path(File.dirname(__FILE__))
+$LOAD_PATH.unshift File.join(dir, 'lib')
 
-require 'mocha'
+# Don't want puppet getting the command line arguments for rake or autotest
+ARGV.clear
+
 require 'puppet'
-gem 'rspec', '=1.2.9'
-require 'spec/autorun'
+require 'facter'
+require 'mocha'
+gem 'rspec', '>=2.0.0'
+require 'rspec/expectations'
 
-Spec::Runner.configure do |config|
-    config.mock_with :mocha
-end
+require 'puppetlabs_spec_helper/module_spec_helper'
 
-# We need this because the RAL uses 'should' as a method.  This
-# allows us the same behaviour but with a different method name.
-class Object
-    alias :must :should
+RSpec.configure do |config|
+  # FIXME REVISIT - We may want to delegate to Facter like we do in
+  # Puppet::PuppetSpecInitializer.initialize_via_testhelper(config) because
+  # this behavior is a duplication of the spec_helper in Facter.
+  config.before :each do
+    # Ensure that we don't accidentally cache facts and environment between
+    # test cases.  This requires each example group to explicitly load the
+    # facts being exercised with something like
+    # Facter.collection.loader.load(:ipaddress)
+    Facter::Util::Loader.any_instance.stubs(:load_all)
+    Facter.clear
+    Facter.clear_messages
+  end
 end
