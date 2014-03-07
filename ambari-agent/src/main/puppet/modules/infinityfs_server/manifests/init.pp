@@ -8,5 +8,16 @@
 # All rights reserved.
 
 class infinityfs_server($service_state) {
-  include infinityfs_server::params
+  include firewall,
+    infinityfs_server::params,
+    infinityfs_server::firewall::firewall_pre,
+    infinityfs_server::firewall::firewall_app
+
+  resources { "firewall":
+    purge => true
+  }
+
+  Class['infinityfs_server::firewall::firewall_pre'] 
+    -> Class['Firewall']
+    -> Class['infinityfs_server::firewall::firewall_app']
 }
