@@ -80,6 +80,7 @@ imports = [
   # Cosmos specific
   "cosmos_user/manifests/*.pp",
   "infinityfs_driver/manifests/*.pp"
+  "infinityfs_server/manifests/*.pp"
 ]
 
 rolesToClass = {
