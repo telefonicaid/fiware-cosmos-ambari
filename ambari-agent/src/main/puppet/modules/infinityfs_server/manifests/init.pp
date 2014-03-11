@@ -17,8 +17,10 @@ class infinityfs_server($service_state) {
         -> Class['infinityfs_server::config']
         -> anchor {'infinityfs_server::end': }
     }
-    'running' :                  {
-      include infinityfs_server::service
+    'running', 'stopped' :       {
+      class { 'infinityfs_server::service':
+        service_state => $service_state
+      }
       anchor {'infinityfs_server::begin' :}
         -> Class['infinityfs_server::service']
         -> anchor {'infinityfs_server::end': }

@@ -8,10 +8,7 @@
 # All rights reserved.
 
 class infinityfs_server::package {
-  include firewall,
-    infinityfs_server::params,
-    infinityfs_server::firewall::firewall_pre,
-    infinityfs_server::firewall::firewall_app
+  include infinityfs_server::params, infinityfs_server::firewall::firewall_pre
 
   notice("Installing Infinity Server")
 
@@ -21,7 +18,5 @@ class infinityfs_server::package {
 
   anchor {'infinityfs_server::package::begin': }
     -> Class['infinityfs_server::firewall::firewall_pre']
-    -> Class['Firewall']
-    -> Class['infinityfs_server::firewall::firewall_app']
     anchor {'infinityfs_server::package::end': }
 }

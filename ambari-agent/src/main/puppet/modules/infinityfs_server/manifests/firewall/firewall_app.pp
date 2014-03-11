@@ -12,7 +12,7 @@
 class infinityfs_server::firewall::firewall_app {
   include infinityfs_server::params
 
-  firewall { "99 HDFS blocked":
+  firewall { "999 HDFS blocked":
     dport  => $infinityfs_server::params::blocked_ports,
     proto  => tcp,
     action => drop
