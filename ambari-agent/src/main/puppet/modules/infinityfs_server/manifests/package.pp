@@ -16,6 +16,10 @@ class infinityfs_server::package {
     purge => true
   }
 
+  package { 'infinity-server':
+    ensure => installed
+  }
+
   anchor {'infinityfs_server::package::begin': }
     -> Class['infinityfs_server::firewall::firewall_pre']
     anchor {'infinityfs_server::package::end': }
