@@ -8,16 +8,20 @@
 # All rights reserved.
 
 class infinityfs_server($service_state) {
-  include firewall,
-    infinityfs_server::params,
-    infinityfs_server::firewall::firewall_pre,
-    infinityfs_server::firewall::firewall_app
 
-  resources { "firewall":
-    purge => true
+  case $service_state {
+    'installed_and_configured' : {
+      include infinityfs_server::package, infinityfs_server::config
+      anchor {'infinityfs_server::begin' :}
+        -> Class['infinityfs_server::package']
+        -> Class['infinityfs_server::config']
+        -> anchor {'infinityfs_server::end': }
+    }
+    'running' :                  {
+      include infinityfs_server::service
+      anchor {'infinityfs_server::begin' :}
+        -> Class['infinityfs_server::service']
+        -> anchor {'infinityfs_server::end': }
+    }
   }
-
-  Class['infinityfs_server::firewall::firewall_pre'] 
-    -> Class['Firewall']
-    -> Class['infinityfs_server::firewall::firewall_app']
 }
