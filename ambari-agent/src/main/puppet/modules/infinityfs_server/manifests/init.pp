@@ -8,5 +8,22 @@
 # All rights reserved.
 
 class infinityfs_server($service_state) {
-  include infinityfs_server::params
+
+  case $service_state {
+    'installed_and_configured' : {
+      include infinityfs_server::package, infinityfs_server::config
+      anchor {'infinityfs_server::begin' :}
+        -> Class['infinityfs_server::package']
+        -> Class['infinityfs_server::config']
+        -> anchor {'infinityfs_server::end': }
+    }
+    'running', 'stopped' :       {
+      class { 'infinityfs_server::service':
+        service_state => $service_state
+      }
+      anchor {'infinityfs_server::begin' :}
+        -> Class['infinityfs_server::service']
+        -> anchor {'infinityfs_server::end': }
+    }
+  }
 }
