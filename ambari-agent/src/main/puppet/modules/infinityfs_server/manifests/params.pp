@@ -8,6 +8,11 @@
 # All rights reserved.
 
 class infinityfs_server::params (
+  $basedir         = '/opt/pdi-cosmos',
   $blocked_ports   = [8020, 9000, 50010, 50020, 50070, 50075],
   $allowed_sources = $hdp::params::all_hosts
-) inherits hdp::params {}
+) inherits hdp::params {
+  $confdir = "${basedir}/etc"
+  $vardir  = "${basedir}/var"
+  $logdir  = "${vardir}/log"
+}

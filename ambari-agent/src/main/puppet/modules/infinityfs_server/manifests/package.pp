@@ -16,9 +16,15 @@ class infinityfs_server::package {
     purge => true
   }
 
+  file { $cosmos::params::cosmos_basedir:
+    ensure => 'directory',
+  }
+
   package { 'infinity-server':
     ensure => installed
   }
+
+  File[$cosmos::params::cosmos_basedir] -> Package['infinity-server']
 
   anchor {'infinityfs_server::package::begin': }
     -> Class['infinityfs_server::firewall::firewall_pre']
