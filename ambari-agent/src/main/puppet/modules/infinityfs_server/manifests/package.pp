@@ -16,7 +16,7 @@ class infinityfs_server::package {
     purge => true
   }
 
-  package { 'infinity-server':
+  package { $infinityfs_server::params::package_and_service_name:
     ensure => installed
   }
 

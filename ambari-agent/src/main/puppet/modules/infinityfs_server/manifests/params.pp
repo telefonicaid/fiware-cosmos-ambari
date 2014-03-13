@@ -10,4 +10,6 @@
 class infinityfs_server::params (
   $blocked_ports   = [8020, 9000, 50010, 50020, 50070, 50075],
   $allowed_sources = $hdp::params::all_hosts
-) inherits hdp::params {}
+) inherits hdp::params {
+  $package_and_service_name = 'infinity-server'
+}

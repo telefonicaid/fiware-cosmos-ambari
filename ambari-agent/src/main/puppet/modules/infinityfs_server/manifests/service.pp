@@ -16,8 +16,13 @@ class infinityfs_server::service($service_state) {
     ensure => $service_state
   }
 
+  service { $infinityfs_server::params::package_and_service_name :
+    ensure => $service_state
+  }
+
   anchor {'infinityfs_server::service::begin': }
     -> Class['firewall']
     -> Class['infinityfs_server::firewall::firewall_app']
+    -> Service[$infinityfs_server::params::package_and_service_name]
     anchor {'infinityfs_server::service::end': }
 }
