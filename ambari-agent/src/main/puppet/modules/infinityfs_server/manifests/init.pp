@@ -11,10 +11,9 @@ class infinityfs_server($service_state) {
 
   case $service_state {
     'installed_and_configured' : {
-      include infinityfs_server::package, infinityfs_server::config
+      include infinityfs_server::package
       anchor {'infinityfs_server::begin' :}
         -> Class['infinityfs_server::package']
-        -> Class['infinityfs_server::config']
         -> anchor {'infinityfs_server::end': }
     }
     'running', 'stopped' :       {
