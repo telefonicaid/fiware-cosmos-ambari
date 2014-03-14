@@ -18,18 +18,25 @@ class infinityfs_server::firewall::firewall_app {
     action => drop
   }
 
+  firewall { '100 HDFS allowed for localhost':
+    dport  => $infinityfs_server::params::blocked_ports,
+    proto  => tcp,
+    action => accept,
+    source => '127.0.0.1',
+  }
+
   hdfs_allowed_source { $infinityfs_server::params::allowed_sources:
     all_allowed_sources => $infinityfs_server::params::allowed_sources
   }
 
   define hdfs_allowed_source($all_allowed_sources) {
     # Template trick to get array index for $all_allowed_sources element
-    $index = 100 + inline_template('<%= all_allowed_sources.index(name) %>')
+    $index = 101 + inline_template('<%= all_allowed_sources.index(name) %>')
     firewall { "${index} HDFS allowed for ${name}":
      dport  => $infinityfs_server::params::blocked_ports,
      proto  => tcp,
      action => accept,
      source => $name,
-   }
+    }
   }
 }
