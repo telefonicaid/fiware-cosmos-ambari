@@ -80,7 +80,9 @@ imports = [
   # Cosmos specific
   "cosmos_user/manifests/*.pp",
   "infinityfs_driver/manifests/*.pp",
-  "infinityfs_server/manifests/*.pp"
+  "infinityfs_server/manifests/*.pp",
+  "infinityfs_server/manifests/master/*.pp",
+  "infinityfs_server/manifests/slave/*.pp"
 ]
 
 rolesToClass = {
@@ -146,7 +148,8 @@ rolesToClass = {
   'USER_MASTER_MANAGER': 'cosmos_user::user_master_manager',
   'USER_SLAVE_MANAGER': 'cosmos_user::user_slave_manager',
   'INFINITY_HFS_DRIVER': 'infinityfs_driver',
-  'INFINITY_HFS_SERVER': 'infinityfs_server'
+  'INFINITY_HFS_SERVER_MASTER': 'infinityfs_server::master',
+  'INFINITY_HFS_SERVER_SLAVE': 'infinityfs_server::slave'
 }
 
 serviceStates = {

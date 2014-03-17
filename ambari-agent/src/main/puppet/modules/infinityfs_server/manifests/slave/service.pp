@@ -7,22 +7,26 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinityfs_server::service($service_state) {
-  include infinityfs_server::firewall::firewall_app
+class infinityfs_server::slave::service($service_state) {
+  include infinityfs_server::params
 
-  notice("Starting Infinity Server")
+  notice("Starting Infinity Nginx Proxy Server")
 
   class { 'firewall':
     ensure => $service_state
   }
 
-  service { $infinityfs_server::params::package_and_service_name :
+  class { 'infinityfs_server::firewall::firewall_app' :
+      blocked_ports => $infinityfs_server::params::blocked_ports_slave
+  }
+
+  service { $infinityfs_server::params::package_and_service_name_slave :
     ensure => $service_state
   }
 
-  anchor {'infinityfs_server::service::begin': }
+  anchor {'infinityfs_server::slave::service::begin': }
     -> Class['firewall']
     -> Class['infinityfs_server::firewall::firewall_app']
-    -> Service[$infinityfs_server::params::package_and_service_name]
-    anchor {'infinityfs_server::service::end': }
+    -> Service[$infinityfs_server::params::package_and_service_name_slave]
+    anchor {'infinityfs_server::slave::service::end': }
 }
