@@ -148,8 +148,8 @@ rolesToClass = {
   'USER_MASTER_MANAGER': 'cosmos_user::user_master_manager',
   'USER_SLAVE_MANAGER': 'cosmos_user::user_slave_manager',
   'INFINITY_HFS_DRIVER': 'infinityfs_driver',
-  'INFINITY_HFS_SERVER_MASTER': 'infinityfs_server::master',
-  'INFINITY_HFS_SERVER_SLAVE': 'infinityfs_server::slave'
+  'INFINITY_HFS_MASTER_SERVER': 'infinityfs_server::master',
+  'INFINITY_HFS_SLAVE_PROXY': 'infinityfs_server::slave'
 }
 
 serviceStates = {

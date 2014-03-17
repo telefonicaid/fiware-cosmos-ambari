@@ -16,7 +16,11 @@
 
     <components>
         <component>
-            <name>INFINITY_HFS_SERVER</name>
+            <name>INFINITY_HFS_MASTER_SERVER</name>
+            <category>MASTER</category>
+        </component>
+        <component>
+            <name>INFINITY_HFS_SLAVE_PROXY</name>
             <category>SLAVE</category>
         </component>
     </components>
