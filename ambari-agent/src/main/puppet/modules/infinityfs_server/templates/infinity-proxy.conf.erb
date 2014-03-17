@@ -2,7 +2,7 @@
 # The Infinity Datanode Secure Proxy Server
 #
 server {
-  listen  <%= @infinity_server_port %> default_server;
+  listen  <%= @server_port_slave %> default_server;
   server_name  _;
 
   # Matches URLs /[MD5_HASH]/[TIMESTAMP]/[URL_TAIL]
@@ -10,7 +10,7 @@ server {
     #[MD5_HASH],[TIMESTAMP]
     secure_link $1,$2;
 
-    secure_link_md5 <%= @infinity_secure_phrase_template %>;
+    secure_link_md5 <%= @proxy_secure_phrase_template %>;
 
 
     if ($secure_link = "") {

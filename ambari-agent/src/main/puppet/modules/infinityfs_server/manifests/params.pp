@@ -12,8 +12,10 @@ class infinityfs_server::params inherits hdp::params {
 
   $blocked_ports_master            = split($infinity_configuration['blocked_ports_master'], ',')
   $blocked_ports_slave             = split($infinity_configuration['blocked_ports_slave'], ',')
-  $infinity_server_port            = $infinity_configuration['server_port']
-  $infinity_secure_phrase_template = $infinity_configuration['secure_phrase_template']
+  #TODO: Inject $server_port_master to infinity-server config
+  $server_port_master              = $infinity_configuration['server_port_master']
+  $server_port_slave               = $infinity_configuration['server_port_slave']
+  $proxy_secure_phrase_template    = $infinity_configuration['proxy_secure_phrase_template']
   $hdfs_datanode_address           = $infinity_configuration['hdfs_datanode_address']
 
   $allowed_sources                 = $hdp::params::all_hosts
