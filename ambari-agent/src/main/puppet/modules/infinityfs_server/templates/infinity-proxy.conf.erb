@@ -1,0 +1,51 @@
+#
+# The Infinity Datanode Secure Proxy Server
+#
+server {
+  listen  <%= @server_port_slave %> default_server;
+  server_name  _;
+
+  # Matches URLs /[MD5_HASH]/[TIMESTAMP]/[URL_TAIL]
+  location ~ /([^/]+)/([^/]+)/(.*) {
+    #[MD5_HASH],[TIMESTAMP]
+    secure_link $1,$2;
+
+    secure_link_md5 <%= @proxy_secure_phrase_template %>;
+
+
+    if ($secure_link = "") {
+        return 403;
+    }
+
+    ## The current local time is greater than the specified expiration time.
+    if ($secure_link = "0") {
+       return 403;
+    }
+
+    # Rewrite URL to be proxied as /[URL_TAIL]?[ARGS]
+    rewrite /([^/]+)/([^/]+)/(.*)  /$3?$args break;
+    proxy_set_header X-Real-IP  $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Host $host;
+    proxy_pass <%= @hdfs_datanode_address %>;
+  }
+
+  error_page  404              /404.html;
+  location = /404.html {
+      root   /usr/share/nginx/html;
+  }
+
+  # redirect server error pages to the static page /50x.html
+  #
+  error_page   500 502 503 504  /50x.html;
+  location = /50x.html {
+      root   /usr/share/nginx/html;
+  }
+
+  # Deny access to everything else
+  location / {
+    deny all;
+  }
+}
+
+

@@ -7,22 +7,22 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinityfs_server($service_state) {
+class infinityfs_server::master($service_state) {
 
   case $service_state {
     'installed_and_configured' : {
-      include infinityfs_server::package
-      anchor {'infinityfs_server::begin' :}
-        -> Class['infinityfs_server::package']
-        -> anchor {'infinityfs_server::end': }
+      include infinityfs_server::master::package
+      anchor {'infinityfs_server::master::begin' :}
+        -> Class['infinityfs_server::master::package']
+        -> anchor {'infinityfs_server::master::end': }
     }
     'running', 'stopped' :       {
-      class { 'infinityfs_server::service':
+      class { 'infinityfs_server::master::service':
         service_state => $service_state
       }
-      anchor {'infinityfs_server::begin' :}
-        -> Class['infinityfs_server::service']
-        -> anchor {'infinityfs_server::end': }
+      anchor {'infinityfs_server::master::begin' :}
+        -> Class['infinityfs_server::master::service']
+        -> anchor {'infinityfs_server::master::end': }
     }
   }
 }
