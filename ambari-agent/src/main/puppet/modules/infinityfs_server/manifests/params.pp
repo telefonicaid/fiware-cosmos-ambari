@@ -8,7 +8,7 @@
 # All rights reserved.
 
 class infinityfs_server::params inherits hdp::params {
-  $infinity_configuration          = $configuration['infinityfs_server']
+  $infinity_configuration          = $configuration['infinityfs-server']
 
   $blocked_ports_master            = split($infinity_configuration['blocked_ports_master'], ',')
   $blocked_ports_slave             = split($infinity_configuration['blocked_ports_slave'], ',')
