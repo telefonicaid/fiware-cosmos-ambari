@@ -7,8 +7,8 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinityfs_server::master::service($service_state) {
-  include infinityfs_server::params
+class infinity_server::master::service($service_state) {
+  include infinity_server::params
 
   notice("Starting Infinity Server")
 
@@ -16,17 +16,17 @@ class infinityfs_server::master::service($service_state) {
     ensure => $service_state
   }
 
-  class { 'infinityfs_server::firewall::firewall_app' :
-      blocked_ports => $infinityfs_server::params::blocked_ports_master
+  class { 'infinity_server::firewall::firewall_app' :
+      blocked_ports => $infinity_server::params::blocked_ports_master
   }
 
-  service { $infinityfs_server::params::package_and_service_name_master :
+  service { $infinity_server::params::package_and_service_name_master :
     ensure => $service_state
   }
 
-  anchor {'infinityfs_server::service::begin': }
+  anchor {'infinity_server::service::begin': }
     -> Class['firewall']
-    -> Class['infinityfs_server::firewall::firewall_app']
-    -> Service[$infinityfs_server::params::package_and_service_name_master]
-    anchor {'infinityfs_server::service::end': }
+    -> Class['infinity_server::firewall::firewall_app']
+    -> Service[$infinity_server::params::package_and_service_name_master]
+    anchor {'infinity_server::service::end': }
 }

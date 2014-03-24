@@ -16,7 +16,7 @@
 
     <components>
         <component>
-            <name>INFINITY_HFS_DRIVER</name>
+            <name>INFINITY_DRIVER</name>
             <category>CLIENT</category>
         </component>
     </components>
