@@ -7,15 +7,6 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinityfs_driver($service_state) {
-  include infinityfs_driver::params
-
-  $ensure = $service_state ? {
-    'uninstalled' => absent,
-    default => $infinityfs_driver::params::install_ensure,
-  }
-
-  package { 'infinityfs':
-    ensure => $ensure
-  }
+class infinity_driver::params inherits hdp::params {
+  $install_ensure = "latest"
 }

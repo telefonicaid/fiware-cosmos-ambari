@@ -7,6 +7,15 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinityfs_driver::params inherits hdp::params {
-  $install_ensure = "latest"
+class infinity_driver($service_state) {
+  include infinity_driver::params
+
+  $ensure = $service_state ? {
+    'uninstalled' => absent,
+    default => $infinity_driver::params::install_ensure,
+  }
+
+  package { 'infinity-driver':
+    ensure => $ensure
+  }
 }

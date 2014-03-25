@@ -9,8 +9,8 @@
 # All rights reserved.
 #
 
-class infinityfs_server::firewall::firewall_app($blocked_ports) {
-  include infinityfs_server::params
+class infinity_server::firewall::firewall_app($blocked_ports) {
+  include infinity_server::params
 
   firewall { "999 HDFS blocked":
     dport  => $blocked_ports,
@@ -25,8 +25,8 @@ class infinityfs_server::firewall::firewall_app($blocked_ports) {
     source => '127.0.0.1',
   }
 
-  hdfs_allowed_source { $infinityfs_server::params::allowed_sources:
-    all_allowed_sources => $infinityfs_server::params::allowed_sources,
+  hdfs_allowed_source { $infinity_server::params::allowed_sources:
+    all_allowed_sources => $infinity_server::params::allowed_sources,
     allowed_ports       => $blocked_ports
   }
 

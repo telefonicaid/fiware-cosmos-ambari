@@ -7,7 +7,7 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinityfs_server::slave::config inherits infinityfs_server::params {
+class infinity_server::slave::config inherits infinity_server::params {
   $nginx_conf_dir = '/etc/nginx/conf.d'
 
   file { $nginx_conf_dir :
@@ -22,6 +22,6 @@ class infinityfs_server::slave::config inherits infinityfs_server::params {
     owner     => 'root',
     group     => 'root',
     mode      => '0644',
-    content   => template('infinityfs_server/infinity-proxy.conf.erb'),
+    content   => template('infinity_server/infinity-proxy.conf.erb'),
   }
 }

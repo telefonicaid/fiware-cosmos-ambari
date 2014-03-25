@@ -7,8 +7,8 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinityfs_server::slave::package {
-  include infinityfs_server::params, infinityfs_server::firewall::firewall_pre
+class infinity_server::master::package {
+  include infinity_server::params, infinity_server::firewall::firewall_pre
 
   notice("Installing Infinity Server")
 
@@ -16,11 +16,11 @@ class infinityfs_server::slave::package {
     purge => true
   }
 
-  package { $infinityfs_server::params::package_and_service_name_slave:
+  package { $infinity_server::params::package_and_service_name_master:
     ensure => installed
   }
 
-  anchor {'infinityfs_server::slave::package::begin': }
-    -> Class['infinityfs_server::firewall::firewall_pre']
-    anchor {'infinityfs_server::slave::package::end': }
+  anchor {'infinity_server::master::package::begin': }
+    -> Class['infinity_server::firewall::firewall_pre']
+    anchor {'infinity_server::master::package::end': }
 }
