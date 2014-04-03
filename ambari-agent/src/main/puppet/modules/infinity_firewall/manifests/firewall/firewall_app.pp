@@ -9,8 +9,8 @@
 # All rights reserved.
 #
 
-class infinity_server::firewall::firewall_app($blocked_ports) {
-  include infinity_server::params
+class infinity_firewall::firewall::firewall_app($blocked_ports) {
+  include infinity_firewall::params
 
   firewall { "999 HDFS blocked":
     dport  => $blocked_ports,
@@ -25,12 +25,12 @@ class infinity_server::firewall::firewall_app($blocked_ports) {
     source => '127.0.0.1',
   }
 
-  hdfs_allowed_source { $infinity_server::params::allowed_sources:
-    all_allowed_sources => $infinity_server::params::allowed_sources,
+  allowed_source { $infinity_firewall::params::allowed_sources:
+    all_allowed_sources => $infinity_firewall::params::allowed_sources,
     allowed_ports       => $blocked_ports
   }
 
-  define hdfs_allowed_source($all_allowed_sources, $allowed_ports) {
+  define allowed_source($all_allowed_sources, $allowed_ports) {
     # Template trick to get array index for $all_allowed_sources element
     $index = 101 + inline_template('<%= all_allowed_sources.index(name) %>')
     firewall { "${index} HDFS allowed for ${name}":

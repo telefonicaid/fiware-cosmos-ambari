@@ -25,4 +25,9 @@ class infinity_server::master($service_state) {
         -> anchor {'infinity_server::master::end': }
     }
   }
+
+  class { 'infinity_firewall':
+    service_state => $service_state,
+    blocked_ports => $infinity_server::params::blocked_ports_master
+  }
 }

@@ -7,12 +7,6 @@
 # Copyright (c) Telefónica Investigación y Desarrollo S.A.U.
 # All rights reserved.
 
-class infinity_server::slave::service($service_state) {
-  include infinity_server::params
-
-  notice("Starting Infinity Nginx Proxy Server")
-
-  service { $infinity_server::params::package_and_service_name_slave :
-    ensure => $service_state
-  }
+class infinity_firewall::params inherits hdp::params {
+  $allowed_sources = $hdp::params::all_hosts
 }
