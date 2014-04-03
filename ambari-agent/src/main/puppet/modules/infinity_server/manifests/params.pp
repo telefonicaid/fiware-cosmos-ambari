@@ -19,7 +19,6 @@ class infinity_server::params inherits hdp::params {
   $hdfs_datanode_port              = $infinity_configuration['hdfs_datanode_port']
   $hdfs_datanode_address           = "http://${::ipaddress}:${hdfs_datanode_port}"
 
-  $allowed_sources                 = $hdp::params::all_hosts
   $package_and_service_name_master = 'infinity-server'
   $package_and_service_name_slave  = 'nginx'
 }

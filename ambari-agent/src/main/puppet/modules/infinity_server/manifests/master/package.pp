@@ -8,19 +8,11 @@
 # All rights reserved.
 
 class infinity_server::master::package {
-  include infinity_server::params, infinity_server::firewall::firewall_pre
+  include infinity_server::params
 
   notice("Installing Infinity Server")
-
-  resources { "firewall":
-    purge => true
-  }
 
   package { $infinity_server::params::package_and_service_name_master:
     ensure => installed
   }
-
-  anchor {'infinity_server::master::package::begin': }
-    -> Class['infinity_server::firewall::firewall_pre']
-    anchor {'infinity_server::master::package::end': }
 }

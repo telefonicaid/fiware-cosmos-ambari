@@ -9,7 +9,7 @@
 # All rights reserved.
 #
 
-class infinity_server::firewall::firewall_pre {
+class infinity_firewall::firewall::firewall_pre {
 
   Firewall {
     require => undef,
