@@ -37,7 +37,7 @@ non_global_configuration_types = ["hdfs-site", "core-site",
                              "webhcat-site", "hdfs-exclude-file", "hue-site",
                              "yarn-site",
                              # Cosmos specific configurations
-                             "cosmos-user", "infinity-server"]
+                             "cosmos-user", "infinity-server", "infinity-driver"]
 
 #read static imports from file and write them to manifest
 def writeImports(outputFile, modulesdir, importsList):

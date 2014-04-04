@@ -9,4 +9,6 @@
 
 class infinity_driver::params inherits hdp::params {
   $install_ensure = "latest"
+  $infinity_configuration = $configuration['infinity-driver']
+  $blocked_ports = split($infinity_configuration['blocked_ports'], ',')
 }
