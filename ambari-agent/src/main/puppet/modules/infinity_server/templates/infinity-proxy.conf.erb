@@ -5,6 +5,11 @@ server {
   listen  <%= @server_port_slave %> default_server;
   server_name  _;
 
+  # SSL Configuration
+  ssl                  on;
+  ssl_certificate      <%= @ssl_certificate_file %>;
+  ssl_certificate_key  <%= @ssl_certificate_key_file %>;
+
   # Matches URLs /[MD5_HASH]/[TIMESTAMP]/[URL_TAIL]
   location ~ /([^/]+)/([^/]+)/(.*) {
     #[MD5_HASH],[TIMESTAMP]

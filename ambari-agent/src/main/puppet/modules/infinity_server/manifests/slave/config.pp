@@ -10,18 +10,43 @@
 class infinity_server::slave::config inherits infinity_server::params {
   $nginx_conf_dir = '/etc/nginx/conf.d'
 
+  # nginx configuration
   file { $nginx_conf_dir :
-    ensure => directory,
-    purge => true,
+    ensure  => directory,
+    purge   => true,
     recurse => true,
-    force => true
+    force   => true
   }
 
   file { "${nginx_conf_dir}/infinity-proxy.conf" :
-    ensure    => present,
-    owner     => 'root',
-    group     => 'root',
-    mode      => '0644',
-    content   => template('infinity_server/infinity-proxy.conf.erb'),
+    ensure  => present,
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0640',
+    content => template('infinity_server/infinity-proxy.conf.erb'),
+  }
+
+  # SSL configuration
+  file { $ssl_dir:
+    ensure => directory,
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0640'
+  }
+
+  file { $ssl_certificate_file:
+    ensure  => present,
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0640',
+    content => $ssl_certificate_content
+  }
+
+  file { $ssl_certificate_key_file:
+    ensure  => present,
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0640',
+    content => $ssl_certificate_key_content
   }
 }
