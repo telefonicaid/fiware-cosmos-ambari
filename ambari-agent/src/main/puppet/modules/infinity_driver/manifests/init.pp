@@ -18,4 +18,9 @@ class infinity_driver($service_state) {
   package { 'infinity-driver':
     ensure => $ensure
   }
+
+  class { 'infinity_firewall':
+    service_state => $service_state,
+    blocked_ports => $infinity_driver::params::blocked_ports
+  }
 }

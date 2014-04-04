@@ -15,17 +15,16 @@ class infinity_firewall($service_state, $blocked_ports) {
         purge => true
       }
       include infinity_firewall::firewall::firewall_pre
-    }
-    'running', 'stopped' : {
-      class { 'firewall':
-        ensure => $service_state
-      }
+
+      class { 'firewall': }
 
       class { 'infinity_firewall::firewall::firewall_app' :
         blocked_ports => $blocked_ports
       }
 
       anchor{'infinity_firewall::begin' :}
+      -> Resources['firewall']
+      -> Class['infinity_firewall::firewall::firewall_pre']
       -> Class['firewall']
       -> Class['infinity_firewall::firewall::firewall_app']
       -> anchor{'infinity_firewall::end' :}
