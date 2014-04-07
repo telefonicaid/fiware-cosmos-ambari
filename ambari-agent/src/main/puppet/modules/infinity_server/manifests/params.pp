@@ -19,6 +19,14 @@ class infinity_server::params inherits hdp::params {
   $hdfs_datanode_port              = $infinity_configuration['hdfs_datanode_port']
   $hdfs_datanode_address           = "http://${::ipaddress}:${hdfs_datanode_port}"
 
+  #SSL Parameters
+  $ssl_certificate_content         = $infinity_configuration['ssl_certificate_content']
+  $ssl_certificate_key_content     = $infinity_configuration['ssl_certificate_key_content']
+  $ssl_dir                         = '/etc/ssl/cosmos'
+  $ssl_certificate_file            = "${ssl_dir}/cosmos_cer.pem"
+  $ssl_certificate_key_file        = "${ssl_dir}/cosmos_key.pem"
+
+  $allowed_sources                 = $hdp::params::all_hosts
   $package_and_service_name_master = 'infinity-server'
   $package_and_service_name_slave  = 'nginx'
 }
