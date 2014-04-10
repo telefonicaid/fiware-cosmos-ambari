@@ -30,7 +30,9 @@ define hdp::java::package(
   $artifact_dir = $hdp::params::artifact_dir
   $jdk_location = $hdp::params::jdk_location
   $jdk_curl_target = "${artifact_dir}/${jdk_bin}"
- 
+  $java_env_filename = 'ambari-java-env.sh'
+  $java_env_file = "/etc/profile.d/${java_env_filename}"
+
   if ($size == "32") {
     $java_home = $hdp::params::java32_home
   } else {
@@ -57,7 +59,23 @@ define hdp::java::package(
  
   file { "${java_exec} ${name}":
   ensure => present
-  }   
+  }
+
+  ## Cosmos fix
+  # Create global profile file for java environment variables
+  # This function is called by multiple packages that need java
+  # The if guards from duplicate definitions of the same file
+  # It will only be defined the 1st time round
+  if ! defined(File[$java_env_file]) {
+    file { $java_env_file :
+      ensure  => present,
+      path    => $java_env_file,
+      owner   => 'root',
+      group   => 'root',
+      mode    => '0644',
+      content => template("${module_name}/${java_env_filename}.erb")
+    }
+  }
  
   if ($security_enabled == true) {
     hdp::java::jce::package{ $name:
@@ -67,7 +85,7 @@ define hdp::java::package(
     }
   }
 
-  anchor{"hdp::java::package::${name}::begin":} -> Exec["${curl_cmd} ${name}"] ->  Exec["${install_cmd} ${name}"] -> File["${java_exec} ${name}"] ->  anchor{"hdp::java::package::${name}::end":}
+  anchor{"hdp::java::package::${name}::begin":} -> Exec["${curl_cmd} ${name}"] ->  Exec["${install_cmd} ${name}"] -> File["${java_exec} ${name}"] -> anchor{"hdp::java::package::${name}::end":}
   if ($security_enabled == true) {
     File["${java_exec} ${name}"] -> Hdp::Java::Jce::Package[$name] 
   }
