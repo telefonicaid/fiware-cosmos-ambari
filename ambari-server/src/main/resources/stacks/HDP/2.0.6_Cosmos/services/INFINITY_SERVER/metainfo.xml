@@ -16,12 +16,8 @@
 
     <components>
         <component>
-            <name>INFINITY_MASTER_SERVER</name>
-            <category>MASTER</category>
-        </component>
-        <component>
-            <name>INFINITY_SLAVE_PROXY</name>
-            <category>SLAVE</category>
+            <name>INFINITY_SERVER</name>
+            <category>CLIENT</category>
         </component>
     </components>
 </metainfo>
