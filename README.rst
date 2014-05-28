@@ -4,7 +4,7 @@ Cosmos fork of Ambari
 
 This is the private fork of Ambari maintained by Cosmos to apply a (small) set of patches to the vanilla distribution.
 
-You can check the differences between cosmos-ambari and the original ambari repo by using git diff:
+You can check the differences between cosmos-ambari and the original ambari repo by using git diff::
 
     git remote add ambari https://github.com/apache/ambari
     git fetch ambari
