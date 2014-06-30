@@ -123,7 +123,6 @@ public class AmbariServer {
     ambariMetaInfo.init();
     LOG.info("********* Meta Info initialized **********");
 
-    performStaticInjection();
     addInMemoryUsers();
     server = new Server();
     serverForAgent = new Server();
@@ -341,6 +340,8 @@ public class AmbariServer {
       clusters.debugDump(clusterDump);
       LOG.info("********* Current Clusters State *********");
       LOG.info(clusterDump.toString());
+
+      performStaticInjection();
 
       LOG.info("********* Initializing ActionManager **********");
       ActionManager manager = injector.getInstance(ActionManager.class);

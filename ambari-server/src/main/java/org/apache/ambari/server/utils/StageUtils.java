@@ -238,6 +238,14 @@ public class StageUtils {
     List<String> allHostPingPorts = new ArrayList<String>();
     for (Host host : allHosts.values()) {
       allHostNames.add(host.getHostName());
+      while (host.getCurrentPingPort() == null) {
+        try {
+          LOG.warn("Ping port is null for " + host.getHostName() + ". Doing a busy wait until the port is set");
+          Thread.sleep(500);
+        } catch (InterruptedException e) {
+          // Do nothing if wait is interrupted
+        }
+      }
       allHostPingPorts.add(host.getCurrentPingPort() == null ? null : host.getCurrentPingPort().toString());
     }
     info.put("all_hosts", allHostNames);
